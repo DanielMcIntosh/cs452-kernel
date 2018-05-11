@@ -1,10 +1,22 @@
 #
 # Makefile for busy-wait IO tests
 #
+DEPDIR := .d
+SRCDIR := src
+BINDIR := bin
+LIBDIR := lib
+TOOLSDIR := tools
+INCLUDEDIR := include
+DOCSDIR := docs
+
+DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
+
+$(shell mkdir -p $(DEPDIR) >/dev/null)
+$(shell mkdir -p $(BINDIR) >/dev/null)
 XCC     = gcc
 AS	= as
 LD      = ld
-CFLAGS  = -c -std=c99 -fPIC -Wall -I. -I include -mcpu=arm920t -msoft-float
+CFLAGS  = $(DEPFLAGS) -c -std=c99 -fPIC -Wall -I. -I $(INCLUDEDIR) -mcpu=arm920t -msoft-float
 # -g: include hooks for gdb
 # -c: only compile
 # -mcpu=arm920t: generate code for the 920t architecture
@@ -14,32 +26,40 @@ CFLAGS  = -c -std=c99 -fPIC -Wall -I. -I include -mcpu=arm920t -msoft-float
 ASFLAGS	= -mcpu=arm920t -mapcs-32
 # -mapcs: always generate a complete stack frame
 
-LDFLAGS = -init main -Map bin/trains.map -N -T tools/orex.ld -L/u/wbcowan/gnuarm-4.0.2/lib/gcc/arm-elf/4.0.2 -L lib
+LDFLAGS = -init main -Map $(BINDIR)/trains.map -N -T $(TOOLSDIR)/orex.ld -L/u/wbcowan/gnuarm-4.0.2/lib/gcc/arm-elf/4.0.2 -L $(LIBDIR)
 
-SRCFILES = $(wildcard src/*.c)
-OBJFILES = $(patsubst src/%.c, bin/%.o, $(SRCFILES))
-ASMFILES = $(patsubst src/%.c, bin/%.s, $(SRCFILES))
+SRCFILES = $(wildcard $(SRCDIR)/*.c)
+OBJFILES = $(patsubst $(SRCDIR)/%.c, $(BINDIR)/%.o, $(SRCFILES))
+ASMFILES = $(patsubst $(SRCDIR)/%.c, $(BINDIR)/%.s, $(SRCFILES))
+
+POSTCOMPILE = @mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d && touch $@
 
 .PHONY = clean build
 
-all: bin/kernel.elf
+all: $(BINDIR)/kernel.elf
 
-bin/%.s: src/%.c 
-	$(XCC) -S $(CFLAGS) -o $@ $^
+$(BINDIR)/%.s: $(SRCDIR)/%.c $(DEPDIR)/%.d
+	$(XCC) -S $(CFLAGS) -o $@ $<
+	$(POSTCOMPILE)
 
-bin/%.o: src/%.s
-	$(AS) $(ASFLAGS) -o $@ $^
+$(BINDIR)/%.o: $(SRCDIR)/%.s
+	$(AS) $(ASFLAGS) -o $@ $<
 
-bin/kernel.elf: $(OBJFILES) $(ASMFILES)
-	$(LD) $(LDFLAGS) -o $@ bin/*.o -lbwio -lgcc
+$(BINDIR)/kernel.elf: $(OBJFILES) $(ASMFILES)
+	$(LD) $(LDFLAGS) -o $@ $(BINDIR)/*.o -lbwio -lgcc
+
+$(DEPDIR)/%.d: ;
+.PRECIOUS: $(DEPDIR)/%.d
 
 clean:
-	-rm -f bin/*
+	-rm -f $(BINDIR)/* $(DEPDIR)/*
 
 build: all clean
 
 install: all
-	@echo "cp bin/kernel.elf /u/cs452/tftp/ARM/baforbes/"
-	@cp bin/kernel.elf /u/cs452/tftp/ARM/baforbes/
+	@echo "cp $(BINDIR)/kernel.elf /u/cs452/tftp/ARM/baforbes/"
+	@cp $(BINDIR)/kernel.elf /u/cs452/tftp/ARM/baforbes/
 
 rebuild: clean all
+
+include $(wildcard $(patsubst %,$(DEPDIR)/%.d,$(basename $(SRCS))))

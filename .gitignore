@@ -3,3 +3,4 @@
 *.elf
 *.map
 todo.txt
+.d/*
