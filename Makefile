@@ -61,5 +61,6 @@ install: all
 	@cp $(BINDIR)/kernel.elf /u/cs452/tftp/ARM/baforbes/
 
 rebuild: clean all
+reinstall: clean install
 
 include $(wildcard $(patsubst %,$(DEPDIR)/%.d,$(basename $(SRCS))))

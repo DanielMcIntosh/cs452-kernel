@@ -6,7 +6,7 @@ typedef struct elem {
     unsigned int size;
 } elem_t;
 
-#define ELEM(x) {x, sizeof(x)}
-#define E(X) x, sizeof(x)
+#define ELEM(x) {x, sizeof(*x)}
+#define E(X) x, sizeof(*x)
 
 #endif
