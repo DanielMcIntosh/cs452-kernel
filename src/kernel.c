@@ -2,6 +2,16 @@
 #include <minheap.h>
 #include <elem.h>
 
+int kernel_init(){
+    
+    int * zerox28 = (int *) 0x28;
+    *(zerox28) = 0; // kernel entry point - set how? (using line directive?)
+    
+    return 0;
+}
+int schedule(); // TODO
+int activate(int s);
+int handle(int a);
 
 int main(){
     entry_t entries[400];
