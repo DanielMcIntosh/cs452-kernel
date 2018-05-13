@@ -1,7 +1,9 @@
 #include <ts7200.h>
 #include <circlebuffer.h>
 
-void cb_init(struct circlebuffer *cb) {
+void cb_init(struct circlebuffer *cb, char *buf, int size) {
+    cb->buf = buf;
+    cb->size = size;
     cb->rd = 0;
     cb->wr = 0;
     cb->empty = 1;
@@ -21,10 +23,19 @@ int cb_read(struct circlebuffer *cb, char *c){
     }
 
     *c = cb->buf[cb->rd];
-    cb->rd = (cb->rd+1) % CIRCLEBUFSIZE;
+    cb->rd = (cb->rd+1) % cb->size;
     if (cb->rd == cb->wr) 
         cb->empty = 1;
 
+    return 0;
+}
+
+int cb_peek(struct circlebuffer *cb, char *c){
+    if (cb_empty(cb)) {
+        return 1;
+    }
+
+    *c = cb->buf[cb->rd];
     return 0;
 }
 
@@ -60,7 +71,7 @@ int cb_write(struct circlebuffer *cb, char c){
     }
 
     cb->buf[cb->wr] = c;
-    cb->wr = (cb->wr + 1) % CIRCLEBUFSIZE;
+    cb->wr = (cb->wr + 1) % cb->size;
     cb->empty = 0;
     return 0;
 }
@@ -70,7 +81,7 @@ int cb_backspace(struct circlebuffer *cb){
         return 1;
     }
 
-    cb->wr = (cb->wr - 1) % CIRCLEBUFSIZE;
+    cb->wr = (cb->wr - 1) % cb->size;
     cb->empty = (cb->wr == cb->rd);
     return 0;
 }
