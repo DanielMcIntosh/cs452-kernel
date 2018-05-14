@@ -6,42 +6,41 @@
 #define TASK_BASE_TID_MASK (TASK_POOL_SIZE - 1)
 
 enum Priority {
-	PRIORITY_HIGHEST,
-	PRIORITY_LOWEST,
-	NUM_PRIORITIES
-}
+    PRIORITY_HIGHEST,
+    PRIORITY_LOWEST,
+    NUM_PRIORITIES
+};
 
 enum State {
-	STATE_READY
-}
+    STATE_READY
+};
 
-typedef struct task-descr
-{
-	//use task descriptors as the ready queues to avoid allocating extra memory
-	struct task-desc *rdy-next;
-	struct task-desc *rdy-prev;
+typedef struct taskdesc {
+    //use task descriptors as the ready queues to avoid allocating extra memory
+    struct taskdesc *rdynext;
+    struct taskdesc *rdyprev;
 
-	int tid;
-	int p_tid;
+    int tid;
+    int p_tid;
 
-	//these are probably better on the stack, but they're here for now as a reminder
-	int sp;
-	int lr;
-	int spsr;
-	int r0; //return value, since we might not be returning to this task which called 
+    int sp;
+    int lr;
+    //these might be better on the stack, but they're here for now as a reminder
+    int spsr;
+    int r0; //return value, since we might not be returning to this task which called 
 
-	State state;
-	Priority priority;
+    enum State state;
+    enum Priority priority;
 } TD;
 
 int task_init();
 int task_getTid(TD *task);
 int task_getParentTid(TD *task);
 TD *task_nextActive();
-int task_create(int parent_tid, Priority priority);
+int task_create(int parent_tid, enum Priority priority, int lr);
 
 static inline TD *task_lookup(TD **task_pool, int tid) {
-	return task_pool[tid & TASK_BASE_TID_MASK];
+    return task_pool[tid & TASK_BASE_TID_MASK];
 }
 
 #endif //TASKS_H
