@@ -2,6 +2,7 @@
 #include <minheap.h>
 #include <elem.h>
 #include <kernel.h>
+#include "tasks.h"
 
 #define FOREVER for(;;)
 
@@ -14,10 +15,8 @@ int kernel_init(){
     return 0;
 }
 
-typedef void task_t;
-task_t* schedule(){
-
-    return 0;
+TD* schedule(){
+    return task_nextActive();
 }
 
 inline static void __attribute__((always_inline)) update_cspr_mode(const int mode){
@@ -31,7 +30,7 @@ inline static void __attribute__((always_inline)) update_cspr_mode(const int mod
         : [mode] "i" (mode));
 }
 
-int __attribute__((noinline)) activate(task_t* task){
+int __attribute__((noinline)) activate(TD *task){
     int ret;
 
     int sp, cpsr_usr, pc_usr; // TEMP: get from task later
@@ -75,8 +74,35 @@ int __attribute__((noinline)) activate(task_t* task){
     return ret & 0x00FFFFFF;// drop first 8 bits
 }
 
-int handle(int a){
-
+int handle(int a, TD *task){
+    switch(a) {
+        case SYSCALL_CREATE:
+        {
+            break;
+        }
+        case SYSCALL_TID:
+        {
+            task->r0 = task_getTid(task);
+            break;
+        }
+        case SYSCALL_PTID:
+        {
+            task->r0 = task_getParentTid(task);
+            break;
+        }
+        case SYSCALL_PASS:
+        {
+            break;
+        }
+        case SYSCALL_EXIT:
+        {
+            break;
+        }
+        default:
+        {
+            break;
+        }
+    }
     return a;
 }
 
@@ -113,7 +139,13 @@ int test_minheap(){
 int main(){
     // test_minheap();
     kernel_init();
-    FOREVER handle(activate(schedule()));
+    TD task_pool[TASK_POOL_SIZE];
+    task_init(task_pool);
+
+    FOREVER {
+        TD *task = schedule();
+        handle(activate(task), task);
+    }
     Pass();
     bwputstr(COM2, "Passed?");
 
