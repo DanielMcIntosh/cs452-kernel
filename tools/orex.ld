@@ -2,7 +2,7 @@ ENTRY (main)
 
 MEMORY
 {
-ram : ORIGIN = 0x00000000, LENGTH = 32M
+ram : ORIGIN = 0x00218000, LENGTH = 32M
 rom : ORIGIN = 0x60000000, LENGTH = 8M
 }
 
@@ -19,7 +19,6 @@ bss : /* Uninitialized data. */
 {
 _BssStart = . ;
 *(.bss)
-*(COMMON)
 _BssEnd = . ;
 } >ram
 
