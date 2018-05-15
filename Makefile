@@ -16,7 +16,7 @@ $(shell mkdir -p $(BINDIR) >/dev/null)
 XCC     = gcc
 AS	= as
 LD      = ld
-CFLAGS  = $(DEPFLAGS) -c -std=c99 -fPIC -Wall -I. -I $(INCLUDEDIR) -mcpu=arm920t -msoft-float
+CFLAGS  = $(DEPFLAGS) -c -std=c99 -fPIC -Wall -I. -I $(INCLUDEDIR) -mcpu=arm920t -msoft-float -O0
 # -g: include hooks for gdb
 # -c: only compile
 # -mcpu=arm920t: generate code for the 920t architecture
@@ -26,7 +26,7 @@ CFLAGS  = $(DEPFLAGS) -c -std=c99 -fPIC -Wall -I. -I $(INCLUDEDIR) -mcpu=arm920t
 ASFLAGS	= -mcpu=arm920t -mapcs-32
 # -mapcs: always generate a complete stack frame
 
-LDFLAGS = -init main -Map $(BINDIR)/trains.map -N -T $(TOOLSDIR)/orex.ld -L/u/wbcowan/gnuarm-4.0.2/lib/gcc/arm-elf/4.0.2 -L $(LIBDIR)
+LDFLAGS = -init main -Map $(BINDIR)/kernel.map -N -T $(TOOLSDIR)/orex.ld -L/u/wbcowan/gnuarm-4.0.2/lib/gcc/arm-elf/4.0.2 -L $(LIBDIR)
 
 SRCFILES = $(wildcard $(SRCDIR)/*.c)
 OBJFILES = $(patsubst $(SRCDIR)/%.c, $(BINDIR)/%.o, $(SRCFILES))

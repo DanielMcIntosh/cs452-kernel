@@ -1,7 +1,7 @@
 #ifndef TASKS_H
 #define TASKS_H
 
-#define TASK_COUNTER_OFFSET 5
+#define TASK_COUNTER_OFFSET 1
 #define TASK_POOL_SIZE (0x1 << (TASK_COUNTER_OFFSET - 1))
 #define TASK_BASE_TID_MASK (TASK_POOL_SIZE - 1)
 
@@ -23,6 +23,8 @@ typedef struct taskdesc {
     int tid;
     int p_tid;
 
+    int sp_base; // for reuse
+
     int sp;
     int lr;
     //these might be better on the stack, but they're here for now as a reminder
@@ -33,7 +35,7 @@ typedef struct taskdesc {
     enum Priority priority;
 } TD;
 
-int task_init();
+int task_init(TD *task_pool, char *stack_space, unsigned int stack_space_size);
 int task_getTid(TD *task);
 int task_getParentTid(TD *task);
 TD *task_nextActive();

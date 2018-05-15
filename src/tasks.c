@@ -40,8 +40,9 @@ TD *init_task(TD *task, int parent_tid, enum Priority priority, int lr) {
     task->p_tid = parent_tid;
 
     task->lr = lr;
-    //sp needs to be handled
-    //spsr, r0 need to be handled, but might be best on the stack
+    task->sp = task->sp_base;
+    task->spsr = 16+64+128;
+    //r0 needs to be handled, but might be best on the stack
 
     task->state = STATE_READY;
     task->priority = priority;
@@ -69,7 +70,14 @@ int get_task(TD **ret) {
 //////////////////////////////////////////////////////
 //  EXPOSED
 //////////////////////////////////////////////////////
-int task_init(TD *task_pool) {
+int task_init(TD *task_pool, char * stack_space, unsigned int stack_space_size) {
+    int STACK_SPACE_PER_TASK = stack_space_size/TASK_POOL_SIZE;
+
+    for (int i = 0; i < TASK_POOL_SIZE; ++i) {
+        task_pool[i].sp_base = (int) stack_space;
+        stack_space += STACK_SPACE_PER_TASK;
+    }
+
 	for (int i = 0; i < TASK_POOL_SIZE - 1; ++i) {
 		task_pool[i].rdynext = task_pool+i+1;
 	}
@@ -122,6 +130,13 @@ int task_create(int parent_tid, enum Priority priority, int lr) {
 	}
 
     init_task(task, parent_tid, priority, lr);
+    // Store registers on stack
+    int task_sp = task->sp;
+    __asm__(
+        "stmdb %[task_sp]!, {r4,r5,r6,r7,r8,r9,r10,r11,r12,r14}\n\t" 
+        : [task_sp]"+r"(task_sp)
+    );
+    task->sp = task_sp;
 
     insert(task, priority);
 
