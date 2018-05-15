@@ -35,11 +35,11 @@ typedef struct taskdesc {
     enum Priority priority;
 } TD;
 
-int task_init(TD *task_pool, char *stack_space, unsigned int stack_space_size);
+int task_init(TD *task_pool, TD **queue_heads, char *stack_space, unsigned int stack_space_size);
 int task_getTid(TD *task);
 int task_getParentTid(TD *task);
-TD *task_nextActive();
-int task_create(int parent_tid, enum Priority priority, int lr);
+TD *task_nextActive(TD **queue_heads);
+int task_create(TD **queue_heads, TD **free_queue, int parent_tid, enum Priority priority, int lr);
 
 static inline TD *task_lookup(TD **task_pool, int tid) {
     return task_pool[tid & TASK_BASE_TID_MASK];

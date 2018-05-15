@@ -18,8 +18,8 @@ int kernel_init(){
     return 0;
 }
 
-TD* schedule(){
-    return task_nextActive();
+TD* schedule(TD **task_ready_queues){
+    return task_nextActive(task_ready_queues);
 }
 
 inline static void __attribute__((always_inline)) update_cspr_mode(const int mode){
@@ -185,21 +185,26 @@ void fak(){
 
 int main(){
     bwputstr(COM1, "Start!");
+
     kernel_init();
     bwputstr(COM1, "Kernel Init!");
-    TD task_pool[TASK_POOL_SIZE];
-    TD *ready_queues[NUM_PRIORITY];
+
     char stack_space[STACK_SPACE_SIZE];
     bwputstr(COM1, "Stack Space!");
-    task_init(task_pool, stack_space, STACK_SPACE_SIZE);
+
+    TD task_pool[TASK_POOL_SIZE];
+    TD *task_ready_queues[NUM_PRIORITIES];
+    TD *task_free_queue = task_pool;
+
+    task_init(task_pool, task_ready_queues, stack_space, STACK_SPACE_SIZE);
     bwputstr(COM1, "Task Init!");
-    task_create(0, PRIORITY_HIGHEST, (int) &fak);
+    task_create(task_ready_queues, &task_free_queue, 0, PRIORITY_HIGHEST, (int) &fak);
     bwputstr(COM1, "Task Created!");
     bwprintf(COM1, "&fak: %p", &fak);
 
     //FOREVER 
     for (int i = 0; i < 4; i++){
-        TD *task = schedule();
+        TD *task = schedule(task_ready_queues);
         bwputstr(COM1, "Task Scheduled!");
         handle(activate(task), task);
     }

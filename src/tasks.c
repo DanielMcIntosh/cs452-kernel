@@ -4,23 +4,9 @@
 #include "circlebuffer.h"
 
 //////////////////////////////////////////////////////
-//  PSEUDO-GLOBALS
-//////////////////////////////////////////////////////
-TD **get_queue_heads() {
-    static TD *queue_heads[NUM_PRIORITIES] = {0};
-    return queue_heads;
-}
-
-TD **get_free_queue() {
-    static TD **free_head;
-    return free_head;
-}
-
-//////////////////////////////////////////////////////
 //  HELPERS
 //////////////////////////////////////////////////////
-void insert(TD *task, enum Priority priority) {
-    TD **queue_heads = get_queue_heads();
+void insert(TD **queue_heads, TD *task, enum Priority priority) {
     TD *head = queue_heads[priority];
     TD *tail = head->rdyprev;
 
@@ -50,8 +36,7 @@ TD *init_task(TD *task, int parent_tid, enum Priority priority, int lr) {
     return task;
 }
 
-int get_task(TD **ret) {
-	TD **free_queue = get_free_queue();
+int get_task(TD **ret, TD **free_queue) {
     if (!(*free_queue)) {
         return -2;
     }
@@ -70,7 +55,7 @@ int get_task(TD **ret) {
 //////////////////////////////////////////////////////
 //  EXPOSED
 //////////////////////////////////////////////////////
-int task_init(TD *task_pool, char * stack_space, unsigned int stack_space_size) {
+int task_init(TD *task_pool, TD **queue_heads, char * stack_space, unsigned int stack_space_size) {
     int STACK_SPACE_PER_TASK = stack_space_size/TASK_POOL_SIZE;
 
     for (int i = 0; i < TASK_POOL_SIZE; ++i) {
@@ -88,9 +73,6 @@ int task_init(TD *task_pool, char * stack_space, unsigned int stack_space_size) 
 	}
 	task_pool[0].rdyprev = task_pool+TASK_POOL_SIZE-1;
 
-	*(get_free_queue()) = task_pool;
-
-	TD **queue_heads = get_queue_heads();
 	for (int i = 0; i < NUM_PRIORITIES; ++i) {
 		queue_heads[i] = 0;
 	}
@@ -105,9 +87,8 @@ int task_getParentTid(TD *task) {
     return task->p_tid;
 }
 
-TD *task_nextActive() {
-    TD **queue_heads = get_queue_heads();
-    for (int i = 0; i < NUM_PRIORITIES; ++i) {
+TD *task_nextActive(TD **queue_heads) {
+   for (int i = 0; i < NUM_PRIORITIES; ++i) {
         if (queue_heads[i]) {
             TD *active = queue_heads[i];
             queue_heads[i] = queue_heads[i]->rdynext;
@@ -118,14 +99,14 @@ TD *task_nextActive() {
     return 0;
 }
 
-int task_create(int parent_tid, enum Priority priority, int lr) {
+int task_create(TD **queue_heads, TD **free_queue, int parent_tid, enum Priority priority, int lr) {
 	TD *task;
 	int err;
 
 	if (priority >= NUM_PRIORITIES) {
 		return -1;
 	}
-	if ((err = get_task(&task))) {
+	if ((err = get_task(&task, free_queue))) {
 		return err;
 	}
 
@@ -138,7 +119,7 @@ int task_create(int parent_tid, enum Priority priority, int lr) {
     );
     task->sp = task_sp;
 
-    insert(task, priority);
+    insert(queue_heads, task, priority);
 
     return 0;
 }
