@@ -57,8 +57,8 @@ clean:
 build: all clean
 
 install: all
-	@echo "cp $(BINDIR)/kernel.elf /u/cs452/tftp/ARM/baforbes/"
-	@cp $(BINDIR)/kernel.elf /u/cs452/tftp/ARM/baforbes/
+	@echo "cp $(BINDIR)/kernel.elf /u/cs452/tftp/ARM/$(shell whoami)/"
+	@cp $(BINDIR)/kernel.elf /u/cs452/tftp/ARM/$(shell whoami)/
 
 rebuild: clean all
 reinstall: clean install
