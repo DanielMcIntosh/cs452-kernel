@@ -2,19 +2,25 @@
 #include "minheap.h"
 #include "elem.h"
 #include "circlebuffer.h"
+#include "bwio.h"
 
 //////////////////////////////////////////////////////
 //  HELPERS
 //////////////////////////////////////////////////////
 void insert(TD **queue_heads, TD *task, enum Priority priority) {
     TD *head = queue_heads[priority];
-    TD *tail = head->rdyprev;
+    if (!head) {
+        queue_heads[priority] = task;
+    }
+    else {
+        TD *tail = head->rdyprev;
 
-    tail->rdynext = task;
+        tail->rdynext = task;
+        task->rdyprev = tail;
+    }
+
     head->rdyprev = task;
-
     task->rdynext = head;
-    task->rdyprev = tail;
 }
 
 TD *init_task(TD *task, int parent_tid, enum Priority priority, int lr) {
@@ -27,7 +33,7 @@ TD *init_task(TD *task, int parent_tid, enum Priority priority, int lr) {
 
     task->lr = lr;
     task->sp = task->sp_base;
-    task->spsr = 16+64+128;
+    task->spsr = 16;
     //r0 needs to be handled, but might be best on the stack
 
     task->state = STATE_READY;
@@ -64,14 +70,14 @@ int task_init(TD *task_pool, TD **queue_heads, char * stack_space, unsigned int 
     }
 
 	for (int i = 0; i < TASK_POOL_SIZE - 1; ++i) {
-		task_pool[i].rdynext = task_pool+i+1;
+		task_pool[i].rdynext = &(task_pool[i+1]);
 	}
 	task_pool[TASK_POOL_SIZE-1].rdynext = task_pool;
 
 	for (int i = 1; i < TASK_POOL_SIZE; ++i) {
-		task_pool[i].rdyprev = task_pool+i-1;
+		task_pool[i].rdyprev = &(task_pool[i-1]);
 	}
-	task_pool[0].rdyprev = task_pool+TASK_POOL_SIZE-1;
+	task_pool[0].rdyprev = &(task_pool[TASK_POOL_SIZE-1]);
 
 	for (int i = 0; i < NUM_PRIORITIES; ++i) {
 		queue_heads[i] = 0;
@@ -103,6 +109,7 @@ int task_create(TD **queue_heads, TD **free_queue, int parent_tid, enum Priority
 	TD *task;
 	int err;
 
+    bwprintf(COM2, "lr = %d\r\n", lr);
 	if (priority >= NUM_PRIORITIES) {
 		return -1;
 	}
@@ -111,16 +118,25 @@ int task_create(TD **queue_heads, TD **free_queue, int parent_tid, enum Priority
 	}
 
     init_task(task, parent_tid, priority, lr);
+    bwprintf(COM2, "lr = %d\r\n", task->lr);
+
     // Store registers on stack
     int task_sp = task->sp;
     __asm__(
-        "stmdb %[task_sp]!, {r4,r5,r6,r7,r8,r9,r10,r11,r12,r14}\n\t" 
+        "stmdb %[task_sp]!, {r4-r12,r14}\n\t"
         : [task_sp]"+r"(task_sp)
     );
     task->sp = task_sp;
 
+    bwprintf(COM2, "lr = %d\r\n", task->lr);
     insert(queue_heads, task, priority);
-
+    bwprintf(COM2, "lr = %d\r\n", task->lr);
+    //*
+    TD *next_task = task_nextActive(queue_heads);
+    bwprintf(COM2, "lr = %d\r\n", next_task->lr);
+    next_task = task_nextActive(queue_heads);
+    bwprintf(COM2, "lr = %d\r\n", next_task->lr);
+    //*/
     return 0;
 }
 

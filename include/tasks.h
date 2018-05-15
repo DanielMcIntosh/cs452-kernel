@@ -25,8 +25,8 @@ typedef struct taskdesc {
 
     int sp_base; // for reuse
 
-    int sp;
     int lr;
+    int sp;
     //these might be better on the stack, but they're here for now as a reminder
     int spsr;
     int r0; //return value, since we might not be returning to this task which called 
