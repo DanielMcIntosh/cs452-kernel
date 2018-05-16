@@ -132,7 +132,7 @@ int task_create(TD **queue_heads, TD **free_queue, int parent_tid, enum Priority
     int task_sp = task->sp, task_sp_out;
     __asm__(
         "mov r0, %[task_sp_in]\n\t"
-        "stmdb r0!, {r4-r12,r14}\n\t"
+        "stmdb r0!, {r4-r12,lr}\n\t"
         "mov %[task_sp_out], r0"
         : [task_sp_out]"=r"(task_sp_out)
         : [task_sp_in]"r"(task_sp)

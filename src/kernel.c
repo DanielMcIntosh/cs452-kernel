@@ -168,6 +168,7 @@ int __attribute__((noinline)) activate(TD *task){
 */
 
 int handle(int a, TD *task){
+    bwprintf(COM2, "HANDLE: %d, %d", a, task);
     switch(a) {
         case SYSCALL_CREATE:
         {
@@ -201,8 +202,9 @@ int handle(int a, TD *task){
 }
 
 void fak(){
+        bwputstr(COM2, "#f\r\n");
     FOREVER {
-        bwputstr(COM2, "#believe");
+        bwputstr(COM2, "#believe\r\n");
         Pass();
     }
 
@@ -248,7 +250,7 @@ int main(){
     //*/
 
     //FOREVER 
-    for (int i = 0; i < 4; i++){
+    for (int i = 0; i < 1; i++){
         TD *task = schedule(task_ready_queues);
         bwputstr(COM2, "\r\nTask Scheduled!\r\ntask->lr = ");
         int task_lr = task->lr;
@@ -259,7 +261,11 @@ int main(){
             : [task_lr] "r" (task_lr)
         );
         bwputstr(COM2, "\r\n");
-        handle(activate(task), task);
+        int f = activate(task);
+        bwputc(COM2, f);
+        bwputstr(COM2, "\r\n");
+
+        handle(f, task);
     }
     //*/
     bwputstr(COM2, "Passed?");
