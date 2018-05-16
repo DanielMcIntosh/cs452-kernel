@@ -22,9 +22,7 @@ typedef struct taskdesc {
 
     int tid;
     int p_tid;
-
     int sp_base; // for reuse
-
     int lr;
     int sp;
     //these might be better on the stack, but they're here for now as a reminder

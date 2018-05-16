@@ -23,16 +23,17 @@ TD* schedule(TD **task_ready_queues){
     return task_nextActive(task_ready_queues);
 }
 
+extern int activate(int task);
+extern void KERNEL_ENTRY_POINT(void);
+
+/*
 inline static void __attribute__((always_inline)) update_cspr_mode(const int mode){
     __asm__(
-        /*
         "MRS r0, CPSR\n\t" // Get CPSR
         "BIC r0, r0, #0x1F\n\t"// Remove current mode
         "ORR r0, r0, %[mode]\n\t"// Substitute  // FIXME: This could be optimized.
         "MSR CPSR_c, r0\n\t" // 
-        /*/
         "MSR CPSR_c, %[mode]\n\t" // 
-        //*/
         : 
         : [mode] "i" (mode));
 }
@@ -71,13 +72,12 @@ int __attribute__((noinline)) activate(TD *task){
         :
         : [sp] "r" (sp));
     update_cspr_mode(0x13 | 0xC0); // 11. Switch to Supervisor mode.
-    /*
     __asm__(
         "mov lr, %[lr]\n\t"
         :
         :[lr]"r"(pc_usr)
     );
-    //*/
+    
     __asm__(
         DUMPR("r5")
         DUMPR("r5")
@@ -108,7 +108,6 @@ int __attribute__((noinline)) activate(TD *task){
     // KERNEL ENTER: ("after the context switch")
 
     // Acquire Args
-    /*
     int a1,a2,a3,a4;
     __asm__(
         "mov %[a1], r0\n\t"
@@ -119,7 +118,7 @@ int __attribute__((noinline)) activate(TD *task){
         :
         : "r0","r1","r2","r3"
     );
-    */
+    
 
     __asm__(
         DUMPR("r6")
@@ -166,6 +165,7 @@ int __attribute__((noinline)) activate(TD *task){
 
     return ret & 0x00FFFFFF;// drop first 8 bits
 }
+*/
 
 int handle(int a, TD *task){
     switch(a) {

@@ -31,9 +31,13 @@ TD *init_task(TD *task, int parent_tid, enum Priority priority, int lr) {
 
     task->p_tid = parent_tid;
 
+    __asm__("LR:":);
     task->lr = lr;
+    __asm__("SP:":);
     task->sp = task->sp_base;
+    __asm__("SPSR:":);
     task->spsr = 16;
+    __asm__("DONE:");
     //r0 needs to be handled, but might be best on the stack
 
     task->state = STATE_READY;
