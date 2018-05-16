@@ -51,7 +51,7 @@ int get_task(TD **ret, TD **free_queue) {
 
     //free queue doesn't actually use rdyprev, so don't bother with it
     if ((*free_queue)->rdynext == task) {
-    	(*free_queue)->rdynext = 0;
+        (*free_queue)->rdynext = 0;
     }
 
     *ret = task;
@@ -62,27 +62,29 @@ int get_task(TD **ret, TD **free_queue) {
 //  EXPOSED
 //////////////////////////////////////////////////////
 int task_init(TD *task_pool, TD **queue_heads, char * stack_space, unsigned int stack_space_size) {
-    int STACK_SPACE_PER_TASK = stack_space_size/TASK_POOL_SIZE;
+    int STACK_SPACE_PER_TASK = stack_space_size/TASK_POOL_SIZE - 4;
 
     for (int i = 0; i < TASK_POOL_SIZE; ++i) {
-        task_pool[i].sp_base = (int) stack_space;
+        //we write to the stack from the bottom up,
+        //so start with sp_base at the end of the allocated range for this task
         stack_space += STACK_SPACE_PER_TASK;
+        task_pool[i].sp_base = (int) stack_space;
     }
 
-	for (int i = 0; i < TASK_POOL_SIZE - 1; ++i) {
-		task_pool[i].rdynext = &(task_pool[i+1]);
-	}
-	task_pool[TASK_POOL_SIZE-1].rdynext = task_pool;
+    for (int i = 0; i < TASK_POOL_SIZE - 1; ++i) {
+        task_pool[i].rdynext = &(task_pool[i+1]);
+    }
+    task_pool[TASK_POOL_SIZE-1].rdynext = task_pool;
 
-	for (int i = 1; i < TASK_POOL_SIZE; ++i) {
-		task_pool[i].rdyprev = &(task_pool[i-1]);
-	}
-	task_pool[0].rdyprev = &(task_pool[TASK_POOL_SIZE-1]);
+    for (int i = 1; i < TASK_POOL_SIZE; ++i) {
+        task_pool[i].rdyprev = &(task_pool[i-1]);
+    }
+    task_pool[0].rdyprev = &(task_pool[TASK_POOL_SIZE-1]);
 
-	for (int i = 0; i < NUM_PRIORITIES; ++i) {
-		queue_heads[i] = 0;
-	}
-	return 0;
+    for (int i = 0; i < NUM_PRIORITIES; ++i) {
+        queue_heads[i] = 0;
+    }
+    return 0;
 }
 
 int task_getTid(TD *task) {
@@ -106,32 +108,40 @@ TD *task_nextActive(TD **queue_heads) {
 }
 
 int task_create(TD **queue_heads, TD **free_queue, int parent_tid, enum Priority priority, int lr) {
-	TD *task;
-	int err;
+    TD *task;
+    int err;
 
     bwprintf(COM2, "lr = %d\r\n", lr);
-	if (priority >= NUM_PRIORITIES) {
-		return -1;
-	}
-	if ((err = get_task(&task, free_queue))) {
-		return err;
-	}
+    if (priority >= NUM_PRIORITIES) {
+        return -1;
+    }
+    if ((err = get_task(&task, free_queue))) {
+        return err;
+    }
 
     init_task(task, parent_tid, priority, lr);
+    bwprintf(COM2, "task = %d\r\n", task);
     bwprintf(COM2, "lr = %d\r\n", task->lr);
+    bwprintf(COM2, "sp = %d\r\n", task->sp);
 
     // Store registers on stack
-    int task_sp = task->sp;
+    int task_sp = task->sp, task_sp_out;
     __asm__(
-        "stmdb %[task_sp]!, {r4-r12,r14}\n\t"
-        : [task_sp]"+r"(task_sp)
+        "mov r0, %[task_sp_in]\n\t"
+        "stmdb r0!, {r4-r12,r14}\n\t"
+        "mov %[task_sp_out], r0"
+        : [task_sp_out]"=r"(task_sp_out)
+        : [task_sp_in]"r"(task_sp)
+        : "r0"
     );
-    task->sp = task_sp;
+    task->sp = task_sp_out;
 
+    bwprintf(COM2, "sp = %d\r\n", task->sp);
+    bwprintf(COM2, "task = %d\r\n", task);
     bwprintf(COM2, "lr = %d\r\n", task->lr);
     insert(queue_heads, task, priority);
     bwprintf(COM2, "lr = %d\r\n", task->lr);
-    //*
+    /*
     TD *next_task = task_nextActive(queue_heads);
     bwprintf(COM2, "lr = %d\r\n", next_task->lr);
     next_task = task_nextActive(queue_heads);

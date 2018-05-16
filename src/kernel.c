@@ -6,7 +6,7 @@
 #include <bwio.h>
 
 #define FOREVER for(;;)
-#define STACK_SPACE_SIZE 160000
+#define STACK_SPACE_SIZE 0x1000
 
 #define DUMPR(x) "mov r0, #1\n\tmov r1, "x"\n\t bl bwputr\n\t"
 
@@ -122,8 +122,8 @@ int __attribute__((noinline)) activate(TD *task){
     */
 
     __asm__(
-        DUMPR("r4")
-        DUMPR("r5")
+        DUMPR("r6")
+        DUMPR("r6")
         DUMPR("r6")
         DUMPR("r7")
         DUMPR("r8")
@@ -235,7 +235,7 @@ int main(){
         :
         : [fak_ptr] "r" (fak_ptr)
     );
-    //*
+    /*
     TD *first_task = task_nextActive(task_ready_queues);
     bwprintf(COM2, "\r\ntask->p_tid: ");
     int p_tid = first_task->p_tid;
