@@ -19,21 +19,21 @@ int kernel_init(){
 }
 
 
-TD* schedule(TD **task_ready_queues){
-    return task_nextActive(task_ready_queues);
+TD* schedule(TD **task_ready_queues, TD **task_ready_queue_tails){
+    return task_nextActive(task_ready_queues, task_ready_queue_tails);
 }
 
-extern int activate(int task);
-extern void KERNEL_ENTRY_POINT(void);
-
-/*
+#if 0
 inline static void __attribute__((always_inline)) update_cspr_mode(const int mode){
     __asm__(
+        /*
         "MRS r0, CPSR\n\t" // Get CPSR
         "BIC r0, r0, #0x1F\n\t"// Remove current mode
         "ORR r0, r0, %[mode]\n\t"// Substitute  // FIXME: This could be optimized.
         "MSR CPSR_c, r0\n\t" // 
+        /*/
         "MSR CPSR_c, %[mode]\n\t" // 
+        //*/
         : 
         : [mode] "i" (mode));
 }
@@ -72,12 +72,13 @@ int __attribute__((noinline)) activate(TD *task){
         :
         : [sp] "r" (sp));
     update_cspr_mode(0x13 | 0xC0); // 11. Switch to Supervisor mode.
+    /*
     __asm__(
         "mov lr, %[lr]\n\t"
         :
         :[lr]"r"(pc_usr)
     );
-    
+    //*/
     __asm__(
         DUMPR("r5")
         DUMPR("r5")
@@ -108,6 +109,7 @@ int __attribute__((noinline)) activate(TD *task){
     // KERNEL ENTER: ("after the context switch")
 
     // Acquire Args
+    /*
     int a1,a2,a3,a4;
     __asm__(
         "mov %[a1], r0\n\t"
@@ -118,7 +120,7 @@ int __attribute__((noinline)) activate(TD *task){
         :
         : "r0","r1","r2","r3"
     );
-    
+    */
 
     __asm__(
         DUMPR("r6")
@@ -165,10 +167,9 @@ int __attribute__((noinline)) activate(TD *task){
 
     return ret & 0x00FFFFFF;// drop first 8 bits
 }
-*/
+#endif
 
 int handle(int a, TD *task){
-    bwprintf(COM2, "HANDLE: %d, %d", a, task);
     switch(a) {
         case SYSCALL_CREATE:
         {
@@ -202,9 +203,8 @@ int handle(int a, TD *task){
 }
 
 void fak(){
-        bwputstr(COM2, "#f\r\n");
     FOREVER {
-        bwputstr(COM2, "#believe\r\n");
+        bwputstr(COM2, "#believe");
         Pass();
     }
 
@@ -221,22 +221,16 @@ int main(){
 
     TD task_pool[TASK_POOL_SIZE] = {(TD){0}};
     TD *task_ready_queues[NUM_PRIORITIES];
+    TD *task_ready_queue_tails[NUM_PRIORITIES];
     TD *task_free_queue = task_pool;
 
-    task_init(task_pool, task_ready_queues, stack_space, STACK_SPACE_SIZE);
+    task_init(task_pool, task_ready_queues, task_ready_queue_tails, stack_space, STACK_SPACE_SIZE);
     bwputstr(COM2, "Task Init!");
 
-    task_create(task_ready_queues, &task_free_queue, 1, PRIORITY_HIGHEST, (int) &fak);
+    task_create(task_ready_queues, task_ready_queue_tails, &task_free_queue, 1, PRIORITY_HIGHEST, (int) &fak);
     bwputstr(COM2, "Task Created!\r\n");
 
-    bwprintf(COM2, "&fak: ");
-    int fak_ptr = (int) &fak;
-    __asm__(
-        "mov r4, %[fak_ptr]\n\t"
-        DUMPR("r4")
-        :
-        : [fak_ptr] "r" (fak_ptr)
-    );
+    bwprintf(COM2, "&fak: %x\r\n", (int) &fak);
     /*
     TD *first_task = task_nextActive(task_ready_queues);
     bwprintf(COM2, "\r\ntask->p_tid: ");
@@ -250,22 +244,12 @@ int main(){
     //*/
 
     //FOREVER 
-    for (int i = 0; i < 1; i++){
-        TD *task = schedule(task_ready_queues);
-        bwputstr(COM2, "\r\nTask Scheduled!\r\ntask->lr = ");
-        int task_lr = task->lr;
-        __asm__(
-            "mov r4, %[task_lr]\n\t"
-            DUMPR("r4")
-            :
-            : [task_lr] "r" (task_lr)
-        );
-        bwputstr(COM2, "\r\n");
-        int f = activate(task);
-        bwputc(COM2, f);
-        bwputstr(COM2, "\r\n");
-
-        handle(f, task);
+    for (int i = 0; i < 4; i++){
+        TD *task = schedule(task_ready_queues, task_ready_queue_tails);
+        bwprintf(COM2, "\r\nTask Scheduled!\r\n");
+        bwprintf(COM2, "task->lr = %x\r\n", task->lr);
+        bwprintf(COM2, "task->tid = %x\r\n", task->tid);
+        handle(activate(task), task);
     }
     //*/
     bwputstr(COM2, "Passed?");

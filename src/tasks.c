@@ -4,23 +4,25 @@
 #include "circlebuffer.h"
 #include "bwio.h"
 
+#define CIRCULAR
+
 //////////////////////////////////////////////////////
 //  HELPERS
 //////////////////////////////////////////////////////
-void insert(TD **queue_heads, TD *task, enum Priority priority) {
-    TD *head = queue_heads[priority];
-    if (!head) {
+void insert(TD **queue_heads, TD **queue_tails, TD *task, enum Priority priority) {
+    TD *tail = queue_tails[priority];
+    if (!tail) {
         queue_heads[priority] = task;
     }
     else {
-        TD *tail = head->rdyprev;
-
-        tail->rdynext = task;
-        task->rdyprev = tail;
+        queue_tails[priority]->rdynext = task;
     }
-
-    head->rdyprev = task;
-    task->rdynext = head;
+#ifdef CIRCULAR
+    task->rdynext = queue_heads[priority];
+#else
+    task->rdynext = 0;
+#endif
+    queue_tails[priority] = task;
 }
 
 TD *init_task(TD *task, int parent_tid, enum Priority priority, int lr) {
@@ -31,13 +33,9 @@ TD *init_task(TD *task, int parent_tid, enum Priority priority, int lr) {
 
     task->p_tid = parent_tid;
 
-    __asm__("LR:":);
     task->lr = lr;
-    __asm__("SP:":);
     task->sp = task->sp_base;
-    __asm__("SPSR:":);
     task->spsr = 16;
-    __asm__("DONE:");
     //r0 needs to be handled, but might be best on the stack
 
     task->state = STATE_READY;
@@ -51,12 +49,8 @@ int get_task(TD **ret, TD **free_queue) {
         return -2;
     }
     TD *task = *free_queue;
+    //free queue is linear, so we don't worry about looping around
     *free_queue = task->rdynext; 
-
-    //free queue doesn't actually use rdyprev, so don't bother with it
-    if ((*free_queue)->rdynext == task) {
-        (*free_queue)->rdynext = 0;
-    }
 
     *ret = task;
     return 0;
@@ -65,7 +59,7 @@ int get_task(TD **ret, TD **free_queue) {
 //////////////////////////////////////////////////////
 //  EXPOSED
 //////////////////////////////////////////////////////
-int task_init(TD *task_pool, TD **queue_heads, char * stack_space, unsigned int stack_space_size) {
+int task_init(TD *task_pool, TD **queue_heads, TD **queue_tails, char * stack_space, unsigned int stack_space_size) {
     int STACK_SPACE_PER_TASK = stack_space_size/TASK_POOL_SIZE - 4;
 
     for (int i = 0; i < TASK_POOL_SIZE; ++i) {
@@ -78,15 +72,11 @@ int task_init(TD *task_pool, TD **queue_heads, char * stack_space, unsigned int 
     for (int i = 0; i < TASK_POOL_SIZE - 1; ++i) {
         task_pool[i].rdynext = &(task_pool[i+1]);
     }
-    task_pool[TASK_POOL_SIZE-1].rdynext = task_pool;
-
-    for (int i = 1; i < TASK_POOL_SIZE; ++i) {
-        task_pool[i].rdyprev = &(task_pool[i-1]);
-    }
-    task_pool[0].rdyprev = &(task_pool[TASK_POOL_SIZE-1]);
+    task_pool[TASK_POOL_SIZE-1].rdynext = 0;
 
     for (int i = 0; i < NUM_PRIORITIES; ++i) {
         queue_heads[i] = 0;
+        queue_tails[i] = 0;
     }
     return 0;
 }
@@ -99,11 +89,18 @@ int task_getParentTid(TD *task) {
     return task->p_tid;
 }
 
-TD *task_nextActive(TD **queue_heads) {
+TD *task_nextActive(TD **queue_heads, TD **queue_tails) {
    for (int i = 0; i < NUM_PRIORITIES; ++i) {
         if (queue_heads[i]) {
             TD *active = queue_heads[i];
             queue_heads[i] = queue_heads[i]->rdynext;
+#ifdef CIRCULAR
+            if (queue_heads[i] == active) {
+#else
+            if (!queue_heads[i]) {
+#endif
+                queue_tails[i] = 0;
+            }
             return active;
         }
     }
@@ -111,11 +108,11 @@ TD *task_nextActive(TD **queue_heads) {
     return 0;
 }
 
-int task_create(TD **queue_heads, TD **free_queue, int parent_tid, enum Priority priority, int lr) {
+int task_create(TD **queue_heads, TD **queue_tails, TD **free_queue, int parent_tid, enum Priority priority, int lr) {
     TD *task;
     int err;
 
-    bwprintf(COM2, "lr = %d\r\n", lr);
+    bwprintf(COM2, "lr = %x\r\n", lr);
     if (priority >= NUM_PRIORITIES) {
         return -1;
     }
@@ -124,15 +121,15 @@ int task_create(TD **queue_heads, TD **free_queue, int parent_tid, enum Priority
     }
 
     init_task(task, parent_tid, priority, lr);
-    bwprintf(COM2, "task = %d\r\n", task);
-    bwprintf(COM2, "lr = %d\r\n", task->lr);
-    bwprintf(COM2, "sp = %d\r\n", task->sp);
+    bwprintf(COM2, "task = %x\r\n", task);
+    bwprintf(COM2, "lr = %x\r\n", task->lr);
+    bwprintf(COM2, "sp = %x\r\n", task->sp);
 
     // Store registers on stack
     int task_sp = task->sp, task_sp_out;
     __asm__(
         "mov r0, %[task_sp_in]\n\t"
-        "stmdb r0!, {r4-r12,lr}\n\t"
+        "stmdb r0!, {r4-r12,r14}\n\t"
         "mov %[task_sp_out], r0"
         : [task_sp_out]"=r"(task_sp_out)
         : [task_sp_in]"r"(task_sp)
@@ -140,16 +137,16 @@ int task_create(TD **queue_heads, TD **free_queue, int parent_tid, enum Priority
     );
     task->sp = task_sp_out;
 
-    bwprintf(COM2, "sp = %d\r\n", task->sp);
-    bwprintf(COM2, "task = %d\r\n", task);
-    bwprintf(COM2, "lr = %d\r\n", task->lr);
-    insert(queue_heads, task, priority);
-    bwprintf(COM2, "lr = %d\r\n", task->lr);
-    /*
-    TD *next_task = task_nextActive(queue_heads);
-    bwprintf(COM2, "lr = %d\r\n", next_task->lr);
-    next_task = task_nextActive(queue_heads);
-    bwprintf(COM2, "lr = %d\r\n", next_task->lr);
+    bwprintf(COM2, "sp = %x\r\n", task->sp);
+    bwprintf(COM2, "task = %x\r\n", task);
+    bwprintf(COM2, "lr = %x\r\n", task->lr);
+    insert(queue_heads, queue_tails, task, priority);
+    bwprintf(COM2, "lr = %x\r\n", task->lr);
+    //*
+    TD *next_task = task_nextActive(queue_heads, queue_tails);
+    bwprintf(COM2, "lr = %x\r\n", next_task->lr);
+    next_task = task_nextActive(queue_heads, queue_tails);
+    bwprintf(COM2, "lr = %x\r\n", next_task->lr);
     //*/
     return 0;
 }
