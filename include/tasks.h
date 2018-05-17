@@ -12,7 +12,10 @@ typedef enum {
 } Priority;
 
 typedef enum {
-    STATE_READY
+    STATE_READY,
+    STATE_BLOCKED,
+    STATE_ZOMBIE,
+    STATE_DESTROYED,
 } State;
 
 typedef struct taskdesc {
@@ -49,11 +52,11 @@ int task_getTid(TD *task);
 int task_getParentTid(TD *task);
 
 TD *task_nextActive(TD **queue_heads, TD **queue_tails);
-int task_enqueue(TD *task, TD **queue_heads, TD **queue_tails);
+int task_react_to_state(TD *task, TD **queue_heads, TD **queue_tails, TD **free_queue);
 int task_create(TD **queue_heads, TD **queue_tails, TD **free_queue, int parent_tid, Priority priority, int lr);
 
-static inline TD *task_lookup(TD **task_pool, int tid) {
-    return task_pool[tid & TASK_BASE_TID_MASK];
+static inline TD *task_lookup(TD *task_pool, int tid) {
+    return &(task_pool[tid & TASK_BASE_TID_MASK]);
 }
 
 #endif //TASKS_H

@@ -26,17 +26,18 @@ TD* schedule(TD **task_ready_queues, TD **task_ready_queue_tails){
 extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
 
-int handle(int a, TD *task, TD** task_ready_queues, TD** task_ready_queue_tails, TD** task_free_queue){
+Syscall handle(Syscall a, TD *task, TD *task_pool, TD** task_ready_queues, TD** task_ready_queue_tails, TD** task_free_queue){
     #if DEBUG
     bwprintf(COM2, "HANDLE: %d, %d\t", a, task);
     #endif
+    int arg0 = task->syscall_arg0, arg1 = task->syscall_arg1;
     switch(a) {
         case SYSCALL_CREATE:
         {
             #if DEBUG
             bwprintf(COM2, "TASK CREATE: %d, %d, %d\r\n", task_getTid(task), task->syscall_arg0, task->syscall_arg1);
             #endif
-            task->r0 = task_create(task_ready_queues, task_ready_queue_tails, task_free_queue, task_getTid(task), task->syscall_arg0, task->syscall_arg1);
+            task->r0 = task_create(task_ready_queues, task_ready_queue_tails, task_free_queue, task_getTid(task), arg0, arg1);
             break;
         }
         case SYSCALL_TID:
@@ -69,7 +70,47 @@ int handle(int a, TD *task, TD** task_ready_queues, TD** task_ready_queue_tails,
             #endif
             //don't re-queue the task, let it become a zombie task.
             //it will still be accessible by it's TID, since that gives us an index in the task pool
-            return a;
+            task->state = STATE_ZOMBIE;
+            break;
+        }
+        //////////////////////////////////////////////////////////////////////////////////////////////
+        //                              NOT FULLY IMPLEMENTED
+        //////////////////////////////////////////////////////////////////////////////////////////////
+        case SYSCALL_SEND:
+        {
+            TD *receiver = task_lookup(task_pool, arg0);
+            #if DEBUG
+            bwputstr(COM2, "SEND called\r\n");
+            bwprintf(COM2, "receiver = %d\r\n", receiver->tid);
+            #endif
+            if (receiver->state == STATE_BLOCKED)
+            {
+                receiver->state = STATE_READY;
+                task_react_to_state(receiver, task_ready_queues, task_ready_queue_tails, task_free_queue);
+            }
+            else {
+                //TODO: handle state when ready to receive a message
+            }
+            break;
+        }
+        case SYSCALL_RECEIVE:
+        {
+            #if DEBUG
+            bwputstr(COM2, "RECEIVE called\r\n");
+            #endif
+            //TODO: check if someone's already sent a message
+            task->state = STATE_BLOCKED;
+            break;
+        }
+        case SYSCALL_REPLY:
+        {
+            #if DEBUG
+            bwputstr(COM2, "REPLY called\r\n");
+            #endif
+            TD *sender = task_lookup(task_pool, arg0);
+            sender->state = STATE_READY;
+            task_react_to_state(sender, task_ready_queues, task_ready_queue_tails, task_free_queue);
+            break;
         }
         default:
         {
@@ -77,12 +118,19 @@ int handle(int a, TD *task, TD** task_ready_queues, TD** task_ready_queue_tails,
             break;
         }
     }
-    task_enqueue(task, task_ready_queues, task_ready_queue_tails);
+    task_react_to_state(task, task_ready_queues, task_ready_queue_tails, task_free_queue);
     return a;
 }
 
 void utsk(){
     int tid = MyTid();
+    if (tid == 3) {
+        int sender;
+        Receive(&sender, 0, 0);
+    }
+    else if (tid == 4) {
+        Send(3, 0, 0, 0, 0);
+    }
     int ptid = MyParentTID();
     bwprintf(COM2, "MyTid: %d, MyParentTid: %d\r\n", tid, ptid);
     Pass();
@@ -142,13 +190,12 @@ int main(){
         bwputstr(COM2, "\r\n");
         #endif
 
-        handle(f, task, task_ready_queues, task_ready_queue_tails, &task_free_queue);
+        handle(f, task, task_pool, task_ready_queues, task_ready_queue_tails, &task_free_queue);
         #if DEBUG
         bwputstr(COM2, "\r\n");
         #endif
         task = schedule(task_ready_queues, task_ready_queue_tails);
     }
-    //*/
     #if DEBUG
     bwputstr(COM2, "Passed?");
     #endif

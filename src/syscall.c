@@ -51,3 +51,17 @@ int MyParentTID(){
 int Create(int priority, void (*code)()){
     return syscall(SYSCALL_CREATE, priority, (int)code);
 }
+
+//TODO: pass more than 2 args
+int Send(int tid, char *msg, int msglen, char *reply, int rplen){
+    return syscall(SYSCALL_SEND, tid, 0);
+}
+
+int Receive(int *tid, char *msg, int msglen){
+    return syscall(SYSCALL_RECEIVE, tid, 0);
+}
+
+int Reply(int tid, char *reply, int rplen){
+    return syscall(SYSCALL_REPLY, tid, 0);
+}
+
