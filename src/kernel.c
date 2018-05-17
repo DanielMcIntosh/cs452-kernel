@@ -6,7 +6,7 @@
 #include <bwio.h>
 
 #define FOREVER for(;;)
-#define STACK_SPACE_SIZE 0x1000
+#define STACK_SPACE_SIZE 0x800000
 
 #define DUMPR(x) "mov r0, #1\n\tmov r1, "x"\n\t bl bwputr\n\t"
 
@@ -116,7 +116,7 @@ int main(){
     task_init(task_pool, task_ready_queues, task_ready_queue_tails, stack_space, STACK_SPACE_SIZE);
 
     int err = task_create(task_ready_queues, task_ready_queue_tails, &task_free_queue, 1, 4, (int) &fut);
-    if (err) {
+    if (err < 0) {
         bwprintf(COM2, "-=-=-=-=-=-=ERR = %d=-=-=-=-=-=-=-\r\n", err);
     }
     bwputstr(COM2, "Task Created!\r\n");
