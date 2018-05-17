@@ -49,6 +49,7 @@ int get_task(TD **ret, TD **free_queue) {
         return -2;
     }
     TD *task = *free_queue;
+
     //free queue is linear, so we don't worry about looping around
     *free_queue = task->rdynext; 
 
@@ -94,13 +95,11 @@ TD *task_nextActive(TD **queue_heads, TD **queue_tails) {
         if (queue_heads[i]) {
             TD *active = queue_heads[i];
             queue_heads[i] = queue_heads[i]->rdynext;
-#ifdef CIRCULAR
-            if (queue_heads[i] == active) {
-#else
+#ifndef CIRCULAR
             if (!queue_heads[i]) {
-#endif
                 queue_tails[i] = 0;
             }
+#endif
             return active;
         }
     }
@@ -112,11 +111,11 @@ int task_create(TD **queue_heads, TD **queue_tails, TD **free_queue, int parent_
     TD *task;
     int err;
 
-    bwprintf(COM2, "lr = %x\r\n", lr);
     if (priority >= NUM_PRIORITIES) {
         return -1;
     }
-    if ((err = get_task(&task, free_queue))) {
+    err = get_task(&task, free_queue);
+    if (err) {
         return err;
     }
 
@@ -137,16 +136,15 @@ int task_create(TD **queue_heads, TD **queue_tails, TD **free_queue, int parent_
     );
     task->sp = task_sp_out;
 
-    bwprintf(COM2, "sp = %x\r\n", task->sp);
     bwprintf(COM2, "task = %x\r\n", task);
     bwprintf(COM2, "lr = %x\r\n", task->lr);
+    bwprintf(COM2, "sp = %x\r\n", task->sp);
     insert(queue_heads, queue_tails, task, priority);
-    bwprintf(COM2, "lr = %x\r\n", task->lr);
-    //*
+    /*
     TD *next_task = task_nextActive(queue_heads, queue_tails);
-    bwprintf(COM2, "lr = %x\r\n", next_task->lr);
+    bwprintf(COM2, "task = %x\r\n", (int)next_task);
     next_task = task_nextActive(queue_heads, queue_tails);
-    bwprintf(COM2, "lr = %x\r\n", next_task->lr);
+    bwprintf(COM2, "task = %x\r\n", (int)next_task);
     //*/
     return 0;
 }

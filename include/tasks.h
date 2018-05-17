@@ -1,7 +1,7 @@
 #ifndef TASKS_H
 #define TASKS_H
 
-#define TASK_COUNTER_OFFSET 1
+#define TASK_COUNTER_OFFSET 3
 #define TASK_POOL_SIZE (0x1 << (TASK_COUNTER_OFFSET - 1))
 #define TASK_BASE_TID_MASK (TASK_POOL_SIZE - 1)
 

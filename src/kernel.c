@@ -27,7 +27,7 @@ extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
 
 int handle(int a, TD *task){
-    bwprintf(COM2, "HANDLE: %d, %d", a, task);
+    bwprintf(COM2, "HANDLE: %d, %d\t", a, task);
     switch(a) {
         case SYSCALL_CREATE:
         {
@@ -36,12 +36,13 @@ int handle(int a, TD *task){
         case SYSCALL_TID:
         {
             task->r0 = task_getTid(task);
+            bwprintf(COM2, "TID: %d\r\n", task->r0);
             break;
         }
         case SYSCALL_PTID:
         {
             task->r0 = task_getParentTid(task);
-            bwprintf(COM2, "PTID: %d", task->r0);
+            bwprintf(COM2, "PTID: %d\r\n", task->r0);
             break;
         }
         case SYSCALL_PASS:
@@ -77,44 +78,33 @@ int main(){
     bwputstr(COM2, "Start!");
 
     kernel_init();
-    bwputstr(COM2, "Kernel Init!");
-
     char stack_space[STACK_SPACE_SIZE];
-    bwputstr(COM2, "Stack Space!");
 
-    TD task_pool[TASK_POOL_SIZE] = {(TD){0}};
+    TD task_pool[TASK_POOL_SIZE];
     TD *task_ready_queues[NUM_PRIORITIES];
     TD *task_ready_queue_tails[NUM_PRIORITIES];
     TD *task_free_queue = task_pool;
 
     task_init(task_pool, task_ready_queues, task_ready_queue_tails, stack_space, STACK_SPACE_SIZE);
-    bwputstr(COM2, "Task Init!");
 
-    task_create(task_ready_queues, task_ready_queue_tails, &task_free_queue, 1, PRIORITY_HIGHEST, (int) &fak);
-    task_create(task_ready_queues, task_ready_queue_tails, &task_free_queue, 1000, PRIORITY_HIGHEST, (int) &fak);
+    int err = task_create(task_ready_queues, task_ready_queue_tails, &task_free_queue, 1, PRIORITY_HIGHEST, (int) &fak);
+    if (err) {
+        bwprintf(COM2, "err = %d\r\n", err);
+    }
+    err = task_create(task_ready_queues, task_ready_queue_tails, &task_free_queue, 1000, PRIORITY_HIGHEST, (int) &fak);
+    if (err) {
+        bwprintf(COM2, "err = %d\r\n", err);
+    }
     bwputstr(COM2, "Task Created!\r\n");
 
-    bwprintf(COM2, "&fak: ");
-    int fak_ptr = (int) &fak;
-    __asm__(
-        "mov r4, %[fak_ptr]\n\t"
-        DUMPR("r4")
-        :
-        : [fak_ptr] "r" (fak_ptr)
-    );
+    bwprintf(COM2, "&fak: %x\r\n", (int) &fak);
 
     //FOREVER 
     for (int i = 0; i < 10; i++){
         TD *task = schedule(task_ready_queues, task_ready_queue_tails);
-        bwputstr(COM2, "\r\nTask Scheduled!\r\ntask->lr = ");
-        int task_lr = task->lr;
-        __asm__(
-            "mov r4, %[task_lr]\n\t"
-            DUMPR("r4")
-            :
-            : [task_lr] "r" (task_lr)
-        );
-        bwputstr(COM2, "\r\n");
+        bwputstr(COM2, "Task Scheduled!\t\t");
+        bwprintf(COM2, "task = %x\t\t", (int) task);
+        bwprintf(COM2, "task->lr = %x\r\n", task->lr);
         int f = activate(task);
         bwputc(COM2, f);
         bwputstr(COM2, "\r\n");
