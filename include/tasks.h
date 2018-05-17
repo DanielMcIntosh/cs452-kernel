@@ -37,8 +37,7 @@ typedef struct taskdesc {
     int sp;
     int spsr;
     int r0; //return value, since we might not be returning to this task which called 
-    int syscall_arg0;
-    int syscall_arg1;
+    int syscall_args[5];
 
     int use_counter;
 
