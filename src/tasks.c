@@ -69,6 +69,7 @@ int task_init(TD *task_pool, TD **queue_heads, TD **queue_tails, char * stack_sp
         //so start with sp_base at the end of the allocated range for this task
         stack_space += STACK_SPACE_PER_TASK;
         task_pool[i].sp_base = (int) stack_space;
+        task_pool[i].tid = i;
     }
 
     for (int i = 0; i < TASK_POOL_SIZE - 1; ++i) {
