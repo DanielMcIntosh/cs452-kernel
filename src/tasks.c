@@ -4,12 +4,12 @@
 #include "circlebuffer.h"
 #include "bwio.h"
 
-#define CIRCULAR
+//#define CIRCULAR
 
 //////////////////////////////////////////////////////
 //  HELPERS
 //////////////////////////////////////////////////////
-void insert(TD **queue_heads, TD **queue_tails, TD *task, enum Priority priority) {
+void insert(TD **queue_heads, TD **queue_tails, TD *task, Priority priority) {
     TD *tail = queue_tails[priority];
     if (!tail) {
         queue_heads[priority] = task;
@@ -25,7 +25,7 @@ void insert(TD **queue_heads, TD **queue_tails, TD *task, enum Priority priority
     queue_tails[priority] = task;
 }
 
-TD *init_task(TD *task, int parent_tid, enum Priority priority, int lr) {
+TD *init_task(TD *task, int parent_tid, Priority priority, int lr) {
 
     static int task_counter = 0;
     int base_tid = task->tid & TASK_BASE_TID_MASK;
@@ -45,7 +45,7 @@ TD *init_task(TD *task, int parent_tid, enum Priority priority, int lr) {
     return task;
 }
 
-int get_task(TD **ret, TD **free_queue) {
+int fetch_task(TD **ret, TD **free_queue) {
     if (!(*free_queue)) {
         return -2;
     }
@@ -108,22 +108,24 @@ TD *task_nextActive(TD **queue_heads, TD **queue_tails) {
     return 0;
 }
 
-int task_create(TD **queue_heads, TD **queue_tails, TD **free_queue, int parent_tid, enum Priority priority, int lr) {
+int task_enqueue(TD *task, TD **queue_heads, TD **queue_tails) {
+    insert(queue_heads, queue_tails, task, task->priority);
+    return 0;
+}
+
+int task_create(TD **queue_heads, TD **queue_tails, TD **free_queue, int parent_tid, Priority priority, int lr) {
     TD *task;
     int err;
 
     if (priority >= NUM_PRIORITIES) {
         return -1;
     }
-    err = get_task(&task, free_queue);
+    err = fetch_task(&task, free_queue);
     if (err) {
         return err;
     }
 
     init_task(task, parent_tid, priority, lr);
-    bwprintf(COM2, "task = %x\r\n", task);
-    bwprintf(COM2, "lr = %x\r\n", task->lr);
-    bwprintf(COM2, "sp = %x\r\n", task->sp);
 
     // Store registers on stack
     int task_sp = task->sp, task_sp_out;
@@ -137,16 +139,11 @@ int task_create(TD **queue_heads, TD **queue_tails, TD **free_queue, int parent_
     );
     task->sp = task_sp_out;
 
-    bwprintf(COM2, "task = %x\r\n", task);
-    bwprintf(COM2, "lr = %x\r\n", task->lr);
+    bwprintf(COM2, "New task = %x\t", task);
+    bwprintf(COM2, "lr = %x\t", task->lr);
     bwprintf(COM2, "sp = %x\r\n", task->sp);
     insert(queue_heads, queue_tails, task, priority);
-    /*
-    TD *next_task = task_nextActive(queue_heads, queue_tails);
-    bwprintf(COM2, "task = %x\r\n", (int)next_task);
-    next_task = task_nextActive(queue_heads, queue_tails);
-    bwprintf(COM2, "task = %x\r\n", (int)next_task);
-    //*/
+
     return 0;
 }
 

@@ -54,18 +54,23 @@ int handle(int a, TD *task, TD** task_ready_queues, TD** task_ready_queue_tails,
         }
         case SYSCALL_EXIT:
         {
-            break;
+            bwputstr(COM2, "EXIT called\r\n");
+            //don't re-queue the task, let it become a zombie task.
+            //it will still be accessible by it's TID, since that gives us an index in the task pool
+            return a;
         }
         default:
         {
+            bwputstr(COM2, "UNKNOWN SYSCALL\r\n");
             break;
         }
     }
+    task_enqueue(task, task_ready_queues, task_ready_queue_tails);
     return a;
 }
 
 void fak(){
-        bwputstr(COM2, "#f\r\n");
+    bwputstr(COM2, "#f\r\n");
     FOREVER {
         bwputstr(COM2, "#believe\r\n");
         Pass();
@@ -112,7 +117,7 @@ int main(){
 
     int err = task_create(task_ready_queues, task_ready_queue_tails, &task_free_queue, 1, 4, (int) &fut);
     if (err) {
-        bwprintf(COM2, "err = %d\r\n", err);
+        bwprintf(COM2, "-=-=-=-=-=-=ERR = %d=-=-=-=-=-=-=-\r\n", err);
     }
     bwputstr(COM2, "Task Created!\r\n");
 
@@ -120,17 +125,18 @@ int main(){
     bwprintf(COM2, "&fut: %x\r\n", (int) &fut);
     bwprintf(COM2, "&utsk: %x\r\n", (int) &utsk);
 
-    //FOREVER 
-    for (int i = 0; i < 30; i++){
-        TD *task = schedule(task_ready_queues, task_ready_queue_tails);
-        bwputstr(COM2, "Task Scheduled!\t\t");
-        bwprintf(COM2, "task = %x\t\t", (int) task);
+    TD *task = schedule(task_ready_queues, task_ready_queue_tails);
+    while (task){
+        bwprintf(COM2, "Task Scheduled! Pr = %d\t", task->priority);
+        bwprintf(COM2, "task = %x\t", (int) task);
         bwprintf(COM2, "task->lr = %x\r\n", task->lr);
         int f = activate(task);
         bwputc(COM2, f);
         bwputstr(COM2, "\r\n");
 
         handle(f, task, task_ready_queues, task_ready_queue_tails, &task_free_queue);
+        bwputstr(COM2, "\r\n");
+        task = schedule(task_ready_queues, task_ready_queue_tails);
     }
     //*/
     bwputstr(COM2, "Passed?");

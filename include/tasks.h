@@ -5,15 +5,15 @@
 #define TASK_POOL_SIZE (0x1 << (TASK_COUNTER_OFFSET - 1))
 #define TASK_BASE_TID_MASK (TASK_POOL_SIZE - 1)
 
-enum Priority {
+typedef enum {
     PRIORITY_HIGHEST,
     PRIORITY_LOWEST = 8,
     NUM_PRIORITIES
-};
+} Priority;
 
-enum State {
+typedef enum {
     STATE_READY
-};
+} State;
 
 typedef struct taskdesc {
     // DO NOT FUCKING MODIFY THIS STRUCT WITHOUT A LOT OF FUCKING WARNING
@@ -38,15 +38,18 @@ typedef struct taskdesc {
     int syscall_arg0;
     int syscall_arg1;
 
-    enum State state;
-    enum Priority priority;
+    State state;
+    Priority priority;
 } TD;
 
 int task_init(TD *task_pool, TD **queue_heads, TD **queue_tails, char *stack_space, unsigned int stack_space_size);
+
 int task_getTid(TD *task);
 int task_getParentTid(TD *task);
+
 TD *task_nextActive(TD **queue_heads, TD **queue_tails);
-int task_create(TD **queue_heads, TD **queue_tails, TD **free_queue, int parent_tid, enum Priority priority, int lr);
+int task_enqueue(TD *task, TD **queue_heads, TD **queue_tails);
+int task_create(TD **queue_heads, TD **queue_tails, TD **free_queue, int parent_tid, Priority priority, int lr);
 
 static inline TD *task_lookup(TD **task_pool, int tid) {
     return task_pool[tid & TASK_BASE_TID_MASK];
