@@ -7,7 +7,7 @@
 
 enum Priority {
     PRIORITY_HIGHEST,
-    PRIORITY_LOWEST,
+    PRIORITY_LOWEST = 8,
     NUM_PRIORITIES
 };
 
@@ -35,6 +35,8 @@ typedef struct taskdesc {
     //these might be better on the stack, but they're here for now as a reminder
     int spsr;
     int r0; //return value, since we might not be returning to this task which called 
+    int syscall_arg0;
+    int syscall_arg1;
 
     enum State state;
     enum Priority priority;

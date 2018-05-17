@@ -1,4 +1,5 @@
 #include <kernel.h>
+#include <bwio.h>
 
 inline static __attribute__((always_inline)) int syscall(const int n, const int arg1, const int arg2){
     int ret;
@@ -14,7 +15,8 @@ __asm__(
     "mov r1, %[arg2]\n\t"
     "swi %[n]\n\t"
         :
-        : [n] "i" (n), [arg1] "ri" (arg1), [arg2] "ri" (arg2));
+        : [n] "i" (n), [arg1] "ri" (arg1), [arg2] "ri" (arg2)
+        : "r0", "r1");
 // Store r0 in memory (return value? what's r0 here)
 __asm__(
     "mov %[ret], r0\n\t"

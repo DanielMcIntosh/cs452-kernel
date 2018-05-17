@@ -26,11 +26,13 @@ TD* schedule(TD **task_ready_queues, TD **task_ready_queue_tails){
 extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
 
-int handle(int a, TD *task){
+int handle(int a, TD *task, TD** task_ready_queues, TD** task_ready_queue_tails, TD** task_free_queue){
     bwprintf(COM2, "HANDLE: %d, %d\t", a, task);
     switch(a) {
         case SYSCALL_CREATE:
         {
+            bwprintf(COM2, "TASK CREATE: %d, %d, %d\r\n", task_getTid(task), task->syscall_arg0, task->syscall_arg1);
+            task->r0 = task_create(task_ready_queues, task_ready_queue_tails, task_free_queue, task_getTid(task), task->syscall_arg0, task->syscall_arg1);
             break;
         }
         case SYSCALL_TID:
@@ -71,7 +73,28 @@ void fak(){
         int ptid = MyParentTID();
         bwprintf(COM2, "%d, %d\r\n", tid, ptid);
     }
+}
 
+void utsk(){
+    int tid = MyTid();
+    int ptid = MyParentTID();
+    bwprintf(COM2, "MyTid: %d, MyParentTid: %d\r\n", tid, ptid);
+    Pass();
+    bwprintf(COM2, "MyTid: %d, MyParentTid: %d\r\n", tid, ptid);
+    Exit();
+}
+
+void fut(){
+    int r = Create(PRIORITY_LOWEST, &utsk);
+    bwprintf(COM2, "Created: %d\r\n", r);
+    r = Create(PRIORITY_LOWEST, &utsk);
+    bwprintf(COM2, "Created: %d\r\n", r);
+    r = Create(PRIORITY_HIGHEST, &utsk);
+    bwprintf(COM2, "Created: %d\r\n", r);
+    r = Create(PRIORITY_HIGHEST, &utsk);
+    bwprintf(COM2, "Created: %d\r\n", r);
+    bwputstr(COM2, "FirstUserTask: exiting\r\n");
+    Exit();
 }
 
 int main(){
@@ -87,20 +110,18 @@ int main(){
 
     task_init(task_pool, task_ready_queues, task_ready_queue_tails, stack_space, STACK_SPACE_SIZE);
 
-    int err = task_create(task_ready_queues, task_ready_queue_tails, &task_free_queue, 1, PRIORITY_HIGHEST, (int) &fak);
-    if (err) {
-        bwprintf(COM2, "err = %d\r\n", err);
-    }
-    err = task_create(task_ready_queues, task_ready_queue_tails, &task_free_queue, 1000, PRIORITY_HIGHEST, (int) &fak);
+    int err = task_create(task_ready_queues, task_ready_queue_tails, &task_free_queue, 1, 4, (int) &fut);
     if (err) {
         bwprintf(COM2, "err = %d\r\n", err);
     }
     bwputstr(COM2, "Task Created!\r\n");
 
     bwprintf(COM2, "&fak: %x\r\n", (int) &fak);
+    bwprintf(COM2, "&fut: %x\r\n", (int) &fut);
+    bwprintf(COM2, "&utsk: %x\r\n", (int) &utsk);
 
     //FOREVER 
-    for (int i = 0; i < 10; i++){
+    for (int i = 0; i < 30; i++){
         TD *task = schedule(task_ready_queues, task_ready_queue_tails);
         bwputstr(COM2, "Task Scheduled!\t\t");
         bwprintf(COM2, "task = %x\t\t", (int) task);
@@ -109,7 +130,7 @@ int main(){
         bwputc(COM2, f);
         bwputstr(COM2, "\r\n");
 
-        handle(f, task);
+        handle(f, task, task_ready_queues, task_ready_queue_tails, &task_free_queue);
     }
     //*/
     bwputstr(COM2, "Passed?");

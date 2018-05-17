@@ -52,8 +52,10 @@ KERNEL_ENTRY_POINT:
 
     MRS r4, SPSR
     str r4, [r5, #24]
+    
+    str r0, [r5, #32]
+    str r1, [r5, #36] @ Put args into task struct
 
-    mov r3, r0
     ldr r0, [lr, #-4]
     and r0, r0, #0xFFFFFF @ Mask SWI bits from Return Value
 

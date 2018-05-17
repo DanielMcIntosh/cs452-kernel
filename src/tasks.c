@@ -30,6 +30,7 @@ TD *init_task(TD *task, int parent_tid, enum Priority priority, int lr) {
     static int task_counter = 0;
     int base_tid = task->tid & TASK_BASE_TID_MASK;
     task->tid = base_tid | (task_counter << TASK_COUNTER_OFFSET);
+    task_counter++;
 
     task->p_tid = parent_tid;
 
