@@ -43,6 +43,8 @@ typedef struct taskdesc {
 
     State state;
     Priority priority;
+
+    struct taskdesc *msg_queue;
 } TD;
 
 int task_init(TD *task_pool, TD **queue_heads, TD **queue_tails, char *stack_space, unsigned int stack_space_size);
