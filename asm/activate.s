@@ -31,10 +31,14 @@ activate:
 KERNEL_ENTRY_POINT:
 
 @ KERNEL ENTER: ("after the context switch")
+    str r0, [sp, #-4]! @we'll need to borrow r0 for the argument
     MSR CPSR_c, #0xDF
+    ldr r0, [sp], #4 @pop arg 5 from stack
     stmdb sp!, {r4-r12,lr}@ Push user registers onto active task stack
     mov r4, sp  @Save Stack Pointer
     MSR CPSR_c, #0xD3 @ Supervisor Mode
+
+    ldr r6, [sp], #4 @Get back original r0
     ldmia sp!, {r5} @load the task we're coming out of's TD*
 
     str r4, [r5, #20]
@@ -45,8 +49,12 @@ KERNEL_ENTRY_POINT:
     MRS r4, SPSR
     str r4, [r5, #24]
     
-    str r0, [r5, #32]
+    str r0, [r5, #48]
+    str r6, [r5, #32] @r6 is original r0
     str r1, [r5, #36] @ Put args into task struct
+    str r2, [r5, #40]
+    str r3, [r5, #44]
+
 
     ldr r0, [lr, #-4]
     and r0, r0, #0xFFFFFF @ Mask SWI bits from Return Value

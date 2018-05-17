@@ -4,6 +4,7 @@
 #include <kernel.h>
 #include <tasks.h>
 #include <bwio.h>
+#include <syscall.h>
 
 #define FOREVER for(;;)
 #define STACK_SPACE_SIZE 0x800000
@@ -30,12 +31,15 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TD** task_ready_queues, TD** 
     #if DEBUG
     bwprintf(COM2, "HANDLE: %d, %d\t", a, task);
     #endif
-    int arg0 = task->syscall_arg0, arg1 = task->syscall_arg1;
+    int arg0 = task->syscall_args[0], arg1 = task->syscall_args[1], arg2 = task->syscall_args[2], arg3 = task->syscall_args[3], arg4 = task->syscall_args[4];
+    #if DEBUG
+    bwprintf(COM2, "ARGS: %d, %d, %d, %d, %d\t", arg0, arg1, arg2, arg3, arg4);
+    #endif
     switch(a) {
         case SYSCALL_CREATE:
         {
             #if DEBUG
-            bwprintf(COM2, "TASK CREATE: %d, %d, %d\r\n", task_getTid(task), task->syscall_arg0, task->syscall_arg1);
+            bwprintf(COM2, "TASK CREATE: %d, %d, %d\r\n", task_getTid(task), arg0, arg1);
             #endif
             task->r0 = task_create(task_ready_queues, task_ready_queue_tails, task_free_queue, task_getTid(task), arg0, arg1);
             break;
@@ -126,10 +130,10 @@ void utsk(){
     int tid = MyTid();
     if (tid == 3) {
         int sender;
-        Receive(&sender, 0, 0);
+        Receive(&sender, 9990, 550);
     }
     else if (tid == 4) {
-        Send(3, 0, 0, 0, 0);
+        Send(3, 10, 20, 30, 40);
     }
     int ptid = MyParentTID();
     bwprintf(COM2, "MyTid: %d, MyParentTid: %d\r\n", tid, ptid);
@@ -178,6 +182,7 @@ int main(){
     #endif
 
     TD *task = schedule(task_ready_queues, task_ready_queue_tails);
+    bwprintf(COM2, "OFFSETS: lr %d, sp %d, r0 %d, spsr %d, args0 %d, arg4 %d, task %d", &(task->lr), &(task->sp), &(task->r0), &(task->spsr), &(task->syscall_args[0]), &(task->syscall_args[4]), task);
     while (task){
         #if DEBUG
         bwprintf(COM2, "Task Scheduled! Pr = %d\t", task->priority);

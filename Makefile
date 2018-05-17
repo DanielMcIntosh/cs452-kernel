@@ -41,7 +41,7 @@ POSTCOMPILE = @mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d && touch $@
 
 all: $(BINDIR)/kernel.elf
 
-$(BINDIR)/%.s: $(SRCDIR)/%.c $(DEPDIR)/%.d
+$(BINDIR)/%.s: $(SRCDIR)/%.c $(DEPDIR)/%.d $(INCLUDEDIR)/%.h
 	$(XCC) -S $(CFLAGS) -o $@ $<
 	$(POSTCOMPILE)
 
