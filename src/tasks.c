@@ -144,6 +144,6 @@ int task_create(TD **queue_heads, TD **queue_tails, TD **free_queue, int parent_
     bwprintf(COM2, "sp = %x\r\n", task->sp);
     insert(queue_heads, queue_tails, task, priority);
 
-    return 0;
+    return task_getTid(task);
 }
 
