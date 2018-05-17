@@ -1,13 +1,11 @@
 #include <kernel.h>
 
-#define ASM_STACK_PUSH(x) "str " x ", [sp, #-4]\n\t"
-#define ASM_STACK_POP(x) "ldr " x ", [sp], #4\n\t"
-
 inline static __attribute__((always_inline)) int syscall(const int n, const int arg1, const int arg2){
     int ret;
 // Save r0-r3 (on the stack?)
 // Insert any arguments in r0-r3 (i.e. pointer for create)
 __asm__(
+    ASM_STACK_PUSH("lr")
     ASM_STACK_PUSH("r0")
     ASM_STACK_PUSH("r1")
     ASM_STACK_PUSH("r2")
@@ -19,12 +17,15 @@ __asm__(
         : [n] "i" (n), [arg1] "ri" (arg1), [arg2] "ri" (arg2));
 // Store r0 in memory (return value? what's r0 here)
 __asm__(
-    "mov %[ret], r1\n\t"
+    "mov %[ret], r0\n\t"
     ASM_STACK_POP("r3")
     ASM_STACK_POP("r2")
     ASM_STACK_POP("r1")
     ASM_STACK_POP("r0")
-    : [ret] "=r"(ret));
+    ASM_STACK_POP("lr")
+    : [ret] "=r"(ret)
+    :
+    : "r0", "r1", "r2", "r3");
 // Re-load r0-r3
     return ret;
 }

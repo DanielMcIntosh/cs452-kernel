@@ -16,6 +16,8 @@ enum State {
 };
 
 typedef struct taskdesc {
+    // DO NOT FUCKING MODIFY THIS STRUCT WITHOUT A LOT OF FUCKING WARNING
+    
     //use task descriptors as the ready queues to avoid allocating extra memory
     struct taskdesc *rdynext;
 
@@ -23,6 +25,12 @@ typedef struct taskdesc {
     int p_tid;
     int sp_base; // for reuse
     int lr;
+    // _____________DO NOT______________
+    //             MODIFY
+    //           THIS STRUCT 
+    //     WITHOUT A LOT OF FUCKING WARNING
+
+    // The offsets are hard coded into asm/activate.s, so changing the fields WILL break the kernel.
     int sp;
     //these might be better on the stack, but they're here for now as a reminder
     int spsr;

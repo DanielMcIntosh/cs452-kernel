@@ -16,19 +16,18 @@ activate:
     stmdb sp!, {r0}
     @ r0 contains a pointer to the task struct
     mov r5, r0
-    ldr r4, [r5, #28] @ CSPR_USR
+    ldr r4, [r5, #24] @ CSPR_USR
     MSR SPSR_cxsf, r4 @ 5. Set SPSR_svc to CPSR_user, which will return it to user mode once movs is called.
        
-    ldr r4, [r5, #20] @LR
+    ldr r4, [r5, #16] @LR
     mov lr, r4
 
-    ldr r4, [r5, #32] @ Return Value
+    ldr r4, [r5, #28] @ Return Value
     @ If return values are buggy, consider moving to inside system mode
     mov r0, r4
 
-
     MSR CPSR_c,#0xDF
-    ldr r4, [r5, #24]
+    ldr r4, [r5, #20]
     mov sp, r4 @ Stack Pointer 
     ldmia sp!, {r4-r12,lr} @ 10. Reload registers from User Stack
     MSR CPSR_c, #0xD3 @ Supervisor Mode
@@ -46,13 +45,13 @@ KERNEL_ENTRY_POINT:
     MSR CPSR_c, #0xD3 @ Supervisor Mode
     ldmia sp!, {r5} @load the task we're coming out of's TD*
 
-    str r4, [r5, #24]
-
-    mov r4, lr @ Link Register from SWI
     str r4, [r5, #20]
 
+    mov r4, lr @ Link Register from SWI
+    str r4, [r5, #16]
+
     MRS r4, SPSR
-    str r4, [r5, #28]
+    str r4, [r5, #24]
 
     mov r3, r0
     ldr r0, [lr, #-4]
