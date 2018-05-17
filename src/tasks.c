@@ -65,15 +65,16 @@ int task_init(TD *task_pool, TD **queue_heads, TD **queue_tails, char * stack_sp
         //we write to the stack from the bottom up,
         //so start with sp_base at the end of the allocated range for this task
         stack_space += STACK_SPACE_PER_TASK;
-        task_pool[i].sp_base = (int) stack_space;
-        task_pool[i].tid = i;
-        task_pool[i].use_counter = 0;
+        task_lookup(task_pool, i)->sp_base = (int) stack_space;
+        task_lookup(task_pool, i)->state = STATE_DESTROYED;
+        task_lookup(task_pool, i)->tid = i;
+        task_lookup(task_pool, i)->use_counter = 0;
     }
 
     for (int i = 0; i < TASK_POOL_SIZE - 1; ++i) {
-        task_pool[i].rdynext = &(task_pool[i+1]);
+        task_lookup(task_pool, i)->rdynext = task_lookup(task_pool, i+1);
     }
-    task_pool[TASK_POOL_SIZE-1].rdynext = 0;
+    task_lookup(task_pool, TASK_POOL_SIZE-1)->rdynext = 0;
 
     for (int i = 0; i < NUM_PRIORITIES; ++i) {
         queue_heads[i] = 0;
@@ -107,8 +108,28 @@ TD *task_nextActive(TD **queue_heads, TD **queue_tails) {
     return 0;
 }
 
-int task_enqueue(TD *task, TD **queue_heads, TD **queue_tails) {
-    insert(queue_heads, queue_tails, task, task->priority);
+int task_react_to_state(TD *task, TD **queue_heads, TD **queue_tails, TD **free_queue) {
+    switch (task->state) {
+        case STATE_READY:
+        {
+            insert(queue_heads, queue_tails, task, task->priority);
+            break;
+        }
+        case STATE_BLOCKED:
+        {
+            break;
+        }
+        case STATE_ZOMBIE:
+        {
+            break;
+        }
+        case STATE_DESTROYED:
+        {
+            task->rdynext = *free_queue;
+            *free_queue = task;
+            break;
+        }
+    }
     return 0;
 }
 
@@ -142,6 +163,7 @@ int task_create(TD **queue_heads, TD **queue_tails, TD **free_queue, int parent_
     bwprintf(COM2, "lr = %x\t", task->lr);
     bwprintf(COM2, "sp = %x\r\n", task->sp);
     #endif
+    //insert the new task into the queues, the old one will be handled in task_react_to_state
     insert(queue_heads, queue_tails, task, priority);
 
     return task_getTid(task);
