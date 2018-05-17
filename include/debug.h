@@ -4,7 +4,7 @@
 #include <ts7200.h>
 #include <bwio.h>
 
-#define DEBUG 1
+#define DEBUG 0
 
 #define PANIC(x) bwputstr(COM2, x);\
     return 1;

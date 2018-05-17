@@ -26,18 +26,15 @@ void insert(TD **queue_heads, TD **queue_tails, TD *task, Priority priority) {
 }
 
 TD *init_task(TD *task, int parent_tid, Priority priority, int lr) {
-
-    static int task_counter = 0;
     int base_tid = task->tid & TASK_BASE_TID_MASK;
-    task->tid = base_tid | (task_counter << TASK_COUNTER_OFFSET);
-    task_counter++;
+    task->tid = base_tid | (task->use_counter << TASK_COUNTER_OFFSET);
+    task->use_counter++;
 
     task->p_tid = parent_tid;
 
     task->lr = lr;
     task->sp = task->sp_base;
     task->spsr = 16;
-    //r0 needs to be handled, but might be best on the stack
 
     task->state = STATE_READY;
     task->priority = priority;
@@ -70,6 +67,7 @@ int task_init(TD *task_pool, TD **queue_heads, TD **queue_tails, char * stack_sp
         stack_space += STACK_SPACE_PER_TASK;
         task_pool[i].sp_base = (int) stack_space;
         task_pool[i].tid = i;
+        task_pool[i].use_counter = 0;
     }
 
     for (int i = 0; i < TASK_POOL_SIZE - 1; ++i) {
@@ -139,10 +137,11 @@ int task_create(TD **queue_heads, TD **queue_tails, TD **free_queue, int parent_
         : "r0"
     );
     task->sp = task_sp_out;
-
+    #if DEBUG
     bwprintf(COM2, "New task = %x\t", task);
     bwprintf(COM2, "lr = %x\t", task->lr);
     bwprintf(COM2, "sp = %x\r\n", task->sp);
+    #endif
     insert(queue_heads, queue_tails, task, priority);
 
     return task_getTid(task);

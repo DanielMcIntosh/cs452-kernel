@@ -1,7 +1,7 @@
 #ifndef TASKS_H
 #define TASKS_H
 
-#define TASK_COUNTER_OFFSET 7
+#define TASK_COUNTER_OFFSET 8
 #define TASK_POOL_SIZE (0x1 << (TASK_COUNTER_OFFSET - 1))
 #define TASK_BASE_TID_MASK (TASK_POOL_SIZE - 1)
 
@@ -16,7 +16,7 @@ typedef enum {
 } State;
 
 typedef struct taskdesc {
-    // DO NOT FUCKING MODIFY THIS STRUCT WITHOUT A LOT OF FUCKING WARNING
+    // DO NOT MODIFY THIS STRUCT WITHOUT A LOT OF WARNING
     
     //use task descriptors as the ready queues to avoid allocating extra memory
     struct taskdesc *rdynext;
@@ -28,15 +28,16 @@ typedef struct taskdesc {
     // _____________DO NOT______________
     //             MODIFY
     //           THIS STRUCT 
-    //     WITHOUT A LOT OF FUCKING WARNING
+    //     WITHOUT A LOT OF WARNING
 
     // The offsets are hard coded into asm/activate.s, so changing the fields WILL break the kernel.
     int sp;
-    //these might be better on the stack, but they're here for now as a reminder
     int spsr;
     int r0; //return value, since we might not be returning to this task which called 
     int syscall_arg0;
     int syscall_arg1;
+
+    int use_counter;
 
     State state;
     Priority priority;
