@@ -31,17 +31,17 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TD** task_ready_queues, TD** 
     #if DEBUG
     bwprintf(COM2, "HANDLE: %d, %d\t", a, task);
     #endif
-    int arg0 = task->syscall_args[0], arg1 = task->syscall_args[1], arg2 = task->syscall_args[2], arg3 = task->syscall_args[3], arg4 = task->syscall_args[4];
+    int *args = task->syscall_args;
     #if DEBUG
-    bwprintf(COM2, "ARGS: %d, %d, %d, %d, %d\t", arg0, arg1, arg2, arg3, arg4);
+    bwprintf(COM2, "ARGS: %d, %d, %d, %d, %d\t", args[0], args[1], args[2], args[3], args[4]);
     #endif
     switch(a) {
         case SYSCALL_CREATE:
         {
             #if DEBUG
-            bwprintf(COM2, "TASK CREATE: %d, %d, %d\r\n", task_getTid(task), arg0, arg1);
+            bwprintf(COM2, "TASK CREATE: %d, %d, %d\r\n", task_getTid(task), args[0], args[1]);
             #endif
-            task->r0 = task_create(task_ready_queues, task_ready_queue_tails, task_free_queue, task_getTid(task), arg0, arg1);
+            task->r0 = task_create(task_ready_queues, task_ready_queue_tails, task_free_queue, task_getTid(task), args[0], args[1]);
             break;
         }
         case SYSCALL_TID:
@@ -82,18 +82,20 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TD** task_ready_queues, TD** 
         //////////////////////////////////////////////////////////////////////////////////////////////
         case SYSCALL_SEND:
         {
-            TD *receiver = task_lookup(task_pool, arg0);
+            TD *receiver = task_lookup(task_pool, args[0]);
             #if DEBUG
             bwputstr(COM2, "SEND called\r\n");
-            bwprintf(COM2, "receiver = %d\r\n", receiver->tid);
             #endif
             if (receiver->state == STATE_BLOCKED)
             {
                 receiver->state = STATE_READY;
+                *((int *)(receiver->syscall_args[0])) = task_getTid(task); //set the tid of the receive caller
                 task_react_to_state(receiver, task_ready_queues, task_ready_queue_tails, task_free_queue);
             }
             else {
-                //TODO: handle state when ready to receive a message
+                task->state = STATE_BLOCKED;
+                task->msg_queue = receiver->msg_queue;
+                receiver->msg_queue = task;
             }
             break;
         }
@@ -102,8 +104,16 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TD** task_ready_queues, TD** 
             #if DEBUG
             bwputstr(COM2, "RECEIVE called\r\n");
             #endif
-            //TODO: check if someone's already sent a message
-            task->state = STATE_BLOCKED;
+            TD *sender = task->msg_queue;
+            if (sender) {
+                *((int *)args[0]) = task_getTid(sender); //set the tid value
+                task->msg_queue = sender->msg_queue;
+                sender->msg_queue = 0;
+            }
+            else
+            {
+                task->state = STATE_BLOCKED;
+            }
             break;
         }
         case SYSCALL_REPLY:
@@ -111,7 +121,7 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TD** task_ready_queues, TD** 
             #if DEBUG
             bwputstr(COM2, "REPLY called\r\n");
             #endif
-            TD *sender = task_lookup(task_pool, arg0);
+            TD *sender = task_lookup(task_pool, args[0]);
             sender->state = STATE_READY;
             task_react_to_state(sender, task_ready_queues, task_ready_queue_tails, task_free_queue);
             break;
@@ -128,12 +138,14 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TD** task_ready_queues, TD** 
 
 void utsk(){
     int tid = MyTid();
-    if (tid == 3) {
+    if (tid == 4) {
         int sender;
         Receive(&sender, 9990, 550);
+        bwprintf(COM2, "sender = %d\r\n", sender);
+        Reply(sender, 0, 0);
     }
-    else if (tid == 4) {
-        Send(3, 10, 20, 30, 40);
+    else if (tid == 3) {
+        Send(4, 10, 20, 30, 40);
     }
     int ptid = MyParentTID();
     bwprintf(COM2, "MyTid: %d, MyParentTid: %d\r\n", tid, ptid);
