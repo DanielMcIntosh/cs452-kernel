@@ -7,6 +7,7 @@
 
 typedef enum {
     PRIORITY_HIGHEST,
+    PRIORITY_WAREHOUSE,
     PRIORITY_LOWEST = 8,
     NUM_PRIORITIES
 } Priority;

@@ -6,11 +6,7 @@
 #include <bwio.h>
 #include <syscall.h>
 #include <sys_handler.h>
-
-#define FOREVER for(;;)
-#define STACK_SPACE_SIZE 0x800000
-
-#define DUMPR(x) "mov r0, #1\n\tmov r1, "x"\n\t bl bwputr\n\t"
+#include <name.h>
 
 int kernel_init(){
     __asm__(
@@ -47,6 +43,8 @@ void utsk(){
 }
 
 void fut(){
+    int NS = Create(PRIORITY_WAREHOUSE, &task_nameserver);
+    bwprintf(COM2, "Created: %d\r\n", NS);
     int r = Create(PRIORITY_LOWEST, &utsk);
     bwprintf(COM2, "Created: %d\r\n", r);
     r = Create(PRIORITY_LOWEST, &utsk);
