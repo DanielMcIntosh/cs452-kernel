@@ -2,6 +2,7 @@
 #define SYS_HANDLER_H
 
 #include "syscall.h"
+#include "tasks.h"
 
 Syscall handle(Syscall a, TD *task, TD *task_pool, TD** task_ready_queues, TD** task_ready_queue_tails, TD** task_free_queue);
 

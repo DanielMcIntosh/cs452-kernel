@@ -2,6 +2,8 @@
 #include "debug.h"
 #include "bwio.h"
 #include "err.h"
+#include "tasks.h"
+#include "util.h"
 
 static inline void handle_create(TD *task, TD** task_ready_queues, TD** task_ready_queue_tails, TD** task_free_queue, int *args) {
     #if DEBUG
@@ -71,9 +73,9 @@ static inline void handle_send(TD *task, TD *task_pool, TD** task_ready_queues, 
         task->msg_queue = receiver->msg_queue;
         receiver->msg_queue = task;
 
-        task->msg_snd = args[1];
+        task->msg_snd = (int *)(args[1]);
         task->msg_snd_len = args[2];
-        task->msg_rpy = args[3];
+        task->msg_rpy = (int *)(args[3]);
         task->msg_rpy_len = args[4];
     }
 }
@@ -125,12 +127,12 @@ static inline void handle_reply(TD *task, TD *task_pool, TD** task_ready_queues,
     if (sender->msg_rpy_len < args[2]) {
         task->r0 = ERR_MSG_TRUNCATED;
         sender->r0 = ERR_MSG_TRUNCATED;
-        memcpy(sender->msg_rpy, args[1], sender->msg_rpy_len);
+        memcpy(sender->msg_rpy, (int *)(args[1]), sender->msg_rpy_len);
     }
     else {
         task->r0 = 0;
         sender->r0 = args[2];
-        memcpy(sender->msg_rpy, args[1], args[2]);   
+        memcpy(sender->msg_rpy, (int *)(args[1]), args[2]);   
     }
 
     sender->state = STATE_READY;
