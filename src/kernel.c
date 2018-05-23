@@ -5,6 +5,7 @@
 #include <tasks.h>
 #include <bwio.h>
 #include <syscall.h>
+#include <sys_handler.h>
 
 #define FOREVER for(;;)
 #define STACK_SPACE_SIZE 0x800000
@@ -26,115 +27,6 @@ TD* schedule(TD **task_ready_queues, TD **task_ready_queue_tails){
 
 extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
-
-Syscall handle(Syscall a, TD *task, TD *task_pool, TD** task_ready_queues, TD** task_ready_queue_tails, TD** task_free_queue){
-    #if DEBUG
-    bwprintf(COM2, "HANDLE: %d, %d\t", a, task);
-    #endif
-    int *args = task->syscall_args;
-    #if DEBUG
-    bwprintf(COM2, "ARGS: %d, %d, %d, %d, %d\t", args[0], args[1], args[2], args[3], args[4]);
-    #endif
-    switch(a) {
-        case SYSCALL_CREATE:
-        {
-            #if DEBUG
-            bwprintf(COM2, "TASK CREATE: %d, %d, %d\r\n", task_getTid(task), args[0], args[1]);
-            #endif
-            task->r0 = task_create(task_ready_queues, task_ready_queue_tails, task_free_queue, task_getTid(task), args[0], args[1]);
-            break;
-        }
-        case SYSCALL_TID:
-        {
-            task->r0 = task_getTid(task);
-            #if DEBUG
-            bwprintf(COM2, "TID: %d\r\n", task->r0);
-            #endif
-            break;
-        }
-        case SYSCALL_PTID:
-        {
-            task->r0 = task_getParentTid(task);
-            #if DEBUG
-            bwprintf(COM2, "PTID: %d\r\n", task->r0);
-            #endif
-            break;
-        }
-        case SYSCALL_PASS:
-        {
-            #if DEBUG
-            bwputstr(COM2, "PASS called\r\n");
-            #endif
-            break;
-        }
-        case SYSCALL_EXIT:
-        {
-            #if DEBUG
-            bwputstr(COM2, "EXIT called\r\n");
-            #endif
-            //don't re-queue the task, let it become a zombie task.
-            //it will still be accessible by it's TID, since that gives us an index in the task pool
-            task->state = STATE_ZOMBIE;
-            break;
-        }
-        //////////////////////////////////////////////////////////////////////////////////////////////
-        //                              NOT FULLY IMPLEMENTED
-        //////////////////////////////////////////////////////////////////////////////////////////////
-        case SYSCALL_SEND:
-        {
-            TD *receiver = task_lookup(task_pool, args[0]);
-            #if DEBUG
-            bwputstr(COM2, "SEND called\r\n");
-            #endif
-            if (receiver->state == STATE_BLOCKED)
-            {
-                receiver->state = STATE_READY;
-                *((int *)(receiver->syscall_args[0])) = task_getTid(task); //set the tid of the receive caller
-                task_react_to_state(receiver, task_ready_queues, task_ready_queue_tails, task_free_queue);
-            }
-            else {
-                task->state = STATE_BLOCKED;
-                task->msg_queue = receiver->msg_queue;
-                receiver->msg_queue = task;
-            }
-            break;
-        }
-        case SYSCALL_RECEIVE:
-        {
-            #if DEBUG
-            bwputstr(COM2, "RECEIVE called\r\n");
-            #endif
-            TD *sender = task->msg_queue;
-            if (sender) {
-                *((int *)args[0]) = task_getTid(sender); //set the tid value
-                task->msg_queue = sender->msg_queue;
-                sender->msg_queue = 0;
-            }
-            else
-            {
-                task->state = STATE_BLOCKED;
-            }
-            break;
-        }
-        case SYSCALL_REPLY:
-        {
-            #if DEBUG
-            bwputstr(COM2, "REPLY called\r\n");
-            #endif
-            TD *sender = task_lookup(task_pool, args[0]);
-            sender->state = STATE_READY;
-            task_react_to_state(sender, task_ready_queues, task_ready_queue_tails, task_free_queue);
-            break;
-        }
-        default:
-        {
-            bwputstr(COM2, "UNKNOWN SYSCALL\r\n");
-            break;
-        }
-    }
-    task_react_to_state(task, task_ready_queues, task_ready_queue_tails, task_free_queue);
-    return a;
-}
 
 void utsk(){
     int tid = MyTid();
