@@ -7,6 +7,9 @@
 #define ERR_NAME_UNREGISTERED -4
 #define ERR_NO_OPPONENT -5
 #define ERR_INVALID_ARGUMENT -6
+#define ERR_INVARIANT_BROKEN -7
+#define ERR_HT_FULL -8;
+#define ERR_HT_NOT_FOUND -9;
 
 
 #endif //ERR_H
