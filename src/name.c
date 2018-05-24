@@ -73,7 +73,7 @@ void task_nameserver(){
 int RegisterAs(char * name) {
     NameMessage msg;
     msg.id = MESSAGE_REGAS;
-    memcpy(msg.name, name, MAXNAMESIZE);
+    memcpy(msg.name, name, MAXNAMESIZE); // TODO legal name checking
     Send(TID_NS, (void *) &msg, sizeof(msg), (void*) &msg, sizeof(msg));
     return msg.tid;
 }

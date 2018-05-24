@@ -7,6 +7,7 @@
 #include <syscall.h>
 #include <sys_handler.h>
 #include <name.h>
+#include <util.h>
 
 int kernel_init(){
     __asm__(
@@ -24,6 +25,46 @@ TD* schedule(TD **task_ready_queues, TD **task_ready_queue_tails){
 extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
 
+void a(){
+    char c[2];
+    c[1] = NULL;
+    for (int i = 4; i < 200; i += 2) {
+        c[0] = i;
+        RegisterAs(c);
+    }
+    Exit();
+}
+void b(){
+    char c[3];
+    c[2] = NULL;
+    for (int i = 4; i < 200; i += 2) {
+        c[0] = i-1;
+        c[1] = 1;
+        RegisterAs(c);
+    }
+    Exit();
+}
+void c(){
+    char c[2];
+    c[1] = NULL;
+    for (int i = 4; i < 200; i+=2) {
+        c[0] = i;
+        bwprintf(COM2, "%s |-> %d\r\n", c, WhoIs(c));
+    }
+    char d[3];
+    for (int i = 4; i < 200; i += 2) {
+        d[0] = i-1;
+        d[1] = 1;
+        bwprintf(COM2, "%s |-> %d\r\n", d, WhoIs(d));
+    }
+    Exit();
+}
+
+void TestHashTable(){
+    Create(PRIORITY_LOWEST-2, &a);
+    Create(PRIORITY_LOWEST-1, &b);
+    Create(PRIORITY_LOWEST, &c);
+}
 void fut(){
     int r = Create(PRIORITY_WAREHOUSE, &task_nameserver);
     bwprintf(COM2, "Created: %d\r\n", r);
@@ -36,6 +77,8 @@ void fut(){
     bwputstr(COM2, "FirstUserTask: exiting\r\n");
     Exit();
 }
+
+
 
 int main(){
     #if DEBUG

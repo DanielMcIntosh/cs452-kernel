@@ -21,11 +21,7 @@ static int streq(char * a, char * b){
         if (*a++ != *b++)
             return 0;
     }
-    if ((*a == NULL && *b != NULL) || 
-        (*b == NULL && *a != NULL))
-        return 0;
-
-    return 1;
+    return *a == *b;
 }
 
 void ht_init(Hashtable *ht){
@@ -47,6 +43,7 @@ int ht_insert(Hashtable *ht, char *key, int value){
             hsh = 0;
         }
         if (n > HT_SIZE) {
+            bwprintf(COM2, "HT FULL: %d/%d\r\n", n, HT_SIZE);
             return ERR_HT_FULL;
         }
     }
@@ -67,9 +64,12 @@ int ht_lookup(Hashtable *ht, char * key){
             hsh = 0;
         }
         if (n > HT_SIZE) {
+            bwprintf(COM2, "HT NOT FOUND: %d/%d\r\n", n, HT_SIZE);
             return ERR_HT_NOT_FOUND;
         }
     }
+    #if DEBUG
     bwprintf(COM2, "Hash: %d |-> Value: %d\r\n", hsh, (*ht)[hsh].value);
+    #endif
     return (*ht)[hsh].value;
 }
