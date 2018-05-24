@@ -24,35 +24,15 @@ TD* schedule(TD **task_ready_queues, TD **task_ready_queue_tails){
 extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
 
-void utsk(){
-    int tid = MyTid();
-    if (tid == 4) {
-        int sender;
-        Receive(&sender, 9990, 550);
-        bwprintf(COM2, "sender = %d\r\n", sender);
-        Reply(sender, 0, 0);
-    }
-    else if (tid == 3) {
-        Send(4, 10, 20, 30, 40);
-    }
-    int ptid = MyParentTID();
-    bwprintf(COM2, "MyTid: %d, MyParentTid: %d\r\n", tid, ptid);
-    Pass();
-    bwprintf(COM2, "MyTid: %d, MyParentTid: %d\r\n", tid, ptid);
-    Exit();
-}
-
 void fut(){
-    int NS = Create(PRIORITY_WAREHOUSE, &task_nameserver);
-    bwprintf(COM2, "Created: %d\r\n", NS);
-    int r = Create(PRIORITY_LOWEST, &utsk);
+    int r = Create(PRIORITY_WAREHOUSE, &task_nameserver);
     bwprintf(COM2, "Created: %d\r\n", r);
-    r = Create(PRIORITY_LOWEST, &utsk);
-    bwprintf(COM2, "Created: %d\r\n", r);
-    r = Create(PRIORITY_HIGHEST, &utsk);
-    bwprintf(COM2, "Created: %d\r\n", r);
-    r = Create(PRIORITY_HIGHEST, &utsk);
-    bwprintf(COM2, "Created: %d\r\n", r);
+    r = RegisterAs("FUT");
+    bwprintf(COM2, "Registered As: \"FUT\" (%d)\r\n", r);
+    int iam = MyTid();
+    bwprintf(COM2, "I Am: %d\r\n", iam);
+    r = WhoIs("FUT");
+    bwprintf(COM2, "\"FUT\" is: %d\r\n", r);
     bwputstr(COM2, "FirstUserTask: exiting\r\n");
     Exit();
 }
@@ -80,11 +60,12 @@ int main(){
     #if DEBUG
     bwputstr(COM2, "Task Created!\r\n");
     bwprintf(COM2, "&fut: %x\r\n", (int) &fut);
-    bwprintf(COM2, "&utsk: %x\r\n", (int) &utsk);
     #endif
 
     TD *task = schedule(task_ready_queues, task_ready_queue_tails);
+    #if DEBUG
     bwprintf(COM2, "OFFSETS: lr %d, sp %d, r0 %d, spsr %d, args0 %d, arg4 %d, task %d", &(task->lr), &(task->sp), &(task->r0), &(task->spsr), &(task->syscall_args[0]), &(task->syscall_args[4]), task);
+    #endif
     while (task){
         #if DEBUG
         bwprintf(COM2, "Task Scheduled! Pr = %d\t", task->priority);

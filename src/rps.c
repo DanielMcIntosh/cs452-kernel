@@ -6,6 +6,7 @@
 #include <name.h>
 #include <err.h>
 #include <debug.h>
+#include <tasks.h>
 
 typedef struct {
     MessageType type;
@@ -30,21 +31,21 @@ int Quit(int rps_tid){
     return Send(rps_tid, (void*)&msg, sizeof(msg), (void*)&msg, sizeof(msg));
 }
 
-int wins(RPS a, RPS b){ // TODO: check if this is even correct
+int wins(RPS a, RPS b){
     if (a == b) return TIE;
     if ((a - b) % 3 == 1) return WIN;
     return LOSE;
 }
 
 typedef struct {
-    int games[100]; // TODO MAX_TIDs
-    int plays[100];
+    int games[TASK_POOL_SIZE];
+    int plays[TASK_POOL_SIZE];
     int unpaired; // this is single threaded - no point in a queue
 } RPSServer;
 
 void task_rps(){
     RPSServer rps;
-    for (int i = 0; i < 100; i++){
+    for (int i = 0; i < TASK_POOL_SIZE; i++){
         rps.games[i] = -1;
         rps.plays[i] = -1;
     }
@@ -89,10 +90,10 @@ void task_rps(){
                 } else {
                     rply.ret = wins(play, msg.move);
                     err = Reply(opp, (void*) &rply, sizeof(rply));
-                    ASSERT(err == 0, "Error recieving message",);
+                    ASSERT(err == 0, "Error replying to message",);
                     rply.ret = wins(msg.move, play);
                     err = Reply(tid, (void *) &rply, sizeof(rply));
-                    ASSERT(err == 0, "Error recieving message",);// TODO swich string to replying
+                    ASSERT(err == 0, "Error replying to message",);
                     rps.plays[opp] = -1;
                 }
             } else {

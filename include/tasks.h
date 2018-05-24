@@ -14,7 +14,9 @@ typedef enum {
 
 typedef enum {
     STATE_READY,
-    STATE_BLOCKED,
+    STATE_REPLY_BLOCKED,
+    STATE_SEND_BLOCKED,
+    STATE_RECEIVE_BLOCKED,
     STATE_ZOMBIE,
     STATE_DESTROYED,
 } State;
@@ -29,7 +31,7 @@ typedef struct taskdesc {
     int p_tid;
     int sp_base; // for reuse
     int lr;
-    // _____________DO NOT______________
+    // ____________DO NOT______________
     //             MODIFY
     //           THIS STRUCT 
     //     WITHOUT A LOT OF WARNING
@@ -45,11 +47,8 @@ typedef struct taskdesc {
     State state;
     Priority priority;
 
-    struct taskdesc *msg_queue;
-    void *msg_snd;
-    int msg_snd_len;
-    void *msg_rpy;
-    int msg_rpy_len;
+    struct taskdesc *rcv_queue;
+    struct taskdesc *rcv_queue_tail;
 } TD;
 
 int task_init(TD *task_pool, TD **queue_heads, TD **queue_tails, char *stack_space, unsigned int stack_space_size);
