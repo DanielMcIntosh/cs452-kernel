@@ -20,8 +20,9 @@ typedef struct namemessage {
 } NameMessage;
 
 int hash(char * x) { // TODO temporary
+    int h = 0;
 
-    return 0;
+    return h;
 }
 
 int TID_NS = 0;
@@ -39,14 +40,14 @@ void task_nameserver(){
         }
         switch (msg.id) {
         case MESSAGE_WHOIS:
-            msg.tid = ns.names[hash(msg.name)];
+            msg.tid = ns.names[hash(msg.name)]; // TODO errors
             break;
         case MESSAGE_REGAS:
             ns.names[hash(msg.name)] = tid;
             msg.tid = 0;
             break;
         default:
-            msg.tid = ERR_NAME_UNREGISTERED;
+            msg.tid = ERR_INVALID_ARGUMENT;
             break;
         }
         Reply(tid, (void*) &msg, sizeof(msg));
