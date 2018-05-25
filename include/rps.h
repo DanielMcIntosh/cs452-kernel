@@ -19,9 +19,10 @@ typedef enum {
 } RPSStatus;
 
 int Signup(int rps_tid);
-int Play(int rps_tid, RPS move);
+int Play(int rps_tid, RPS move, RPSStatus* reply);
 int Quit(int rps_tid);
 
 void task_rps();
+void task_rps_client();
 
 #endif

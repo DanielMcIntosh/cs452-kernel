@@ -64,17 +64,19 @@ static inline void handle_send(TD *task, TD *task_pool, TD** task_ready_queues, 
         #if DEBUG
         bwputstr(COM2, "Receiver is send blocked\r\n");
         #endif
-        // TODO message length things
         *((int *)(receiver->syscall_args[0])) = task_getTid(task); //set the tid of the receive caller
-        memcpy((int *)(receiver->syscall_args[1]), (int *)(args[1]), args[2]);
+        if (args[2] != receiver->syscall_args[2]){
+            receiver->r0 = ERR_MSG_TRUNCATED;
+        } else {
+            memcpy((int *)(receiver->syscall_args[1]), (int *)(args[1]), args[2]);
+            receiver->r0 = 0;
+        }
         receiver->state = STATE_READY;
-        receiver->r0 = 0;
         task->state = STATE_REPLY_BLOCKED; // sender state will be reacted to after returning from this method
         task_react_to_state(receiver, task_ready_queues, task_ready_queue_tails, task_free_queue);
     }
     else {
         task->state = STATE_RECEIVE_BLOCKED;
-
         // Put task into receiver queue.
         if (receiver->rcv_queue == NULL){
             receiver->rcv_queue = task;
@@ -108,19 +110,15 @@ static inline void handle_receive(TD *task, int *args) {
         int len = sender->syscall_args[2];
 
         *((int *)args[0]) = task_getTid(sender); //set the tid value
-
-        if (args[2] < len) { // TODO error when size is different
+        if (args[2] != len) { // TODO: is this the correct behavior for when the lengths are wrong?
             task->r0 = ERR_MSG_TRUNCATED;
-            sender->r0 = ERR_MSG_TRUNCATED;
-            memcpy((int *)(args[1]), msg, args[2]);
-        }
-        else {
-            *((int *) task->syscall_args[0]) = len;
+        } else {
+            *((int *) task->syscall_args[2]) = len;
             memcpy((int *)(args[1]), msg, len);   
-            sender->state = STATE_REPLY_BLOCKED;
-            task->state = STATE_READY;
             task->r0 = 0;
         }
+        sender->state = STATE_REPLY_BLOCKED;
+        task->state = STATE_READY;
     }
     else
     {
@@ -143,15 +141,12 @@ static inline void handle_reply(TD *task, TD *task_pool, TD** task_ready_queues,
         return;
     }
 
-    if (sender->syscall_args[4] < args[2]) {
+    if (sender->syscall_args[4] != args[2]) {
         task->r0 = ERR_MSG_TRUNCATED;
         sender->r0 = ERR_MSG_TRUNCATED;
-        memcpy((void *) sender->syscall_args[3], (int *)(args[1]), sender->syscall_args[4]);
-    }
-    else {
+    } else {
         task->r0 = 0;
         sender->r0 = 0;
-        *((int *) sender->syscall_args[4]) = args[2];
         memcpy((void *) sender->syscall_args[3], (int *)(args[1]), args[2]);   
     }
 

@@ -7,6 +7,7 @@
 #include <syscall.h>
 #include <sys_handler.h>
 #include <name.h>
+#include <rps.h>
 #include <util.h>
 
 int kernel_init(){
@@ -67,14 +68,13 @@ void TestHashTable(){
 }
 void fut(){
     int r = Create(PRIORITY_WAREHOUSE, &task_nameserver);
-    bwprintf(COM2, "Created: %d\r\n", r);
     r = RegisterAs("FUT");
-    bwprintf(COM2, "Registered As: \"FUT\" (%d)\r\n", r);
-    int iam = MyTid();
-    bwprintf(COM2, "I Am: %d\r\n", iam);
-    r = WhoIs("FUT");
-    bwprintf(COM2, "\"FUT\" is: %d\r\n", r);
-    bwputstr(COM2, "FirstUserTask: exiting\r\n");
+    r = Create(PRIORITY_WAREHOUSE+1, &task_rps);
+    bwprintf(COM2, "Created RPS Server: %d\r\n", r);
+    r = Create(PRIORITY_LOWEST, &task_rps_client);
+    bwprintf(COM2, "Created RPS Client 1: %d\r\n", r);
+    r = Create(PRIORITY_LOWEST, &task_rps_client);
+    bwprintf(COM2, "Created RPS Client 2: %d\r\n", r);
     Exit();
 }
 

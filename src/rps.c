@@ -18,11 +18,14 @@ int Signup(int rps_tid){
     msg.type = MESSAGE_RPS_SIGNUP;
     return Send(rps_tid, (void*)&msg, sizeof(msg), (void*)&msg, sizeof(msg));
 }
-int Play(int rps_tid, RPS move){
+int Play(int rps_tid, RPS move, RPSStatus* reply){
     RPSMessage msg;
+    ReplyMessage rply;
     msg.type = MESSAGE_RPS_PLAY;
     msg.move = move;
-    return Send(rps_tid, (void*)&msg, sizeof(msg), (void*)&msg, sizeof(msg));
+    int err = Send(rps_tid, (void*)&msg, sizeof(msg), (void*)&rply, sizeof(rply));
+    *reply = rply.ret;
+    return err;
 }
 int Quit(int rps_tid){
     RPSMessage msg;
@@ -44,6 +47,9 @@ typedef struct {
 } RPSServer;
 
 void task_rps(){
+    #if DEBUG
+    bwputstr(COM2, "RPS Server Start");
+    #endif
     RPSServer rps;
     for (int i = 0; i < TASK_POOL_SIZE; i++){
         rps.games[i] = -1;
@@ -51,14 +57,24 @@ void task_rps(){
     }
     rps.unpaired = -1;
 
+    #if DEBUG
+    bwputstr(COM2, "RPS Server Registration");
+    #endif
     RegisterAs(RPS_NAME);
     int tid, err, opp, play;
     RPSMessage msg;
     ReplyMessage rply;
     rply.type = MESSAGE_REPLY;
+    #if DEBUG
+    bwputstr(COM2, "RPS Server Init");
+    #endif
     FOREVER {
         err = Receive(&tid, (void *) &msg, sizeof(msg));
         ASSERT(err == 0, "Error recieving message",);
+        #if DEBUG
+        bwprintf(COM2, "RPS Server recieved: %d\r\n", msg.type);
+        #endif
+        tid &= TASK_BASE_TID_MASK;
         switch (msg.type) {
         case MESSAGE_RPS_SIGNUP:
             if (rps.unpaired == -1){
@@ -67,10 +83,10 @@ void task_rps(){
                 rps.games[tid] = rps.unpaired;
                 rps.games[rps.unpaired] = tid;
                 rply.ret = OPPONENT_FOUND;
+                bwprintf(COM2, "RPS Server replying to: %d\r\n", tid);
                 err = Reply(tid, (void *) &rply, sizeof(rply));
-                ASSERT(err == 0, "Error recieving message",);
+                bwprintf(COM2, "RPS Server replying to: %d\r\n", rps.unpaired);
                 err = Reply(rps.unpaired, (void *) &rply, sizeof(rply));
-                ASSERT(err == 0, "Error recieving message",);
                 rps.unpaired = -1;
             }
             break;
@@ -105,4 +121,31 @@ void task_rps(){
             Reply(tid, (void *) &rply, sizeof(rply));
         }
     }
+    Exit();
+}
+
+void task_rps_client(){
+    int rps_tid = WhoIs(RPS_NAME);
+    int err = Signup(rps_tid);
+    RPSStatus reply;
+    if (err){
+        bwprintf(COM2, "Error with RPS Signup: %d\r\n", err);
+        Exit();
+    }
+    for (int i = 0; i < 10; i++){
+        RPS move = ROCK;
+        err = Play(rps_tid, move, &reply);
+        if (err){
+            bwprintf(COM2, "Error playing RPS Move: %d\r\n", err);
+            break;
+        } else if (reply == OPPONENT_QUIT) {
+            bwputstr(COM2, "Opponent Quit\r\n");
+            break;
+
+        }
+        bwprintf(COM2, "I played: %d, result: %s\r\n", move, ((reply == WIN ? "WIN" : (reply == LOSE ? "LOSE" : "TIE"))));
+        bwgetc(COM2);
+    }
+    Quit(rps_tid);
+    Exit();
 }

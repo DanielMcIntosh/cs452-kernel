@@ -1,4 +1,3 @@
-// big TODO
 #include <name.h>
 #include <kernel.h>
 #include <syscall.h>
@@ -21,6 +20,13 @@ typedef struct namemessage {
 
 int TID_NS = 0;
 
+int legal_name(char * n){
+    int len = 0;
+    while (*n++ != NULL)
+        len++;
+    return len <= 8;
+}
+
 void task_nameserver(){
     #if DEBUG
     bwputstr(COM2, "NameServer init\r\n");
@@ -41,6 +47,8 @@ void task_nameserver(){
             bwprintf(COM2, "Message: %d %s %d\r\n", msg.id, msg.name, msg.tid);
             #endif
             msg.tid = err;
+        } else if (!legal_name(msg.name)){
+            msg.tid = ERR_INVALID_ARGUMENT;
         } else {
             switch (msg.id) {
             case MESSAGE_WHOIS:
@@ -73,7 +81,7 @@ void task_nameserver(){
 int RegisterAs(char * name) {
     NameMessage msg;
     msg.id = MESSAGE_REGAS;
-    memcpy(msg.name, name, MAXNAMESIZE); // TODO legal name checking
+    memcpy(msg.name, name, MAXNAMESIZE); 
     Send(TID_NS, (void *) &msg, sizeof(msg), (void*) &msg, sizeof(msg));
     return msg.tid;
 }
@@ -85,4 +93,3 @@ int WhoIs(char * name){
     Send(TID_NS, (void *) &msg, sizeof(msg), (void*) &msg, sizeof(msg));
     return msg.tid;
 }
-
