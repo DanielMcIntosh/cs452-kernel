@@ -36,9 +36,6 @@ activate:
     mov pc, #0
     .globl KERNEL_ENTRY_POINT
 KERNEL_ENTRY_POINT:
-
-@ KERNEL ENTER: ("after the context switch")
-
     str r0, [sp, #-4]! @we'll need to borrow r0 for the argument
     MSR CPSR_c, #0xDF
     ldr r0, [sp], #4 @pop arg 5 from stack

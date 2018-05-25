@@ -7,6 +7,7 @@
 #include <err.h>
 #include <debug.h>
 #include <tasks.h>
+#include <clock.h>
 
 typedef struct {
     MessageType type;
@@ -83,9 +84,13 @@ void task_rps(){
                 rps.games[tid] = rps.unpaired;
                 rps.games[rps.unpaired] = tid;
                 rply.ret = OPPONENT_FOUND;
+                #if DEBUG
                 bwprintf(COM2, "RPS Server replying to: %d\r\n", tid);
+                #endif
                 err = Reply(tid, (void *) &rply, sizeof(rply));
+                #if DEBUG
                 bwprintf(COM2, "RPS Server replying to: %d\r\n", rps.unpaired);
+                #endif
                 err = Reply(rps.unpaired, (void *) &rply, sizeof(rply));
                 rps.unpaired = -1;
             }
@@ -106,16 +111,22 @@ void task_rps(){
                     rps.plays[opp] = -1;
                     rps.games[tid] = -1;
                     rps.games[opp] = tid;
+                    #if DEBUG
                     bwprintf(COM2, "RPS Server replying to: %d\r\n", tid);
+                    #endif
                     err = Reply(tid, (void*) &rply, sizeof(rply));
                     ASSERT(err == 0, "Error replying to message",);
                 } else {
                     rply.ret = wins(play, msg.move);
+                    #if DEBUG
                     bwprintf(COM2, "RPS Server replying to: %d\r\n", opp);
+                    #endif
                     err = Reply(opp, (void*) &rply, sizeof(rply));
                     ASSERT(err == 0, "Error replying to message",);
                     rply.ret = wins(msg.move, play);
+                    #if DEBUG
                     bwprintf(COM2, "RPS Server replying to: %d\r\n", tid);
+                    #endif
                     err = Reply(tid, (void *) &rply, sizeof(rply));
                     ASSERT(err == 0, "Error replying to message",);
                     rps.plays[opp] = -1;
@@ -134,24 +145,27 @@ void task_rps(){
 
 void task_rps_client(){
     int rps_tid = WhoIs(RPS_NAME);
+    int mytid = MyTid();
     int err = Signup(rps_tid);
     RPSStatus reply;
     if (err){
-        bwprintf(COM2, "Error with RPS Signup: %d\r\n", err);
+        bwprintf(COM2, "%d: Error with RPS Signup: %d\r\n", mytid, err);
         Exit();
     }
     for (int i = 0; i < 10; i++){
-        RPS move = ROCK;
+        RPS move = clk4->value_low % 3; //randomization using clock time
         err = Play(rps_tid, move, &reply);
         if (err){
-            bwprintf(COM2, "Error playing RPS Move: %d\r\n", err);
+            bwprintf(COM2, "%d: Error playing RPS Move: %d\r\n", mytid,  err);
             break;
         } else if (reply == OPPONENT_QUIT) {
-            bwputstr(COM2, "Opponent Quit\r\n");
+            bwprintf(COM2, "%d: Opponent Quit\r\n", mytid);
             break;
 
         }
-        bwprintf(COM2, "I played: %d, result: %s\r\n", move, ((reply == WIN ? "WIN" : (reply == LOSE ? "LOSE" : "TIE"))));
+        bwprintf(COM2, "%d: I played: %s, result: %s\r\n", mytid,  
+            (move == ROCK ? "ROCK" : (move == PAPER ? "PAPER" : "SCISSORS")),
+            (reply == WIN ? "WIN" : (reply == LOSE ? "LOSE" : "TIE")));
         bwgetc(COM2);
     }
     Quit(rps_tid);
