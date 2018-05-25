@@ -105,7 +105,7 @@ int main(){
     bwprintf(COM2, "&fut: %x\r\n", (int) &fut);
     #endif
 
-    TD *task = schedule(task_ready_queues, task_ready_queue_tails);
+    volatile TD *task = schedule(task_ready_queues, task_ready_queue_tails);
     #if DEBUG
     bwprintf(COM2, "OFFSETS: lr %d, sp %d, r0 %d, spsr %d, args0 %d, arg4 %d, task %d", &(task->lr), &(task->sp), &(task->r0), &(task->spsr), &(task->syscall_args[0]), &(task->syscall_args[4]), task);
     #endif
@@ -128,7 +128,7 @@ int main(){
         task = schedule(task_ready_queues, task_ready_queue_tails);
     }
     #if DEBUG
-    bwputstr(COM2, "Passed?");
+    bwputstr(COM2, "Kernel Exiting - No More Tasks");
     #endif
 
     return 0;
