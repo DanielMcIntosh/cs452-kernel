@@ -1,8 +1,10 @@
 bin/*.o
 bin/*.s
-*.elf
 *.map
 todo.txt
 .d/*
 old/*
 *.sw*
+docs/*.log
+docs/*.aux
+docs/*.out
