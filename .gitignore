@@ -1,6 +1,10 @@
-*.o
-*.s
-*.elf
+bin/*.o
+bin/*.s
 *.map
 todo.txt
 .d/*
+old/*
+*.sw*
+docs/*.log
+docs/*.aux
+docs/*.out

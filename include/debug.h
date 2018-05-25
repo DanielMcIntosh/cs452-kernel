@@ -4,13 +4,13 @@
 #include <ts7200.h>
 #include <bwio.h>
 
-#define DEBUG 1
+#define DEBUG 0
 
 #define PANIC(x) bwputstr(COM2, x);\
-    return 0;
+    return 1;
 
-#define I1(x) #x
-#define S(x) I1(x) 
+#define IS(x) #x
+#define S(x) IS(x) 
 #define ASSERT(x, y) \
 if (!(x) && DEBUG)\
     PANIC("ASSERT FAILED: " S(x) "\r\nFUNCTION: " S(__func__) "\r\nFILE: "S(__FILE__) "\r\nLINE: " S(__LINE__) "\r\n" S(y) "\r\n")
