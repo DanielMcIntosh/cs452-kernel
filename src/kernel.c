@@ -6,11 +6,9 @@
 #include <bwio.h>
 #include <syscall.h>
 #include <sys_handler.h>
-
-#define FOREVER for(;;)
-#define STACK_SPACE_SIZE 0x800000
-
-#define DUMPR(x) "mov r0, #1\n\tmov r1, "x"\n\t bl bwputr\n\t"
+#include <name.h>
+#include <rps.h>
+#include <util.h>
 
 int kernel_init(){
     __asm__(
@@ -28,36 +26,59 @@ TD* schedule(TD **task_ready_queues, TD **task_ready_queue_tails){
 extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
 
-void utsk(){
-    int tid = MyTid();
-    if (tid == 4) {
-        int sender;
-        Receive(&sender, 9990, 550);
-        bwprintf(COM2, "sender = %d\r\n", sender);
-        Reply(sender, 0, 0);
+void a(){
+    char c[2];
+    c[1] = NULL;
+    for (int i = 4; i < 200; i += 2) {
+        c[0] = i;
+        RegisterAs(c);
     }
-    else if (tid == 3) {
-        Send(4, 10, 20, 30, 40);
+    Exit();
+}
+void b(){
+    char c[3];
+    c[2] = NULL;
+    for (int i = 4; i < 200; i += 2) {
+        c[0] = i-1;
+        c[1] = 1;
+        RegisterAs(c);
     }
-    int ptid = MyParentTID();
-    bwprintf(COM2, "MyTid: %d, MyParentTid: %d\r\n", tid, ptid);
-    Pass();
-    bwprintf(COM2, "MyTid: %d, MyParentTid: %d\r\n", tid, ptid);
+    Exit();
+}
+void c(){
+    char c[2];
+    c[1] = NULL;
+    for (int i = 4; i < 200; i+=2) {
+        c[0] = i;
+        bwprintf(COM2, "%s |-> %d\r\n", c, WhoIs(c));
+    }
+    char d[3];
+    for (int i = 4; i < 200; i += 2) {
+        d[0] = i-1;
+        d[1] = 1;
+        bwprintf(COM2, "%s |-> %d\r\n", d, WhoIs(d));
+    }
     Exit();
 }
 
+void TestHashTable(){
+    Create(PRIORITY_LOWEST-2, &a);
+    Create(PRIORITY_LOWEST-1, &b);
+    Create(PRIORITY_LOWEST, &c);
+}
 void fut(){
-    int r = Create(PRIORITY_LOWEST, &utsk);
-    bwprintf(COM2, "Created: %d\r\n", r);
-    r = Create(PRIORITY_LOWEST, &utsk);
-    bwprintf(COM2, "Created: %d\r\n", r);
-    r = Create(PRIORITY_HIGHEST, &utsk);
-    bwprintf(COM2, "Created: %d\r\n", r);
-    r = Create(PRIORITY_HIGHEST, &utsk);
-    bwprintf(COM2, "Created: %d\r\n", r);
-    bwputstr(COM2, "FirstUserTask: exiting\r\n");
+    int r = Create(PRIORITY_WAREHOUSE, &task_nameserver);
+    r = RegisterAs("FUT");
+    r = Create(PRIORITY_WAREHOUSE+1, &task_rps);
+    bwprintf(COM2, "Created RPS Server: %d\r\n", r);
+    r = Create(PRIORITY_LOWEST, &task_rps_client);
+    bwprintf(COM2, "Created RPS Client 1: %d\r\n", r);
+    r = Create(PRIORITY_LOWEST, &task_rps_client);
+    bwprintf(COM2, "Created RPS Client 2: %d\r\n", r);
     Exit();
 }
+
+
 
 int main(){
     #if DEBUG
@@ -82,11 +103,12 @@ int main(){
     #if DEBUG
     bwputstr(COM2, "Task Created!\r\n");
     bwprintf(COM2, "&fut: %x\r\n", (int) &fut);
-    bwprintf(COM2, "&utsk: %x\r\n", (int) &utsk);
     #endif
 
     TD *task = schedule(task_ready_queues, task_ready_queue_tails);
+    #if DEBUG
     bwprintf(COM2, "OFFSETS: lr %d, sp %d, r0 %d, spsr %d, args0 %d, arg4 %d, task %d", &(task->lr), &(task->sp), &(task->r0), &(task->spsr), &(task->syscall_args[0]), &(task->syscall_args[4]), task);
+    #endif
     while (task){
         #if DEBUG
         bwprintf(COM2, "Task Scheduled! Pr = %d\t", task->priority);

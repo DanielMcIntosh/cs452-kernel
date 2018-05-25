@@ -59,24 +59,32 @@ static inline void handle_send(TD *task, TD *task_pool, TD** task_ready_queues, 
 
 
     //reciever is already waiting for a message
-    if (receiver->state == STATE_BLOCKED)
+    if (receiver->state == STATE_SEND_BLOCKED)
     {
-        //TODO
+        #if DEBUG
+        bwputstr(COM2, "Receiver is send blocked\r\n");
+        #endif
         *((int *)(receiver->syscall_args[0])) = task_getTid(task); //set the tid of the receive caller
-
+        if (args[2] != receiver->syscall_args[2]){
+            receiver->r0 = ERR_MSG_TRUNCATED;
+        } else {
+            memcpy((int *)(receiver->syscall_args[1]), (int *)(args[1]), args[2]);
+            receiver->r0 = 0;
+        }
         receiver->state = STATE_READY;
+        task->state = STATE_REPLY_BLOCKED; // sender state will be reacted to after returning from this method
         task_react_to_state(receiver, task_ready_queues, task_ready_queue_tails, task_free_queue);
     }
     else {
-        task->state = STATE_BLOCKED;
-        
-        task->msg_queue = receiver->msg_queue;
-        receiver->msg_queue = task;
-
-        task->msg_snd = (int *)(args[1]);
-        task->msg_snd_len = args[2];
-        task->msg_rpy = (int *)(args[3]);
-        task->msg_rpy_len = args[4];
+        task->state = STATE_RECEIVE_BLOCKED;
+        // Put task into receiver queue.
+        if (receiver->rcv_queue == NULL){
+            receiver->rcv_queue = task;
+            receiver->rcv_queue_tail = task;
+        } else {
+            receiver->rcv_queue_tail->rdynext = task;
+            receiver->rcv_queue_tail = task;
+        }
     }
 }
 
@@ -84,28 +92,37 @@ static inline void handle_receive(TD *task, int *args) {
     #if DEBUG
     bwputstr(COM2, "RECEIVE called\r\n");
     #endif
-    TD *sender = task->msg_queue;
+    TD *sender = task->rcv_queue;
 
     //someone has already sent us a message
     if (sender != NULL) {
+        #if DEBUG
+        bwprintf(COM2, "Sender: %d\r\n", sender);
+        #endif
+
+        //pop sender from queue
+        task->rcv_queue = sender->rdynext;
+        if (task->rcv_queue == NULL){
+            task->rcv_queue_tail = NULL;
+        }
+
+        void * msg = (void*) sender->syscall_args[1];
+        int len = sender->syscall_args[2];
+
         *((int *)args[0]) = task_getTid(sender); //set the tid value
-
-        task->msg_queue = sender->msg_queue;
-        sender->msg_queue = 0;
-
-        if (args[2] < sender->msg_snd_len) {
+        if (args[2] != len) { // TODO: is this the correct behavior for when the lengths are wrong?
             task->r0 = ERR_MSG_TRUNCATED;
-            memcpy((int *)(args[1]), sender->msg_snd, args[2]);
+        } else {
+            *((int *) task->syscall_args[2]) = len;
+            memcpy((int *)(args[1]), msg, len);   
+            task->r0 = 0;
         }
-        else {
-            task->r0 = sender->msg_snd_len;
-            memcpy((int *)(args[1]), sender->msg_snd, sender->msg_snd_len);   
-        }
+        sender->state = STATE_REPLY_BLOCKED;
+        task->state = STATE_READY;
     }
     else
     {
-        //TODO
-        task->state = STATE_BLOCKED;
+        task->state = STATE_SEND_BLOCKED;
     }
 }
 
@@ -119,20 +136,18 @@ static inline void handle_reply(TD *task, TD *task_pool, TD** task_ready_queues,
         task->r0 = ERR_TASK_DOES_NOT_EXIST;
         return;
     }
-    if (sender->msg_queue != NULL || sender->state != STATE_BLOCKED) {
+    if (sender->state != STATE_REPLY_BLOCKED) {
         task->r0 = ERR_TASK_NOT_REPLY_BLOCKED;
         return;
     }
 
-    if (sender->msg_rpy_len < args[2]) {
+    if (sender->syscall_args[4] != args[2]) {
         task->r0 = ERR_MSG_TRUNCATED;
         sender->r0 = ERR_MSG_TRUNCATED;
-        memcpy(sender->msg_rpy, (int *)(args[1]), sender->msg_rpy_len);
-    }
-    else {
+    } else {
         task->r0 = 0;
-        sender->r0 = args[2];
-        memcpy(sender->msg_rpy, (int *)(args[1]), args[2]);   
+        sender->r0 = 0;
+        memcpy((void *) sender->syscall_args[3], (int *)(args[1]), args[2]);   
     }
 
     sender->state = STATE_READY;

@@ -39,6 +39,8 @@ TD *init_task(TD *task, int parent_tid, Priority priority, int lr) {
     task->state = STATE_READY;
     task->priority = priority;
 
+    task->rcv_queue = 0;
+    task->rcv_queue_tail = 0;
     return task;
 }
 
@@ -115,7 +117,9 @@ int task_react_to_state(TD *task, TD **queue_heads, TD **queue_tails, TD **free_
             insert(queue_heads, queue_tails, task, task->priority);
             break;
         }
-        case STATE_BLOCKED:
+        case STATE_SEND_BLOCKED:
+        case STATE_RECEIVE_BLOCKED:
+        case STATE_REPLY_BLOCKED:
         {
             break;
         }

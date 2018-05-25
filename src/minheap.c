@@ -57,7 +57,7 @@ int mh_add(minheap_t *mh, elem_t elem, unsigned int value) {
 }
 
 int mh_remove_min(minheap_t *mh, elem_t* elem){
-    ASSERT(elem != 0, "Return ptr cannot be null");
+    ASSERT(elem != 0, "Return ptr cannot be null", 1);
     entry_t item;
     if (mh->count > 1){
         memswap(mh->entries, mh->entries+mh->count -1, sizeof(entry_t));

@@ -65,7 +65,6 @@ int Create(int priority, void (*code)()){
     return syscall_2(SYSCALL_CREATE, priority, (int)code);
 }
 
-//TODO: pass more than 2 args
 int Send(int tid, char *msg, int msglen, char *reply, int rplen){
     return syscall_5(SYSCALL_SEND, tid, (int) msg, msglen, (int) reply, rplen);
 }
