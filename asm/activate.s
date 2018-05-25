@@ -3,12 +3,6 @@
     .type    activate,%function
 activate:
     .fnstart
-@	mov	ip, sp
-@	stmfd	sp!, {fp, ip, lr, pc}
-@	sub	fp, ip, #4
-@	sub	sp, sp, #8
-@	str	r0, [fp, #-24]
-
     @ save kernel state
     stmdb sp!, {r4-r12,lr} @ Not Saved: PC, SP
     MRS r4, CPSR
@@ -17,19 +11,18 @@ activate:
     @ r0 contains a pointer to the task struct
     mov r5, r0
     ldr r4, [r5, #24] @ CSPR_USR
-    MSR SPSR_cxsf, r4 @ 5. Set SPSR_svc to CPSR_user, which will return it to user mode once movs is called.
+    MSR SPSR_cxsf, r4 @ Set SPSR_svc to CPSR_user, which will return it to user mode once movs is called.
        
     ldr r4, [r5, #16] @LR
     mov lr, r4
 
     ldr r4, [r5, #28] @ Return Value
-    @ If return values are buggy, consider moving to inside system mode
     mov r0, r4
 
     MSR CPSR_c,#0xDF
     ldr r4, [r5, #20]
     mov sp, r4 @ Stack Pointer 
-    ldmia sp!, {r4-r12,lr} @ 10. Reload registers from User Stack
+    ldmia sp!, {r4-r12,lr} @ Reload registers from User Stack
     MSR CPSR_c, #0xD3 @ Supervisor Mode
 
     movs pc, lr
@@ -38,7 +31,6 @@ activate:
 KERNEL_ENTRY_POINT:
 
 @ KERNEL ENTER: ("after the context switch")
-@ TODO Acquire Args
     MSR CPSR_c, #0xDF
     stmdb sp!, {r4-r12,lr}@ Push user registers onto active task stack
     mov r4, sp  @Save Stack Pointer

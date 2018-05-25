@@ -57,6 +57,9 @@ $(BINDIR)/kernel.elf: $(OBJFILES) $(HANDASM) $(ASMFILES)
 $(DEPDIR)/%.d: ;
 .PRECIOUS: $(DEPDIR)/%.d
 
+$(DOCSDIR)/%.pdf: $(DOCSDIR)/%.tex
+	pdflatex -output-directory $(DOCSDIR) $<
+
 clean:
 	-rm -f $(BINDIR)/* $(DEPDIR)/*
 
@@ -68,5 +71,7 @@ install: all
 
 rebuild: clean all
 reinstall: clean install
+
+docs: $(DOCSDIR)/k1.pdf
 
 include $(wildcard $(patsubst %,$(DEPDIR)/%.d,$(basename $(SRCS))))

@@ -17,7 +17,7 @@ __asm__(
         :
         : [n] "i" (n), [arg1] "ri" (arg1), [arg2] "ri" (arg2)
         : "r0", "r1");
-// Store r0 in memory (return value? what's r0 here)
+// Store r0 (return value)
 __asm__(
     "mov %[ret], r0\n\t"
     ASM_STACK_POP("r3")
