@@ -9,7 +9,7 @@ struct circlebuffer {
     int empty;
 };
 
-void cb_init(struct circlebuffer *cb);
+void cb_init(struct circlebuffer *cb, char * buf, int size);
 int cb_full(struct circlebuffer *cb);
 int cb_empty(struct circlebuffer *cb);
 int cb_read(struct circlebuffer *cb, char *c);
