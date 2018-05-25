@@ -16,4 +16,15 @@ if (!(x) && DEBUG) {\
     PANIC("ASSERT FAILED: " S(x) "\r\nFUNCTION: " S(__func__) "\r\nFILE: "S(__FILE__) "\r\nLINE: " S(__LINE__) "\r\n" S(y) "\r\n", z)\
 }
 
+#if DEBUG
+#define LOGF(...) bwprintf(COM2, __VA_ARGS__);
+#define LOGC(c) bwputc(COM2, (c));
+#define LOG(str) bwputstr(COM2, str);
+#else
+#define LOGF(...)
+#define LOGC(c)
+#define LOG(str)
+#endif
+
+
 #endif

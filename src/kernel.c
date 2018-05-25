@@ -69,21 +69,18 @@ void TestHashTable(){
 void fut(){
     int r = Create(PRIORITY_WAREHOUSE, &task_nameserver);
     r = RegisterAs("FUT");
-    r = Create(PRIORITY_WAREHOUSE+1, &task_rps);
+    r = Create(PRIORITY_HIGH, &task_rps);
     bwprintf(COM2, "Created RPS Server: %d\r\n", r);
-    r = Create(PRIORITY_LOWEST, &task_rps_client);
+    r = Create(PRIORITY_LOW, &task_rps_client);
     bwprintf(COM2, "Created RPS Client 1: %d\r\n", r);
-    r = Create(PRIORITY_LOWEST, &task_rps_client);
+    r = Create(PRIORITY_LOW, &task_rps_client);
     bwprintf(COM2, "Created RPS Client 2: %d\r\n", r);
     Exit();
 }
 
 
-
 int main(){
-    #if DEBUG
-    bwputstr(COM2, "Start!");
-    #endif
+    LOG("Start!");
 
     kernel_init();
     char stack_space[STACK_SPACE_SIZE];
@@ -100,36 +97,24 @@ int main(){
         bwprintf(COM2, "-=-=-=-=-=-=ERR = %d=-=-=-=-=-=-=-\r\n", err);
         return -1;
     }
-    #if DEBUG
-    bwputstr(COM2, "Task Created!\r\n");
-    bwprintf(COM2, "&fut: %x\r\n", (int) &fut);
-    #endif
+    LOG("Task Created!\r\n");
+    LOGF("&fut: %x\r\n", (int) &fut);
 
-    volatile TD *task = schedule(task_ready_queues, task_ready_queue_tails);
-    #if DEBUG
-    bwprintf(COM2, "OFFSETS: lr %d, sp %d, r0 %d, spsr %d, args0 %d, arg4 %d, task %d", &(task->lr), &(task->sp), &(task->r0), &(task->spsr), &(task->syscall_args[0]), &(task->syscall_args[4]), task);
-    #endif
+    TD *task = schedule(task_ready_queues, task_ready_queue_tails);
+    LOGF("OFFSETS: lr %d, sp %d, r0 %d, spsr %d, args0 %d, arg4 %d, task %d", &(task->lr), &(task->sp), &(task->r0), &(task->spsr), &(task->syscall_args[0]), &(task->syscall_args[4]), task);
     while (task){
-        #if DEBUG
-        bwprintf(COM2, "Task Scheduled! Pr = %d\t", task->priority);
-        bwprintf(COM2, "task = %x\t", (int) task);
-        bwprintf(COM2, "task->lr = %x\r\n", task->lr);
-        #endif
+        LOGF("Task Scheduled! Pr = %d\t", task->priority);
+        LOGF("task = %x\t", (int) task);
+        LOGF("task->lr = %x\r\n", task->lr);
         int f = activate((int) task);
-        #if DEBUG
-        bwputc(COM2, f);
-        bwputstr(COM2, "\r\n");
-        #endif
+        LOGC(f);
+        LOG("\r\n");
 
         handle(f, task, task_pool, task_ready_queues, task_ready_queue_tails, &task_free_queue);
-        #if DEBUG
-        bwputstr(COM2, "\r\n");
-        #endif
+        LOG("\r\n");
         task = schedule(task_ready_queues, task_ready_queue_tails);
     }
-    #if DEBUG
-    bwputstr(COM2, "Kernel Exiting - No More Tasks");
-    #endif
+    LOG("Kernel Exiting - No More Tasks");
 
     return 0;
 }

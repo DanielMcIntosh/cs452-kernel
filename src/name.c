@@ -28,24 +28,18 @@ int legal_name(char * n){
 }
 
 void task_nameserver(){
-    #if DEBUG
-    bwputstr(COM2, "NameServer init\r\n");
-    #endif
+    LOG("NameServer init\r\n");
     NameServer ns;
     ht_init(&ns.ht);
     TID_NS = MyTid();
     int tid, err;
     NameMessage msg;
-    #if DEBUG
-    bwprintf(COM2, "NameServer (%d) begin loop", TID_NS);
-    #endif
+    LOGF("NameServer (%d) begin loop", TID_NS);
     FOREVER { 
         err = Receive(&tid, (void *) &msg, sizeof(msg));
         if (err){
-            #if DEBUG
-            bwprintf(COM2, "NameServer error: %d\r\n ", err);
-            bwprintf(COM2, "Message: %d %s %d\r\n", msg.id, msg.name, msg.tid);
-            #endif
+            LOGF("NameServer error: %d\r\n ", err);
+            LOGF("Message: %d %s %d\r\n", msg.id, msg.name, msg.tid);
             msg.tid = err;
         } else if (!legal_name(msg.name)){
             msg.tid = ERR_INVALID_ARGUMENT;
@@ -53,23 +47,15 @@ void task_nameserver(){
             switch (msg.id) {
             case MESSAGE_WHOIS:
                 msg.tid = ht_lookup(&ns.ht, msg.name);
-                #if DEBUG
-                bwprintf(COM2, "NameServer found %s as %d\r\n ", msg.name, msg.tid);
-                #endif
+                LOGF("NameServer found %s as %d\r\n ", msg.name, msg.tid);
                 break;
             case MESSAGE_REGAS:
-                #if DEBUG
-                bwprintf(COM2, "NameServer registering %s as %d\r\n ", msg.name, tid);
-                #endif
+                LOGF("NameServer registering %s as %d\r\n ", msg.name, tid);
                 msg.tid = ht_insert(&ns.ht, msg.name, tid);
-                #if DEBUG
-                bwprintf(COM2, "NameServer registered %s as %d\r\n ", msg.name, tid);
-                #endif
+                LOGF("NameServer registered %s as %d\r\n ", msg.name, tid);
                 break;
             default:
-                #if DEBUG
-                bwprintf(COM2, "NameServer received invalid argument %d\r\n ", msg.id);
-                #endif
+                LOGF("NameServer received invalid argument %d\r\n ", msg.id);
                 msg.tid = ERR_INVALID_ARGUMENT;
                 break;
             }

@@ -32,9 +32,7 @@ void ht_init(Hashtable *ht){
 }
 
 int ht_insert(Hashtable *ht, char *key, int value){
-    #if DEBUG
-    bwprintf(COM2, "HT Insert: %d, %s, %d\r\n", ht, key, value);
-    #endif
+    LOGF("HT Insert: %d, %s, %d\r\n", ht, key, value);
     int hsh = hash(key), n = 0;
     ASSERT(hsh < HT_SIZE, "Hash Invariant", ERR_INVARIANT_BROKEN);
     while ((*ht)[hsh].value != -1) {
@@ -49,9 +47,7 @@ int ht_insert(Hashtable *ht, char *key, int value){
     }
     memcpy((*ht)[hsh].key, key, HT_KEY_SIZE);
     (*ht)[hsh].value = value;
-    #if DEBUG
-    bwprintf(COM2, "Hash: %d |-> Value: %d\r\n", hsh, value);
-    #endif
+    LOGF("Hash: %d |-> Value: %d\r\n", hsh, value);
     return 0;
 }
 
@@ -68,8 +64,6 @@ int ht_lookup(Hashtable *ht, char * key){
             return ERR_HT_NOT_FOUND;
         }
     }
-    #if DEBUG
-    bwprintf(COM2, "Hash: %d |-> Value: %d\r\n", hsh, (*ht)[hsh].value);
-    #endif
+    LOGF("Hash: %d |-> Value: %d\r\n", hsh, (*ht)[hsh].value);
     return (*ht)[hsh].value;
 }

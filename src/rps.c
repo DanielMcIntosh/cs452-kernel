@@ -47,9 +47,7 @@ typedef struct {
 } RPSServer;
 
 void task_rps(){
-    #if DEBUG
-    bwputstr(COM2, "RPS Server Start");
-    #endif
+    LOG("RPS Server Start");
     RPSServer rps;
     for (int i = 0; i < TASK_POOL_SIZE; i++){
         rps.games[i] = -1;
@@ -57,23 +55,17 @@ void task_rps(){
     }
     rps.unpaired = -1;
 
-    #if DEBUG
-    bwputstr(COM2, "RPS Server Registration");
-    #endif
+    LOG("RPS Server Registration");
     RegisterAs(RPS_NAME);
     int tid, err, opp, play;
     RPSMessage msg;
     ReplyMessage rply;
     rply.type = MESSAGE_REPLY;
-    #if DEBUG
-    bwputstr(COM2, "RPS Server Init");
-    #endif
+    LOG("RPS Server Init");
     FOREVER {
         err = Receive(&tid, (void *) &msg, sizeof(msg));
         ASSERT(err == 0, "Error recieving message",);
-        #if DEBUG
-        bwprintf(COM2, "RPS Server recieved: %d, %d\r\n", msg.type, msg.move);
-        #endif
+        LOGF("RPS Server recieved: %d, %d\r\n", msg.type, msg.move);
         tid &= TASK_BASE_TID_MASK;
         switch (msg.type) {
         case MESSAGE_RPS_SIGNUP:
@@ -83,13 +75,9 @@ void task_rps(){
                 rps.games[tid] = rps.unpaired;
                 rps.games[rps.unpaired] = tid;
                 rply.ret = OPPONENT_FOUND;
-                #if DEBUG
-                bwprintf(COM2, "RPS Server replying to: %d\r\n", tid);
-                #endif
+                LOGF("RPS Server replying to: %d\r\n", tid);
                 err = Reply(tid, (void *) &rply, sizeof(rply));
-                #if DEBUG
-                bwprintf(COM2, "RPS Server replying to: %d\r\n", rps.unpaired);
-                #endif
+                LOGF("RPS Server replying to: %d\r\n", rps.unpaired);
                 err = Reply(rps.unpaired, (void *) &rply, sizeof(rply));
                 rps.unpaired = -1;
             }
@@ -110,22 +98,16 @@ void task_rps(){
                     rps.plays[opp] = -1;
                     rps.games[tid] = -1;
                     rps.games[opp] = tid;
-                    #if DEBUG
-                    bwprintf(COM2, "RPS Server replying to: %d\r\n", tid);
-                    #endif
+                    LOGF("RPS Server replying to: %d\r\n", tid);
                     err = Reply(tid, (void*) &rply, sizeof(rply));
                     ASSERT(err == 0, "Error replying to message",);
                 } else {
                     rply.ret = wins(play, msg.move);
-                    #if DEBUG
-                    bwprintf(COM2, "RPS Server replying to: %d\r\n", opp);
-                    #endif
+                    LOGF("RPS Server replying to: %d\r\n", opp);
                     err = Reply(opp, (void*) &rply, sizeof(rply));
                     ASSERT(err == 0, "Error replying to message",);
                     rply.ret = wins(msg.move, play);
-                    #if DEBUG
-                    bwprintf(COM2, "RPS Server replying to: %d\r\n", tid);
-                    #endif
+                    LOGF("RPS Server replying to: %d\r\n", tid);
                     err = Reply(tid, (void *) &rply, sizeof(rply));
                     ASSERT(err == 0, "Error replying to message",);
                     rps.plays[opp] = -1;

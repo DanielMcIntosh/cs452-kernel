@@ -6,36 +6,26 @@
 #include "util.h"
 
 static inline void handle_create(TD *task, TD** task_ready_queues, TD** task_ready_queue_tails, TD** task_free_queue, int *args) {
-    #if DEBUG
-    bwprintf(COM2, "TASK CREATE: %d, %d, %d\r\n", task_getTid(task), args[0], args[1]);
-    #endif
+    LOGF("TASK CREATE: %d, %d, %d\r\n", task_getTid(task), args[0], args[1]);
     task->r0 = task_create(task_ready_queues, task_ready_queue_tails, task_free_queue, task_getTid(task), args[0], args[1]);
 }
 
 static inline void handle_tid(TD *task) {
     task->r0 = task_getTid(task);
-    #if DEBUG
-    bwprintf(COM2, "TID: %d\r\n", task->r0);
-    #endif
+    LOGF("TID: %d\r\n", task->r0);
 }
 
 static inline void handle_ptid(TD *task) {
     task->r0 = task_getParentTid(task);
-    #if DEBUG
-    bwprintf(COM2, "PTID: %d\r\n", task->r0);
-    #endif
+    LOGF("PTID: %d\r\n", task->r0);
 }
 
 static inline void handle_pass() {
-    #if DEBUG
-    bwputstr(COM2, "PASS called\r\n");
-    #endif
+    LOG("PASS called\r\n");
 }
 
 static inline void handle_exit(TD *task) {
-    #if DEBUG
-    bwputstr(COM2, "EXIT called\r\n");
-    #endif
+    LOG("EXIT called\r\n");
     //don't re-queue the task, let it become a zombie task.
     //it will still be accessible by it's TID, since that gives us an index in the task pool
     task->state = STATE_ZOMBIE;
@@ -47,9 +37,7 @@ static inline void handle_exit(TD *task) {
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 static inline void handle_send(TD *task, TD *task_pool, TD** task_ready_queues, TD** task_ready_queue_tails, TD** task_free_queue, int *args) {
-    #if DEBUG
-    bwputstr(COM2, "SEND called\r\n");
-    #endif
+    LOG("SEND called\r\n");
 
     TD *receiver = task_lookup(task_pool, args[0]);
     if (receiver == NULL) {
@@ -61,9 +49,7 @@ static inline void handle_send(TD *task, TD *task_pool, TD** task_ready_queues, 
     //reciever is already waiting for a message
     if (receiver->state == STATE_SEND_BLOCKED)
     {
-        #if DEBUG
-        bwputstr(COM2, "Receiver is send blocked\r\n");
-        #endif
+        LOG("Receiver is send blocked\r\n");
         *((int *)(receiver->syscall_args[0])) = task_getTid(task); //set the tid of the receive caller
         if (args[2] != receiver->syscall_args[2]){
             receiver->r0 = ERR_MSG_TRUNCATED;
@@ -89,16 +75,12 @@ static inline void handle_send(TD *task, TD *task_pool, TD** task_ready_queues, 
 }
 
 static inline void handle_receive(TD *task, int *args) {
-    #if DEBUG
-    bwputstr(COM2, "RECEIVE called\r\n");
-    #endif
+    LOG("RECEIVE called\r\n");
     TD *sender = task->rcv_queue;
 
     //someone has already sent us a message
     if (sender != NULL) {
-        #if DEBUG
-        bwprintf(COM2, "Sender: %d\r\n", sender);
-        #endif
+        LOGF("Sender: %d\r\n", sender);
 
         //pop sender from queue
         task->rcv_queue = sender->rdynext;
@@ -127,9 +109,7 @@ static inline void handle_receive(TD *task, int *args) {
 }
 
 static inline void handle_reply(TD *task, TD *task_pool, TD** task_ready_queues, TD** task_ready_queue_tails, TD** task_free_queue, int *args) {
-    #if DEBUG
-    bwputstr(COM2, "REPLY called\r\n");
-    #endif
+    LOG("REPLY called\r\n");
     
     TD *sender = task_lookup(task_pool, args[0]);
     if (sender == NULL) {
@@ -155,13 +135,9 @@ static inline void handle_reply(TD *task, TD *task_pool, TD** task_ready_queues,
 }
 
 Syscall handle(Syscall a, TD *task, TD *task_pool, TD** task_ready_queues, TD** task_ready_queue_tails, TD** task_free_queue) {
-    #if DEBUG
-    bwprintf(COM2, "HANDLE: %d, %d\t", a, task);
-    #endif
+    LOGF("HANDLE: %d, %d\t", a, task);
     int *args = task->syscall_args;
-    #if DEBUG
-    bwprintf(COM2, "ARGS: %d, %d, %d, %d, %d\t", args[0], args[1], args[2], args[3], args[4]);
-    #endif
+    LOGF("ARGS: %d, %d, %d, %d, %d\t", args[0], args[1], args[2], args[3], args[4]);
     switch(a) {
         case SYSCALL_CREATE:
         {

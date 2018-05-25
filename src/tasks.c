@@ -3,6 +3,7 @@
 #include "elem.h"
 #include "circlebuffer.h"
 #include "bwio.h"
+#include "debug.h"
 
 //#define CIRCULAR
 
@@ -162,11 +163,9 @@ int task_create(TD **queue_heads, TD **queue_tails, TD **free_queue, int parent_
         : "r0"
     );
     task->sp = task_sp_out;
-    #if DEBUG
-    bwprintf(COM2, "New task = %x\t", task);
-    bwprintf(COM2, "lr = %x\t", task->lr);
-    bwprintf(COM2, "sp = %x\r\n", task->sp);
-    #endif
+    LOGF("New task = %x\t", task);
+    LOGF("lr = %x\t", task->lr);
+    LOGF("sp = %x\r\n", task->sp);
     //insert the new task into the queues, the old one will be handled in task_react_to_state
     insert(queue_heads, queue_tails, task, priority);
 
