@@ -17,8 +17,9 @@ int MyTid();
 int MyParentTID();
 void Pass();
 void Exit();
-int Send(int tid, char *msg, int msglen, char *reply, int rplen);
-int Receive(int *tid, char *msg, int msglen);
-int Reply(int tid, char *reply, int rplen);
+
+int Send(int tid, void *msg, int msglen, void *reply, int rplen);
+int Receive(int *tid, void *msg, int msglen);
+int Reply(int tid, void *reply, int rplen);
 
 #endif

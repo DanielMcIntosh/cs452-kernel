@@ -16,14 +16,14 @@ typedef struct {
 int Signup(int rps_tid){
     RPSMessage msg;
     msg.type = MESSAGE_RPS_SIGNUP;
-    return Send(rps_tid, (void*)&msg, sizeof(msg), (void*)&msg, sizeof(msg));
+    return Send(rps_tid, &msg, sizeof(msg), &msg, sizeof(msg));
 }
 int Play(int rps_tid, RPS move, RPSStatus* reply){
     RPSMessage msg;
     ReplyMessage rply;
     msg.type = MESSAGE_RPS_PLAY;
     msg.move = move;
-    int err = Send(rps_tid, (void*)&msg, sizeof(msg), (void*)&rply, sizeof(rply));
+    int err = Send(rps_tid, &msg, sizeof(msg), &rply, sizeof(rply));
     *reply = rply.ret;
     return err;
 }
@@ -31,7 +31,7 @@ int Quit(int rps_tid){
     RPSMessage msg;
     msg.type = MESSAGE_RPS_PLAY;
     msg.move = QUIT;
-    return Send(rps_tid, (void*)&msg, sizeof(msg), (void*)&msg, sizeof(msg));
+    return Send(rps_tid, &msg, sizeof(msg), &msg, sizeof(msg));
 }
 
 int wins(RPS a, RPS b){
@@ -63,7 +63,7 @@ void task_rps(){
     rply.type = MESSAGE_REPLY;
     LOG("RPS Server Init");
     FOREVER {
-        err = Receive(&tid, (void *) &msg, sizeof(msg));
+        err = Receive(&tid, &msg, sizeof(msg));
         ASSERT(err == 0, "Error recieving message",);
         LOGF("RPS Server recieved: %d, %d\r\n", msg.type, msg.move);
         tid &= TASK_BASE_TID_MASK;
@@ -76,9 +76,9 @@ void task_rps(){
                 rps.games[rps.unpaired] = tid;
                 rply.ret = OPPONENT_FOUND;
                 LOGF("RPS Server replying to: %d\r\n", tid);
-                err = Reply(tid, (void *) &rply, sizeof(rply));
+                err = Reply(tid, &rply, sizeof(rply));
                 LOGF("RPS Server replying to: %d\r\n", rps.unpaired);
-                err = Reply(rps.unpaired, (void *) &rply, sizeof(rply));
+                err = Reply(rps.unpaired, &rply, sizeof(rply));
                 rps.unpaired = -1;
             }
             break;
@@ -86,7 +86,7 @@ void task_rps(){
             opp = rps.games[tid];
             if (opp == -1) {
                 rply.ret = ERR_NO_OPPONENT;
-                err = Reply(opp, (void*) &rply, sizeof(rply));
+                err = Reply(opp, &rply, sizeof(rply));
                 ASSERT(err == 0, "Error replying to message",);
                 break;
             }
@@ -99,16 +99,16 @@ void task_rps(){
                     rps.games[tid] = -1;
                     rps.games[opp] = tid;
                     LOGF("RPS Server replying to: %d\r\n", tid);
-                    err = Reply(tid, (void*) &rply, sizeof(rply));
+                    err = Reply(tid, &rply, sizeof(rply));
                     ASSERT(err == 0, "Error replying to message",);
                 } else {
                     rply.ret = wins(play, msg.move);
                     LOGF("RPS Server replying to: %d\r\n", opp);
-                    err = Reply(opp, (void*) &rply, sizeof(rply));
+                    err = Reply(opp, &rply, sizeof(rply));
                     ASSERT(err == 0, "Error replying to message",);
                     rply.ret = wins(msg.move, play);
                     LOGF("RPS Server replying to: %d\r\n", tid);
-                    err = Reply(tid, (void *) &rply, sizeof(rply));
+                    err = Reply(tid, &rply, sizeof(rply));
                     ASSERT(err == 0, "Error replying to message",);
                     rps.plays[opp] = -1;
                 }
@@ -118,7 +118,7 @@ void task_rps(){
             break;
         default:
             rply.ret = ERR_INVALID_ARGUMENT;
-            Reply(tid, (void *) &rply, sizeof(rply));
+            Reply(tid, &rply, sizeof(rply));
         }
     }
     Exit();

@@ -65,15 +65,15 @@ int Create(int priority, void (*code)()){
     return syscall_2(SYSCALL_CREATE, priority, (int)code);
 }
 
-int Send(int tid, char *msg, int msglen, char *reply, int rplen){
+int Send(int tid, void *msg, int msglen, void *reply, int rplen){
     return syscall_5(SYSCALL_SEND, tid, (int) msg, msglen, (int) reply, rplen);
 }
 
-int Receive(int *tid, char *msg, int msglen){
+int Receive(int *tid, void *msg, int msglen){
     return syscall_3(SYSCALL_RECEIVE, (int) tid, (int) msg, msglen);
 }
 
-int Reply(int tid, char *reply, int rplen){
+int Reply(int tid, void *reply, int rplen){
     return syscall_3(SYSCALL_REPLY, tid, (int) reply, rplen);
 }
 

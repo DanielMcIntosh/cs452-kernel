@@ -36,7 +36,7 @@ void task_nameserver(){
     NameMessage msg;
     LOGF("NameServer (%d) begin loop", TID_NS);
     FOREVER { 
-        err = Receive(&tid, (void *) &msg, sizeof(msg));
+        err = Receive(&tid, &msg, sizeof(msg));
         if (err){
             LOGF("NameServer error: %d\r\n ", err);
             LOGF("Message: %d %s %d\r\n", msg.id, msg.name, msg.tid);
@@ -60,7 +60,7 @@ void task_nameserver(){
                 break;
             }
         }
-        Reply(tid, (void*) &msg, sizeof(msg));
+        Reply(tid, &msg, sizeof(msg));
     }
 }
 
@@ -68,7 +68,7 @@ int RegisterAs(char * name) {
     NameMessage msg;
     msg.id = MESSAGE_REGAS;
     memcpy(msg.name, name, MAXNAMESIZE); 
-    Send(TID_NS, (void *) &msg, sizeof(msg), (void*) &msg, sizeof(msg));
+    Send(TID_NS, &msg, sizeof(msg), &msg, sizeof(msg));
     return msg.tid;
 }
 
@@ -76,6 +76,6 @@ int WhoIs(char * name){
     NameMessage msg;
     msg.id = MESSAGE_WHOIS;
     memcpy(msg.name, name, MAXNAMESIZE);
-    Send(TID_NS, (void *) &msg, sizeof(msg), (void*) &msg, sizeof(msg));
+    Send(TID_NS, &msg, sizeof(msg), &msg, sizeof(msg));
     return msg.tid;
 }

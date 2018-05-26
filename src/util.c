@@ -11,8 +11,8 @@ void * memcpy(void * dest, const void* src, unsigned int sz){
 
 void memswap(void *a, void *b, unsigned int sz) {
     // from https://github.com/qca/open-plc-utils/blob/master/tools/memswap.c
-    register char * b1 = (char *) a;
-    register char *b2 = (char *) b;
+    register char * b1 = a;
+    register char *b2 = b;
     if (a != b) while (sz--) {
         char b = *b1;
         *b1++=*b2;
