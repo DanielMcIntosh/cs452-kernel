@@ -5,16 +5,40 @@
 
 
 static int hash(char * key) {
+    /*
     int h = 0;
     while(*key != NULL)
         h += *key++;
     return h % HT_SIZE;
+    /*/
+    unsigned long hash = 5381;
+    int c;
+
+    while ((c = *key++))
+        hash = hash * 33 + c;
+
+    return hash % HT_SIZE;
+    //*/
 }
 
+/*
 static unsigned long long c2ull(char * key){
-    // TODO use long long instead of char *
-    return *((unsigned long long*) key);
+    unsigned long long v = *((unsigned long long*) key);
+    //clear the bytes after the null character (17 operations):
+    //ascii values only use the lower 7 bits, so we don't have to worry about the high bit
+    unsigned long long zeroBytes = ~((v + 0x7F7F7F7F7F7F7F7F) | 0x7F7F7F7F7F7F7F7F);
+    unsigned long long mask = zeroBytes;
+    mask |= mask >> 1;
+    mask |= mask >> 2;
+    mask |= mask >> 4;
+    mask |= mask >> 8;
+    mask |= mask >> 16;
+    mask |= mask >> 32;
+    mask = ~mask;
+
+    return v & mask;
 }
+//*/
 
 static int streq(char * a, char * b){
     while (*a != NULL && *b != NULL){
@@ -31,7 +55,7 @@ void ht_init(Hashtable *ht){
     }
 }
 
-int ht_insert(Hashtable *ht, char *key, int value){
+int ht_insert(Hashtable *ht, char key[static HT_KEY_SIZE], int value){
     LOGF("HT Insert: %d, %s, %d\r\n", ht, key, value);
     int hsh = hash(key), n = 0;
     ASSERT(hsh < HT_SIZE, "Hash Invariant", ERR_INVARIANT_BROKEN);
@@ -51,7 +75,7 @@ int ht_insert(Hashtable *ht, char *key, int value){
     return 0;
 }
 
-int ht_lookup(Hashtable *ht, char * key){
+int ht_lookup(Hashtable *ht, char key[static HT_KEY_SIZE]){
     int hsh = hash(key), n = 0;
     ASSERT(hsh < HT_SIZE, "Hash Invariant", ERR_INVARIANT_BROKEN);
     while (streq((*ht)[hsh].key, key) == 0) {

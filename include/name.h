@@ -1,7 +1,7 @@
 #ifndef NAME_H
 #define NAME_H
 
-#define MAXNAMESIZE 20
+#define MAXNAMESIZE 8
 #define NUM_NAMES 100
 
 extern int TID_NS;
