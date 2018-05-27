@@ -1,6 +1,4 @@
 #include <debug.h>
-#include <minheap.h>
-#include <elem.h>
 #include <kernel.h>
 #include <tasks.h>
 #include <bwio.h>
@@ -9,6 +7,7 @@
 #include <name.h>
 #include <rps.h>
 #include <util.h>
+#include <msg_metrics.h>
 
 int kernel_init(){
     __asm__(
@@ -69,12 +68,16 @@ void TestHashTable(){
 void fut(){
     int r = Create(PRIORITY_WAREHOUSE, &task_nameserver);
     r = RegisterAs("FUT");
+    //*
+    r = Create(PRIORITY_HIGH, &task_msg_metrics);
+    /*/
     r = Create(PRIORITY_HIGH, &task_rps);
     bwprintf(COM2, "Created RPS Server: %d\r\n", r);
     r = Create(PRIORITY_LOW, &task_rps_client);
     bwprintf(COM2, "Created RPS Client 1: %d\r\n", r);
     r = Create(PRIORITY_LOW, &task_rps_client);
     bwprintf(COM2, "Created RPS Client 2: %d\r\n", r);
+    //*/
     Exit();
 }
 
