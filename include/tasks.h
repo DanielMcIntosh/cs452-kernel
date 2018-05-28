@@ -55,14 +55,21 @@ typedef struct taskdesc {
     struct taskdesc *rcv_queue_tail;
 } TD;
 
-int task_init(TD *task_pool, TD **queue_heads, TD **queue_tails, char *stack_space, unsigned int stack_space_size);
+typedef struct {
+    TD *heads[NUM_PRIORITIES];
+    TD *tails[NUM_PRIORITIES];
+    TD *free_queue;
+    unsigned int ready_bitfield : NUM_PRIORITIES;
+} TaskQueue;
+
+int task_init(TD *task_pool, TaskQueue *queue, char *stack_space, unsigned int stack_space_size);
 
 int task_getTid(TD *task);
 int task_getParentTid(TD *task);
 
-TD *task_nextActive(TD **queue_heads, TD **queue_tails);
-int task_react_to_state(TD *task, TD **queue_heads, TD **queue_tails, TD **free_queue);
-int task_create(TD **queue_heads, TD **queue_tails, TD **free_queue, int parent_tid, Priority priority, int lr);
+TD *task_nextActive(TaskQueue *queue);
+int task_react_to_state(TD *task, TaskQueue *queue);
+int task_create(TaskQueue *queue, int parent_tid, Priority priority, int lr);
 
 static inline TD *task_lookup(TD *task_pool, int tid) {
     return &(task_pool[tid & TASK_BASE_TID_MASK]);

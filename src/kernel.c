@@ -18,8 +18,8 @@ int kernel_init(){
 }
 
 
-TD* schedule(TD **task_ready_queues, TD **task_ready_queue_tails){
-    return task_nextActive(task_ready_queues, task_ready_queue_tails);
+TD* schedule(TaskQueue *task_ready_queue){
+    return task_nextActive(task_ready_queue);
 }
 
 extern int activate(int task);
@@ -89,13 +89,11 @@ int main(){
     char stack_space[STACK_SPACE_SIZE];
 
     TD task_pool[TASK_POOL_SIZE];
-    TD *task_ready_queues[NUM_PRIORITIES];
-    TD *task_ready_queue_tails[NUM_PRIORITIES];
-    TD *task_free_queue = task_pool;
+    TaskQueue task_ready_queue;
 
-    task_init(task_pool, task_ready_queues, task_ready_queue_tails, stack_space, STACK_SPACE_SIZE);
+    task_init(task_pool, &task_ready_queue, stack_space, STACK_SPACE_SIZE);
 
-    int err = task_create(task_ready_queues, task_ready_queue_tails, &task_free_queue, 1, 4, (int) &fut);
+    int err = task_create(&task_ready_queue, 1, 4, (int) &fut);
     if (err < 0) {
         bwprintf(COM2, "-=-=-=-=-=-=ERR = %d=-=-=-=-=-=-=-\r\n", err);
         return -1;
@@ -103,8 +101,8 @@ int main(){
     LOG("Task Created!\r\n");
     LOGF("&fut: %x\r\n", (int) &fut);
 
-    TD *task = schedule(task_ready_queues, task_ready_queue_tails);
-    LOGF("OFFSETS: lr %d, sp %d, r0 %d, spsr %d, args0 %d, arg4 %d, task %d", &(task->lr), &(task->sp), &(task->r0), &(task->spsr), &(task->syscall_args[0]), &(task->syscall_args[4]), task);
+    TD *task = schedule(&task_ready_queue);
+    LOGF("OFFSETS: lr %d, sp %d, r0 %d, spsr %d, args0 %d, arg4 %d, task %d\r\n", &(task->lr), &(task->sp), &(task->r0), &(task->spsr), &(task->syscall_args[0]), &(task->syscall_args[4]), task);
     while (task){
         LOGF("Task Scheduled! Pr = %d\t", task->priority);
         LOGF("task = %x\t", (int) task);
@@ -114,9 +112,9 @@ int main(){
         LOGC(f);
         LOG("\r\n");
 
-        handle(f, task, task_pool, task_ready_queues, task_ready_queue_tails, &task_free_queue);
+        handle(f, task, task_pool, &task_ready_queue);
         LOG("\r\n");
-        task = schedule(task_ready_queues, task_ready_queue_tails);
+        task = schedule(&task_ready_queue);
     }
     LOG("Kernel Exiting - No More Tasks");
 

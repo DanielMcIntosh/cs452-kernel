@@ -5,9 +5,9 @@
 #include "tasks.h"
 #include "util.h"
 
-static inline void handle_create(TD *task, TD** task_ready_queues, TD** task_ready_queue_tails, TD** task_free_queue, int *args) {
+static inline void handle_create(TD *task, TaskQueue *task_ready_queue, int *args) {
     LOGF("TASK CREATE: %d, %d, %d\r\n", task_getTid(task), args[0], args[1]);
-    task->r0 = task_create(task_ready_queues, task_ready_queue_tails, task_free_queue, task_getTid(task), args[0], args[1]);
+    task->r0 = task_create(task_ready_queue, task_getTid(task), args[0], args[1]);
 }
 
 static inline void handle_tid(TD *task) {
@@ -36,7 +36,7 @@ static inline void handle_exit(TD *task) {
 //                                  MESSAGE PASSING
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-static inline void handle_send(TD *task, TD *task_pool, TD** task_ready_queues, TD** task_ready_queue_tails, TD** task_free_queue, int *args) {
+static inline void handle_send(TD *task, TD *task_pool, TaskQueue *task_ready_queue, int *args) {
     LOG("SEND called\r\n");
 
     TD *receiver = task_lookup(task_pool, args[0]);
@@ -59,7 +59,7 @@ static inline void handle_send(TD *task, TD *task_pool, TD** task_ready_queues, 
 
         receiver->state = STATE_READY;
         task->state = STATE_REPLY_BLOCKED; // sender state will be reacted to after returning from this method
-        task_react_to_state(receiver, task_ready_queues, task_ready_queue_tails, task_free_queue);
+        task_react_to_state(receiver, task_ready_queue);
     }
     else {
         task->state = STATE_RECEIVE_BLOCKED;
@@ -106,7 +106,7 @@ static inline void handle_receive(TD *task, int *args) {
     }
 }
 
-static inline void handle_reply(TD *task, TD *task_pool, TD** task_ready_queues, TD** task_ready_queue_tails, TD** task_free_queue, int *args) {
+static inline void handle_reply(TD *task, TD *task_pool, TaskQueue *task_ready_queue, int *args) {
     LOG("REPLY called\r\n");
     
     TD *sender = task_lookup(task_pool, args[0]);
@@ -129,17 +129,17 @@ static inline void handle_reply(TD *task, TD *task_pool, TD** task_ready_queues,
     memcpy((void *) sender->syscall_args[3], (int *)(args[1]), MIN(args[2], sender->syscall_args[4]));   
 
     sender->state = STATE_READY;
-    task_react_to_state(sender, task_ready_queues, task_ready_queue_tails, task_free_queue);
+    task_react_to_state(sender, task_ready_queue);
 }
 
-Syscall handle(Syscall a, TD *task, TD *task_pool, TD** task_ready_queues, TD** task_ready_queue_tails, TD** task_free_queue) {
+Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) {
     LOGF("HANDLE: %d, %d\t", a, task);
     int *args = task->syscall_args;
     LOGF("ARGS: %d, %d, %d, %d, %d\t", args[0], args[1], args[2], args[3], args[4]);
     switch(a) {
         case SYSCALL_CREATE:
         {
-            handle_create(task, task_ready_queues, task_ready_queue_tails, task_free_queue, args);
+            handle_create(task, task_ready_queue, args);
             break;
         }
         case SYSCALL_TID:
@@ -164,7 +164,7 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TD** task_ready_queues, TD** 
         }
         case SYSCALL_SEND:
         {
-            handle_send(task, task_pool, task_ready_queues, task_ready_queue_tails, task_free_queue, args);
+            handle_send(task, task_pool, task_ready_queue, args);
             break;
         }
         case SYSCALL_RECEIVE:
@@ -174,7 +174,7 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TD** task_ready_queues, TD** 
         }
         case SYSCALL_REPLY:
         {
-            handle_reply(task, task_pool, task_ready_queues, task_ready_queue_tails, task_free_queue, args);
+            handle_reply(task, task_pool, task_ready_queue, args);
             break;
         }
         default:
@@ -183,6 +183,6 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TD** task_ready_queues, TD** 
             break;
         }
     }
-    task_react_to_state(task, task_ready_queues, task_ready_queue_tails, task_free_queue);
+    task_react_to_state(task, task_ready_queue);
     return a;
 }

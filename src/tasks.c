@@ -5,25 +5,33 @@
 #include "bwio.h"
 #include "debug.h"
 
-//#define CIRCULAR
-
 //////////////////////////////////////////////////////
 //  HELPERS
 //////////////////////////////////////////////////////
-void insert(TD **queue_heads, TD **queue_tails, TD *task, Priority priority) {
-    TD *tail = queue_tails[priority];
+static const char LogTable256[256] = 
+{
+#define LT(n) n, n, n, n, n, n, n, n, n, n, n, n, n, n, n, n
+    -1, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3,
+    LT(4), LT(5), LT(5), LT(6), LT(6), LT(6), LT(6),
+    LT(7), LT(7), LT(7), LT(7), LT(7), LT(7), LT(7), LT(7)
+};
+
+static inline int log_2(unsigned int v) {
+    register unsigned int t; // temporaries
+
+    return (t = v >> 8) ? 8 + LogTable256[t] : LogTable256[v];
+}
+
+void insert(TaskQueue *queue, TD *task, Priority priority) {
+    TD *tail = queue->tails[priority];
     if (!tail) {
-        queue_heads[priority] = task;
+        queue->heads[priority] = task;
     }
     else {
-        queue_tails[priority]->rdynext = task;
+        tail->rdynext = task;
     }
-#ifdef CIRCULAR
-    task->rdynext = queue_heads[priority];
-#else
     task->rdynext = 0;
-#endif
-    queue_tails[priority] = task;
+    queue->tails[priority] = task;
 }
 
 TD *init_task(TD *task, int parent_tid, Priority priority, int lr) {
@@ -45,14 +53,13 @@ TD *init_task(TD *task, int parent_tid, Priority priority, int lr) {
     return task;
 }
 
-int fetch_task(TD **ret, TD **free_queue) {
-    if (!(*free_queue)) {
+int fetch_task(TD **ret, TaskQueue *queue) {
+    if (!queue->free_queue) {
         return -2;
     }
-    TD *task = *free_queue;
+    TD *task = queue->free_queue;
 
-    //free queue is linear, so we don't worry about looping around
-    *free_queue = task->rdynext; 
+    queue->free_queue = task->rdynext; 
 
     *ret = task;
     return 0;
@@ -61,7 +68,7 @@ int fetch_task(TD **ret, TD **free_queue) {
 //////////////////////////////////////////////////////
 //  EXPOSED
 //////////////////////////////////////////////////////
-int task_init(TD *task_pool, TD **queue_heads, TD **queue_tails, char * stack_space, unsigned int stack_space_size) {
+int task_init(TD *task_pool, TaskQueue *queue, char * stack_space, unsigned int stack_space_size) {
     int STACK_SPACE_PER_TASK = stack_space_size/TASK_POOL_SIZE - 4;
 
     for (int i = 0; i < TASK_POOL_SIZE; ++i) {
@@ -80,9 +87,10 @@ int task_init(TD *task_pool, TD **queue_heads, TD **queue_tails, char * stack_sp
     task_lookup(task_pool, TASK_POOL_SIZE-1)->rdynext = 0;
 
     for (int i = 0; i < NUM_PRIORITIES; ++i) {
-        queue_heads[i] = 0;
-        queue_tails[i] = 0;
+        queue->heads[i] = 0;
+        queue->tails[i] = 0;
     }
+    queue->free_queue = task_pool;
     return 0;
 }
 
@@ -94,28 +102,28 @@ int task_getParentTid(TD *task) {
     return task->p_tid;
 }
 
-TD *task_nextActive(TD **queue_heads, TD **queue_tails) {
-   for (int i = 0; i < NUM_PRIORITIES; ++i) {
-        if (queue_heads[i]) {
-            TD *active = queue_heads[i];
-            queue_heads[i] = queue_heads[i]->rdynext;
-#ifndef CIRCULAR
-            if (!queue_heads[i]) {
-                queue_tails[i] = 0;
+TD *task_nextActive(TaskQueue *queue) {
+    for (int ready = 0; ready < NUM_PRIORITIES; ++ready) {
+        if (queue->heads[ready]) {
+
+            TD *active = queue->heads[ready];
+            queue->heads[ready] = queue->heads[ready]->rdynext;
+
+            if (!queue->heads[ready]) {
+                queue->tails[ready] = 0;
             }
-#endif
+
             return active;
         }
     }
-
     return 0;
 }
 
-int task_react_to_state(TD *task, TD **queue_heads, TD **queue_tails, TD **free_queue) {
+int task_react_to_state(TD *task, TaskQueue *queue) {
     switch (task->state) {
         case STATE_READY:
         {
-            insert(queue_heads, queue_tails, task, task->priority);
+            insert(queue, task, task->priority);
             break;
         }
         case STATE_SEND_BLOCKED:
@@ -130,22 +138,22 @@ int task_react_to_state(TD *task, TD **queue_heads, TD **queue_tails, TD **free_
         }
         case STATE_DESTROYED:
         {
-            task->rdynext = *free_queue;
-            *free_queue = task;
+            task->rdynext = queue->free_queue;
+            queue->free_queue = task;
             break;
         }
     }
     return 0;
 }
 
-int task_create(TD **queue_heads, TD **queue_tails, TD **free_queue, int parent_tid, Priority priority, int lr) {
+int task_create(TaskQueue *queue, int parent_tid, Priority priority, int lr) {
     TD *task;
     int err;
 
     if (priority >= NUM_PRIORITIES) {
         return -1;
     }
-    err = fetch_task(&task, free_queue);
+    err = fetch_task(&task, queue);
     if (err) {
         return err;
     }
@@ -167,7 +175,7 @@ int task_create(TD **queue_heads, TD **queue_tails, TD **free_queue, int parent_
     LOGF("lr = %x\t", task->lr);
     LOGF("sp = %x\r\n", task->sp);
     //insert the new task into the queues, the old one will be handled in task_react_to_state
-    insert(queue_heads, queue_tails, task, priority);
+    insert(queue, task, priority);
 
     return task_getTid(task);
 }
