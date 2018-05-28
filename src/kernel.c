@@ -83,6 +83,18 @@ void fut(){
 
 
 int main(){
+#if CACHE
+    __asm__(
+        "ldr r1, %[bits]\n\t"
+        "MRC p15, 0, r0, c1, c0, 0\n\t"
+        "orr r0, r0, r1\n\t"
+        "MCR p15, 0, r0, c1, c0, 0\n\t"
+            :
+            : [bits] "rim" (0x1004)
+            : "r0", "r1"
+        );
+#endif //CACHE
+
     LOG("Start!");
 
     kernel_init();

@@ -6,13 +6,6 @@
 #include "bwio.h"
 #include "debug.h"
 
-//OPTIONS
-#define MSG_SIZE 4
-
-#define PRIORITY_SND PRIORITY_MID
-#define PRIORITY_RCV PRIORITY_LOW
-
-#define ITERATIONS 50000
 
 void snd_task() {
     RegisterAs(SND_NAME);

@@ -117,7 +117,7 @@ TD *task_nextActive(TaskQueue * restrict queue) {
     return 0;
 }
 
-int task_react_to_state(TD * restrict task, TaskQueue * restrict queue) {
+void task_react_to_state(TD * restrict task, TaskQueue * restrict queue) {
     switch (task->state) {
         case STATE_READY:
         {
@@ -141,7 +141,6 @@ int task_react_to_state(TD * restrict task, TaskQueue * restrict queue) {
             break;
         }
     }
-    return 0;
 }
 
 int task_create(TaskQueue * restrict queue, int parent_tid, Priority priority, int lr) {
