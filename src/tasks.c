@@ -8,7 +8,7 @@
 //////////////////////////////////////////////////////
 //  HELPERS
 //////////////////////////////////////////////////////
-static const char LogTable256[256] = 
+static const signed char LogTable256[256] = 
 {
 #define LT(n) n, n, n, n, n, n, n, n, n, n, n, n, n, n, n, n
     -1, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3,
@@ -26,6 +26,7 @@ void insert(TaskQueue * restrict queue, TD * restrict task, Priority priority) {
     TD *tail = queue->tails[priority];
     if (!tail) {
         queue->heads[priority] = task;
+        queue->ready_bitfield |= 0x1 << priority;
     }
     else {
         tail->rdynext = task;
@@ -89,6 +90,7 @@ int task_init(TD *task_pool, TaskQueue * restrict queue, char * restrict stack_s
         queue->tails[i] = 0;
     }
     queue->free_queue = task_pool;
+    queue->ready_bitfield = 0;
     return 0;
 }
 
@@ -101,20 +103,21 @@ int task_getParentTid(TD *task) {
 }
 
 TD *task_nextActive(TaskQueue * restrict queue) {
-    for (int ready = 0; ready < NUM_PRIORITIES; ++ready) {
-        if (queue->heads[ready]) {
-
-            TD * restrict active = queue->heads[ready];
-            queue->heads[ready] = active->rdynext;
-
-            if (!queue->heads[ready]) {
-                queue->tails[ready] = 0;
-            }
-
-            return active;
-        }
+    int ready = log_2(queue->ready_bitfield);
+    if (ready < 0) {
+        return 0;
     }
-    return 0;
+
+    TD * restrict active = queue->heads[ready];
+    queue->heads[ready] = active->rdynext;
+
+    if (!queue->heads[ready]) {
+        queue->tails[ready] = 0;
+        //since we know that it is true, use xor to invert, rather than &= ~() as this takes 1 fewer operations
+        queue->ready_bitfield ^= 0x1 << ready;
+    }
+
+    return active;
 }
 
 void task_react_to_state(TD * restrict task, TaskQueue * restrict queue) {
