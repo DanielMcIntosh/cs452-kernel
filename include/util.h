@@ -16,4 +16,13 @@ void * memcpy(void * dest, const void* src, unsigned int sz);
 #define NULL 0
 #endif
 
+#ifndef MAX
+#define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))
+#endif
+
+#ifndef MIN
+#define MIN(X, Y) (((X) > (Y)) ? (X) : (Y))
+#endif
+
+
 #endif

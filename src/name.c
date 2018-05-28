@@ -32,15 +32,15 @@ void task_nameserver(){
     NameServer ns;
     ht_init(&ns.ht);
     TID_NS = MyTid();
-    int tid, err;
+    int tid, size;
     NameMessage msg;
     LOGF("NameServer (%d) begin loop", TID_NS);
     FOREVER { 
-        err = Receive(&tid, &msg, sizeof(msg));
-        if (err){
-            LOGF("NameServer error: %d\r\n ", err);
+        size = Receive(&tid, &msg, sizeof(msg));
+        if (size != sizeof(msg)){
+            LOGF("NameServer error: %d\r\n ", size);
             LOGF("Message: %d %s %d\r\n", msg.id, msg.name, msg.tid);
-            msg.tid = err;
+            msg.tid = ERR_MSG_TRUNCATED;
         } else if (!legal_name(msg.name)){
             msg.tid = ERR_INVALID_ARGUMENT;
         } else {

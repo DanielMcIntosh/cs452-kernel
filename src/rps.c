@@ -16,22 +16,24 @@ typedef struct {
 int Signup(int rps_tid){
     RPSMessage msg;
     msg.type = MESSAGE_RPS_SIGNUP;
-    return Send(rps_tid, &msg, sizeof(msg), &msg, sizeof(msg));
+    int size = Send(rps_tid, &msg, sizeof(msg), &msg, sizeof(msg));
+    return (size == sizeof(msg)) ? 0 : size;
 }
 int Play(int rps_tid, RPS move, RPSStatus* reply){
     RPSMessage msg;
     ReplyMessage rply;
     msg.type = MESSAGE_RPS_PLAY;
     msg.move = move;
-    int err = Send(rps_tid, &msg, sizeof(msg), &rply, sizeof(rply));
+    int size = Send(rps_tid, &msg, sizeof(msg), &rply, sizeof(rply));
     *reply = rply.ret;
-    return err;
+    return (size == sizeof(rply)) ? 0 : size;
 }
 int Quit(int rps_tid){
     RPSMessage msg;
     msg.type = MESSAGE_RPS_PLAY;
     msg.move = QUIT;
-    return Send(rps_tid, &msg, sizeof(msg), &msg, sizeof(msg));
+    int size = Send(rps_tid, &msg, sizeof(msg), &msg, sizeof(msg));
+    return (size == sizeof(msg)) ? 0 : size;
 }
 
 int wins(RPS a, RPS b){
@@ -57,14 +59,14 @@ void task_rps(){
 
     LOG("RPS Server Registration");
     RegisterAs(RPS_NAME);
-    int tid, err, opp, play;
+    int tid, size, err, opp, play;
     RPSMessage msg;
     ReplyMessage rply;
     rply.type = MESSAGE_REPLY;
     LOG("RPS Server Init");
     FOREVER {
-        err = Receive(&tid, &msg, sizeof(msg));
-        ASSERT(err == 0, "Error recieving message",);
+        size = Receive(&tid, &msg, sizeof(msg));
+        ASSERT(size == sizeof(msg), "Error recieving complete message",);
         LOGF("RPS Server recieved: %d, %d\r\n", msg.type, msg.move);
         tid &= TASK_BASE_TID_MASK;
         switch (msg.type) {

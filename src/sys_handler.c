@@ -54,9 +54,10 @@ static inline void handle_send(TD *task, TD *task_pool, TD** task_ready_queues, 
         if (args[2] != receiver->syscall_args[2]){
             receiver->r0 = ERR_MSG_TRUNCATED;
         } else {
-            memcpy((int *)(receiver->syscall_args[1]), (int *)(args[1]), args[2]);
-            receiver->r0 = 0;
+            receiver->r0 = args[2];
         }
+        memcpy((int *)(receiver->syscall_args[1]), (int *)(args[1]), MIN(args[2], receiver->syscall_args[2]));
+
         receiver->state = STATE_READY;
         task->state = STATE_REPLY_BLOCKED; // sender state will be reacted to after returning from this method
         task_react_to_state(receiver, task_ready_queues, task_ready_queue_tails, task_free_queue);
@@ -95,10 +96,10 @@ static inline void handle_receive(TD *task, int *args) {
         if (args[2] != len) { // TODO: is this the correct behavior for when the lengths are wrong?
             task->r0 = ERR_MSG_TRUNCATED;
         } else {
-            *((int *) task->syscall_args[2]) = len;
-            memcpy((int *)(args[1]), msg, len);   
-            task->r0 = 0;
+            task->r0 = len;
         }
+        memcpy((int *)(args[1]), msg, MIN(len, args[2]));
+
         sender->state = STATE_REPLY_BLOCKED;
         task->state = STATE_READY;
     }
@@ -126,9 +127,9 @@ static inline void handle_reply(TD *task, TD *task_pool, TD** task_ready_queues,
         sender->r0 = ERR_MSG_TRUNCATED;
     } else {
         task->r0 = 0;
-        sender->r0 = 0;
-        memcpy((void *) sender->syscall_args[3], (int *)(args[1]), args[2]);   
+        sender->r0 = args[2];
     }
+    memcpy((void *) sender->syscall_args[3], (int *)(args[1]), MIN(args[2], sender->syscall_args[4]));   
 
     sender->state = STATE_READY;
     task_react_to_state(sender, task_ready_queues, task_ready_queue_tails, task_free_queue);
