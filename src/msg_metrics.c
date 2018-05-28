@@ -12,7 +12,7 @@
 #define PRIORITY_SND PRIORITY_MID
 #define PRIORITY_RCV PRIORITY_LOW
 
-#define ITERATIONS 10000
+#define ITERATIONS 50000
 
 void snd_task() {
     RegisterAs(SND_NAME);

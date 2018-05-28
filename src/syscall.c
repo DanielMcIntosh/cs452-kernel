@@ -8,11 +8,7 @@ inline static __attribute__((always_inline)) int syscall_5(const int n, const in
 // Save r0-r3 (on the stack?)
 // Insert any arguments in r0-r3 (i.e. pointer for create)
 __asm__(
-    ASM_STACK_PUSH("lr")
-    ASM_STACK_PUSH("r0")
-    ASM_STACK_PUSH("r1")
-    ASM_STACK_PUSH("r2")
-    ASM_STACK_PUSH("r3")
+    "stmdb sp!, {r0-r3,lr}\n\t"
     "mov r0, %[arg5]\n\t"
     ASM_STACK_PUSH("r0")
     "mov r0, %[arg1]\n\t"
@@ -26,11 +22,7 @@ __asm__(
 // Store r0 (return value)
 __asm__(
     "mov %[ret], r0\n\t"
-    ASM_STACK_POP("r3")
-    ASM_STACK_POP("r2")
-    ASM_STACK_POP("r1")
-    ASM_STACK_POP("r0")
-    ASM_STACK_POP("lr")
+    "ldmia sp!, {r0-r3,lr}\n\t"
     : [ret] "=r"(ret)
     :
     : "r0", "r1", "r2", "r3", "lr");
@@ -69,7 +61,7 @@ int Send(int tid, void *msg, int msglen, void *reply, int rplen){
     return syscall_5(SYSCALL_SEND, tid, (int) msg, msglen, (int) reply, rplen);
 }
 
-int Receive(int *tid, void *msg, int msglen){
+int Receive(int * restrict tid, void * restrict msg, int msglen){
     return syscall_3(SYSCALL_RECEIVE, (int) tid, (int) msg, msglen);
 }
 

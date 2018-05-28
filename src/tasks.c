@@ -22,7 +22,7 @@ static inline int log_2(unsigned int v) {
     return (t = v >> 8) ? 8 + LogTable256[t] : LogTable256[v];
 }
 
-void insert(TaskQueue *queue, TD *task, Priority priority) {
+void insert(TaskQueue * restrict queue, TD * restrict task, Priority priority) {
     TD *tail = queue->tails[priority];
     if (!tail) {
         queue->heads[priority] = task;
@@ -53,22 +53,20 @@ TD *init_task(TD *task, int parent_tid, Priority priority, int lr) {
     return task;
 }
 
-int fetch_task(TD **ret, TaskQueue *queue) {
+TD *fetch_task(TaskQueue * restrict queue) {
     if (!queue->free_queue) {
-        return -2;
+        return 0;
     }
-    TD *task = queue->free_queue;
-
+    TD * restrict task = queue->free_queue;
     queue->free_queue = task->rdynext; 
 
-    *ret = task;
-    return 0;
+    return task;
 }
 
 //////////////////////////////////////////////////////
 //  EXPOSED
 //////////////////////////////////////////////////////
-int task_init(TD *task_pool, TaskQueue *queue, char * stack_space, unsigned int stack_space_size) {
+int task_init(TD *task_pool, TaskQueue * restrict queue, char * restrict stack_space, unsigned int stack_space_size) {
     int STACK_SPACE_PER_TASK = stack_space_size/TASK_POOL_SIZE - 4;
 
     for (int i = 0; i < TASK_POOL_SIZE; ++i) {
@@ -102,12 +100,12 @@ int task_getParentTid(TD *task) {
     return task->p_tid;
 }
 
-TD *task_nextActive(TaskQueue *queue) {
+TD *task_nextActive(TaskQueue * restrict queue) {
     for (int ready = 0; ready < NUM_PRIORITIES; ++ready) {
         if (queue->heads[ready]) {
 
-            TD *active = queue->heads[ready];
-            queue->heads[ready] = queue->heads[ready]->rdynext;
+            TD * restrict active = queue->heads[ready];
+            queue->heads[ready] = active->rdynext;
 
             if (!queue->heads[ready]) {
                 queue->tails[ready] = 0;
@@ -119,7 +117,7 @@ TD *task_nextActive(TaskQueue *queue) {
     return 0;
 }
 
-int task_react_to_state(TD *task, TaskQueue *queue) {
+int task_react_to_state(TD * restrict task, TaskQueue * restrict queue) {
     switch (task->state) {
         case STATE_READY:
         {
@@ -146,16 +144,15 @@ int task_react_to_state(TD *task, TaskQueue *queue) {
     return 0;
 }
 
-int task_create(TaskQueue *queue, int parent_tid, Priority priority, int lr) {
-    TD *task;
-    int err;
+int task_create(TaskQueue * restrict queue, int parent_tid, Priority priority, int lr) {
+    TD * restrict task;
 
     if (priority >= NUM_PRIORITIES) {
         return -1;
     }
-    err = fetch_task(&task, queue);
-    if (err) {
-        return err;
+    task = fetch_task(queue);
+    if (!task) {
+        return -2;
     }
 
     init_task(task, parent_tid, priority, lr);
