@@ -22,7 +22,7 @@ __asm__(
     "swi %[n]\n\t"
         :
         : [n] "i" (n), [arg1] "ri" (arg1), [arg2] "ri" (arg2), [arg3] "ri" (arg3), [arg4] "ri" (arg4), [arg5] "ri" (arg5)
-        : "r0", "r1", "r2", "r3");
+        : "r0", "r1", "r2", "r3", "lr");
 // Store r0 (return value)
 __asm__(
     "mov %[ret], r0\n\t"
@@ -33,7 +33,7 @@ __asm__(
     ASM_STACK_POP("lr")
     : [ret] "=r"(ret)
     :
-    : "r0", "r1", "r2", "r3");
+    : "r0", "r1", "r2", "r3", "lr");
 // Re-load r0-r3
     return ret;
 }

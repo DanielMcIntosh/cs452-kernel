@@ -108,6 +108,7 @@ int main(){
     while (task){
         LOGF("Task Scheduled! Pr = %d\t", task->priority);
         LOGF("task = %x\t", (int) task);
+        LOGF("task->r0 = %d\t", task->r0);
         LOGF("task->lr = %x\r\n", task->lr);
         int f = activate((int) task);
         LOGC(f);

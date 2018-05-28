@@ -49,7 +49,6 @@ static inline void handle_send(TD *task, TD *task_pool, TD** task_ready_queues, 
     //reciever is already waiting for a message
     if (receiver->state == STATE_SEND_BLOCKED)
     {
-        LOG("Receiver is send blocked\r\n");
         *((int *)(receiver->syscall_args[0])) = task_getTid(task); //set the tid of the receive caller
         if (args[2] != receiver->syscall_args[2]){
             receiver->r0 = ERR_MSG_TRUNCATED;
@@ -81,8 +80,6 @@ static inline void handle_receive(TD *task, int *args) {
 
     //someone has already sent us a message
     if (sender != NULL) {
-        LOGF("Sender: %d\r\n", sender);
-
         //pop sender from queue
         task->rcv_queue = sender->rdynext;
         if (task->rcv_queue == NULL){
@@ -98,7 +95,7 @@ static inline void handle_receive(TD *task, int *args) {
         } else {
             task->r0 = len;
         }
-        memcpy((int *)(args[1]), msg, MIN(len, args[2]));
+        memcpy((void *)(args[1]), msg, MIN(len, args[2]));
 
         sender->state = STATE_REPLY_BLOCKED;
         task->state = STATE_READY;
