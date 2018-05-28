@@ -1,5 +1,5 @@
 bin/*.o
-bin/*.s
+bin/*
 *.map
 todo.txt
 .d/*
