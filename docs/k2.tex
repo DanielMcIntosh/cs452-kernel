@@ -13,6 +13,7 @@
 The repository for the code can be found at \url{https://git.uwaterloo.ca/baforbes/cs452-kernel/tree/k2}.
 To build the executable, run the following command from the root directory: \begin{verbatim} make \end{verbatim}
 To build this document, run the following command from the root directory: \begin{verbatim} make docs \end{verbatim}
+The executable will be built to \verb|<repo_root>/bin/kernel.elf|\\
 
 Once run, the program will initialize the kernel, and then create the first user task. This task will then create 3 other tasks: the Rock Paper Scissors (RPS) server, and 2 RPS clients. The clients will play $10$ RPS games against each other, awaiting user input when they recieve replies from the RPS server so the game results are displayed.
 
@@ -58,7 +59,7 @@ Each task struct now has a recieve queue (implemented via head and tail pointers
     After finding the RPS server TID and signing up for a game, clients play 10 moves. Each move is chosen via taking the low bits of the 40-bit debug clock modulo 3 - effectively randomly. After 10 games, they quit, and then exit.
 
 \subsection{Changes from Kernel 1}
-    The architecture from Kernel 1 has not been significantly changed, but various optimizations were added. For example, unneccesary instructions were removed from \verb|asm/activate.s|, the loop in \verb|memcpy| was unrolled, more information was added to aid GCC's optimization, and sequential stack pushes/pops of individual registers were merged into \verb|stmdb| and \verb|ldmia| instructions.
+    The architecture from Kernel 1 has not been significantly changed, but various optimizations were added. For example, unneccesary instructions were removed from \verb|asm/activate.s|, the loop in \verb|memcpy| was unrolled using duff's device, more information was added to aid GCC's optimization, and sequential stack pushes/pops of individual registers were merged into \verb|stmdb| and \verb|ldmia| instructions.
 \subsection{New Data Structures}
     The only major new data structure used is the hash table in the name server. We chose a hash table with linear probing because it was relatively small (only a factor $1.3$ time larger than an array of the size of the maximum number of names we expected to store), easy to implement, and was a decent performance increase in the average case. We recognized that most stores and lookups only happened on kernel startup, but still saw benefit to these performance increases.
 
@@ -67,7 +68,7 @@ Each task struct now has a recieve queue (implemented via head and tail pointers
     If it is not the correct item, the hashtable is probed linearly downwards (cyclically) until the key is found.
     In both operations, the operation fails if the hashtable is full.
 
-    As a hash function, we chose the djb2 function (from http://www.cse.yorku.ca/~oz/hash.html). This is because it is extremely simple, fast, and has good distribution of hashes.
+    As a hash function, we chose the djb2 function (from \url{http://www.cse.yorku.ca/\~oz/hash.html}). This is because it is extremely simple, fast, and has good distribution of hashes.
 \section{Explanation of Program Output}
 The output of the program should be:
 \begin{verbatim}
@@ -104,5 +105,51 @@ Message length & Caches & Send before Reply & Optimization & Time\\
 64  &    on   &   no    &      on        &      16\\
 \hline
 \end{tabular}
+\section{File Hashes and Commit hash}
+\begin{minipage}{\textwidth}
+Output of \verb|sha1sum src/* include/* asm/*|
 
+\begin{tabular}{|c|l|}
+\hline
+Hash & File\\
+\hline
+97231c9fde9f0d4155cc6733c81473fe43145871    &     src/circlebuffer.c\\
+873aa16244be9feb8696a41bd6860e380c738773    &     src/clock.c\\
+8010e18b2f848f65ca49fd70ad0250822f01d686    &     src/comio.c\\
+0796c2a8d3aa58db79c116ee2fe0f7c23269396a    &     src/hashtable.c\\
+ede430e48ae75191c3981e59702be57ac6e365d2    &     src/kernel.c\\
+240681f6e6a4ff7e6c21913f475c010f8fa94836    &     src/minheap.c\\
+93c61448622b997a5316f3630371f96eef74637c    &     src/msg\_metrics.c\\
+818c1cb7dfba9b64774d250d6f43599ff823ea48    &     src/name.c\\
+6bbf2f4b05ea5200dfde4529268618ff0dc4ad10    &     src/rps.c\\
+9ca83aed60b535be101ea973aa8e321dfa260577    &     src/sys\_handler.c\\
+8ab24aed7959069820c1b78ae5127d3296cf7230    &     src/syscall.c\\
+448dbc529557a03523524015b8771d7f91717743    &     src/tasks.c\\
+a4ba75a0a842651ec25dde2fb3ada423a9394930    &     src/track\_data.c\\
+c27eea7678367b8e67648851035b7f216581d592    &     src/util.c\\
+304c87bfa20cc259217a5b89218c22ace9782fd7    &     include/bwio.h\\
+fbd69d26075f67eaf1ae17d09be5d26b202a4382    &     include/circlebuffer.h\\
+1f42302fdde007ec9d73a0cc37d80140c4531fe6    &     include/clock.h\\
+d871edc6c39e07102bb5fbfe10cbc657bf64c4e1    &     include/comio.h\\
+92d08a1c7b26241036cda9d946bf78ad278282b8    &     include/debug.h\\
+e400d1667b2aa52683dc8980709635beed86b455    &     include/elem.h\\
+c41c6a180ea06c5e61f7e9eb3bbe858b98506309    &     include/err.h\\
+cbb7faeff032fb3703540cac1a152a310a08565a    &     include/hashtable.h\\
+e8eb6c8c7327bc68be8373102e7f4b19913a26a7    &     include/kernel.h\\
+ac8eaf2964566e3bcda903e3dcf27b3abe49dfb5    &     include/message.h\\
+b75bead1e2e343f8b80db372925d27583c30005b    &     include/minheap.h\\
+723d801a3c99cd243bc9e12b15c319d8ae16da6a    &     include/msg\_metrics.h\\
+e52482b9f0f9c45c6d0e7b6644c543c65238e5b3    &     include/name.h\\
+82a1cc6e0e1f232f0e56eec87dc6e2173ca1fb76    &     include/rps.h\\
+b988d142755c58c9321f98c4605887b0caeab2c6    &     include/sys\_handler.h\\
+371c2704f5ba742ec5d1fcc5eb876036a1c10a1e    &     include/syscall.h\\
+dd749b1bc62069f06791465613ceece826824869    &     include/tasks.h\\
+464a4766793704c28e49960fb3b78283124fecd6    &     include/track\_data.h\\
+f5c6374f35eda215237b9692e2f5c602cb405d08    &     include/track\_node.h\\
+d701602b5ceeff844853f2360d5a7fa3d35ade33    &     include/ts7200.h\\
+78eb6344868e03101c348ffb0debd079530286e8    &     include/util.h\\
+020477a7be0fdc05a32a2f918a46f4a9062750f4    &     asm/activate.s\\
+\hline
+\end{tabular}
+\end{minipage}
 \end{document}
