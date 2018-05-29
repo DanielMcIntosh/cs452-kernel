@@ -68,9 +68,9 @@ void TestHashTable(){
 void fut(){
     int r = Create(PRIORITY_WAREHOUSE, &task_nameserver);
     r = RegisterAs("FUT");
-    //*
+    /*
     r = Create(PRIORITY_HIGH, &task_msg_metrics);
-    /*/
+    //*/
     r = Create(PRIORITY_HIGH, &task_rps);
     bwprintf(COM2, "Created RPS Server: %d\r\n", r);
     r = Create(PRIORITY_LOW, &task_rps_client);

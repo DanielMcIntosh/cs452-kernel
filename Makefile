@@ -72,6 +72,6 @@ install: all
 rebuild: clean all
 reinstall: clean install
 
-docs: $(DOCSDIR)/k1.pdf
+docs: $(DOCSDIR)/k1.pdf $(DOCSDIR)/k2.pdf
 
 include $(wildcard $(patsubst %,$(DEPDIR)/%.d,$(basename $(SRCS))))

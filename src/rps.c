@@ -38,7 +38,7 @@ int Quit(int rps_tid){
 
 int wins(RPS a, RPS b){
     if (a == b) return TIE;
-    if ((a - b) % 3 == 1) return WIN;
+    if ((b + 1) % 3 == a) return WIN;
     return LOSE;
 }
 
