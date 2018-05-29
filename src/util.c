@@ -2,10 +2,19 @@
 
 void * memcpy(void * dest, const void* src, unsigned int sz){
     // from http://clc-wiki.net/wiki/C_standard_library:string.h:memcpy#Implementation
-    char *dp = dest;
-    const char *sp = src;
-    while (sz--)
-        *dp++ = *sp++;
+    unsigned char *dp = dest;
+    const unsigned char *sp = src;
+
+    //use duffs device to unroll loop
+    register int n = sz >> 2;
+    switch (sz & 0x3) {
+            do {
+    case 0:     *dp++ = *sp++;
+    case 3:     *dp++ = *sp++;
+    case 2:     *dp++ = *sp++;
+    case 1:     *dp++ = *sp++;
+            } while (--n > 0);
+    }
     return dest;
 }
 

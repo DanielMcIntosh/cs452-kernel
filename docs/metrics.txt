@@ -1,18 +1,18 @@
 Message Caches  Send before Optimization    Time
 length          Reply       
-4       off     yes         off             314
-64      off     yes         off             784
+4       off     yes         off             308
+64      off     yes         off             641
 4       on      yes         off             22
-64      on      yes         off             53
-4       off     no          off             309
-64      off     no          off             781
+64      on      yes         off             44
+4       off     no          off             298
+64      off     no          off             635
 4       on      no          off             22
-64      on      no          off             54
+64      on      no          off             44
 4       off     yes         on              138
-64      off     yes         on              292
+64      off     yes         on              242
 4       on      yes         on              10
-64      on      yes         on              20
+64      on      yes         on              16
 4       off     no          on              137
-64      off     no          on              292
+64      off     no          on              241
 4       on      no          on              10
-64      on      no          on              20
+64      on      no          on              16

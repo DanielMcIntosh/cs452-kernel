@@ -9,8 +9,12 @@
 #define CACHE 1
 #define PRIORITY_SND PRIORITY_MID
 #define PRIORITY_RCV PRIORITY_LOW
-#define ITERATIONS 50000
 
+#if CACHE
+#define ITERATIONS 500000
+#else
+#define ITERATIONS 50000
+#endif
 
 void task_msg_metrics();
 
