@@ -1,9 +1,10 @@
-#include "sys_handler.h"
-#include "debug.h"
-#include "bwio.h"
-#include "err.h"
-#include "tasks.h"
-#include "util.h"
+#include <sys_handler.h>
+#include <debug.h>
+#include <bwio.h>
+#include <err.h>
+#include <tasks.h>
+#include <util.h>
+#include <vic.h>
 
 static inline void handle_create(TD *task, TaskQueue *task_ready_queue) {
     LOGF("TASK CREATE: %d, %d, %d\r\n", task_getTid(task), TD_arg(task, 0), TD_arg(task, 1));
@@ -132,12 +133,22 @@ static inline void handle_reply(TD *task, TD *task_pool, TaskQueue *task_ready_q
     task_react_to_state(sender, task_ready_queue);
 }
 
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+//                                  INTERRUPTS
+//////////////////////////////////////////////////////////////////////////////////////////////
 static inline void handle_await(TD *task){}
 static inline void handle_interrupt(TD *task){
+    LOG("HANDLE INTERRUPT\r\n");
+    LOGF("int reg: %d\r\n", vic1->IRQStatus);
+    vic1->SoftIntClear = 1;
+    LOGF("int reg: %d\r\n", vic1->IRQStatus);
+    bwputstr(COM2, "========================================================================================================================================================================================================================================================================================================================================================");
     // figure out what interrupt it is
     // turn off that interrupt
     // unblock task waiting for that interrupt?
 }
+
 
 Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) {
     LOGF("HANDLE: %d, %d\t", a, task);

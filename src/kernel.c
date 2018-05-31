@@ -6,8 +6,13 @@
 #include <sys_handler.h>
 #include <name.h>
 #include <rps.h>
+#include <vic.h>
 #include <util.h>
 #include <msg_metrics.h>
+
+extern int activate(int task);
+extern void KERNEL_ENTRY_POINT(void);
+extern void IRQ_ENTRY_POINT(void);
 
 int kernel_init(){
     __asm__(
@@ -15,25 +20,23 @@ int kernel_init(){
         "ldr r1, =0x28\n\t"
         "str r0, [r1]\n\t"
         "ldr r0, =IRQ_ENTRY_POINT\n\t"
-        "ldr r1, =0x2c\n\t"\
+        "ldr r1, =0x38\n\t"\
         "str r0, [r1]\n\t"
         );
 
-        // Initialize Timer
-        // Unmask timer interrupt
+    // Initialize Timer
+    // Unmask timer interrupt
+    vic1->IntEnable |= 1;
     return 0;
 }
-
 
 TD* schedule(TaskQueue *task_ready_queue){
     return task_nextActive(task_ready_queue);
 }
 
-extern int activate(int task);
-extern void KERNEL_ENTRY_POINT(void);
-extern void IRQ_ENTRY_POINT(void);
-
 void fut(){
+    LOG("First User Task: Start\r\n");
+    software_interrupt(1);
     int r = Create(PRIORITY_WAREHOUSE, &task_nameserver);
     r = RegisterAs("FUT");
     /*
@@ -84,6 +87,7 @@ int main(){
 
     TD *task = schedule(&task_ready_queue);
     LOGF("OFFSETS: lr %d, sp %d, r0 %d, spsr %d, task %d\r\n", (int) &(task->lr)-(int)task, (int)&(task->sp)-(int)task, (int)&(task->r0)-(int)task, (int)&(task->spsr)-(int)task, task);
+    int f = 0;
     while (task){
         LOGF("Task Scheduled! Pr = %d\t", task->priority);
         LOGF("task = %x\t", (int) task);
@@ -93,10 +97,13 @@ int main(){
         for (int i = 0; i < 25; i++) {
             LOGF("SP[%d] = %d\r\n", i, task->sp[i])
         }
-        task->sp[0] = task->r0; // TODO ?? is there a better way to do this? iunno
+        if (f == SYSCALL_INTERRUPT){
+            task->lr -= 4;
+        } else {
+            task->sp[0] = task->r0; // TODO ?? is there a better way to do this?
+        }
         int f = activate((int) task);
-        LOGC(f);
-        LOG("\r\n");
+        LOGF("SYSCALL: %d\r\n", f);
 
         handle(f, task, task_pool, &task_ready_queue);
         LOG("\r\n");

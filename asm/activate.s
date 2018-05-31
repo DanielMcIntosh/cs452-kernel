@@ -35,7 +35,7 @@ KERNEL_ENTRY_POINT:
     ldmia sp!, {r5} @load the task we're coming out of's TD*
 
     str r4, [r5, #20] @sp
-    str lr, [r5, #16] @ Link Register from SWI
+
     MRS r4, SPSR
     str r4, [r5, #24] @CPSR_usr
     
@@ -44,6 +44,7 @@ KERNEL_ENTRY_POINT:
     MSR CPSR_c, #0xD2 @ IRQ mode
         mov r0, sp
         mov sp, #0
+        mov r1, lr
     MSR CPSR_c, #0xD3 @ SVC mode
 
     teq r0, #1
@@ -51,10 +52,12 @@ KERNEL_ENTRY_POINT:
     @ If this isn't IRQ, we get the value from here
     ldr r0, [lr, #-4]
     and r0, r0, #0xFFFFFF @ Mask SWI bits from Return Value
+    str lr, [r5, #16] @ Link Register from SWI
     b after
 irq:
     @ If this is an IRQ, we use the IRQ return value
     mov r0, #100
+    str r1, [r5, #16] @ Link Register from IRQ
 after:
 
     ldmia sp!, {r4}
