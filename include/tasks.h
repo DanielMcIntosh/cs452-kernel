@@ -41,10 +41,9 @@ typedef struct taskdesc {
     //     WITHOUT A LOT OF WARNING
 
     // The offsets are hard coded into asm/activate.s, so changing the fields WILL break the kernel.
-    int sp;
+    int* sp;
     int spsr;
     int r0; //return value, since we might not be returning to this task which called 
-    int syscall_args[5];
 
     int use_counter;
 
@@ -54,6 +53,8 @@ typedef struct taskdesc {
     struct taskdesc *rcv_queue;
     struct taskdesc *rcv_queue_tail;
 } TD;
+
+#define TD_arg(t, n) (n == 4 ? t->sp[14] : t->sp[n])
 
 typedef struct {
     TD *heads[NUM_PRIORITIES];

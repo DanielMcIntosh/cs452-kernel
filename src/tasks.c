@@ -1,9 +1,6 @@
-#include "tasks.h"
-#include "minheap.h"
-#include "elem.h"
-#include "circlebuffer.h"
-#include "bwio.h"
-#include "debug.h"
+#include <tasks.h>
+#include <bwio.h>
+#include <debug.h>
 
 //////////////////////////////////////////////////////
 //  HELPERS
@@ -42,7 +39,7 @@ TD *init_task(TD *task, int parent_tid, Priority priority, int lr) {
     task->p_tid = parent_tid;
 
     task->lr = lr;
-    task->sp = task->sp_base;
+    task->sp = (int *) task->sp_base;
     task->spsr = 16;
 
     task->state = STATE_READY;
@@ -157,16 +154,12 @@ int task_create(TaskQueue * restrict queue, int parent_tid, Priority priority, i
     init_task(task, parent_tid, priority, lr);
 
     // Store registers on stack
-    int task_sp = task->sp, task_sp_out;
-    __asm__(
-        "mov r0, %[task_sp_in]\n\t"
-        "stmdb r0!, {r4-r12,r14}\n\t"
-        "mov %[task_sp_out], r0"
-        : [task_sp_out]"=r"(task_sp_out)
-        : [task_sp_in]"r"(task_sp)
-        : "r0"
-    );
-    task->sp = task_sp_out;
+    int *task_sp = task->sp;
+    for (int i = 1; i <= 15; i++){// 14 registers, 1 arg5
+        task_sp--;
+        *task_sp = i;
+    }
+    task->sp = task_sp;
     LOGF("New task = %x\t", task);
     LOGF("lr = %x\t", task->lr);
     LOGF("sp = %x\r\n", task->sp);

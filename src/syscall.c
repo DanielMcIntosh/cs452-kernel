@@ -1,12 +1,12 @@
 #include <kernel.h>
 #include <bwio.h>
 #include <syscall.h>
+#include <debug.h>
 
 // FIXME: Optimize number of arguments for smaller syscalls
 inline static __attribute__((always_inline)) int syscall_5(const int n, const int arg1, const int arg2, const int arg3, const int arg4, const int arg5){
-    int ret;
-// Save r0-r3 (on the stack?)
-// Insert any arguments in r0-r3 (i.e. pointer for create)
+    int ret, lr;
+    LOGF("Expected Arguments: %d, %d, %d, %d, %d\r\n", arg1, arg2, arg3, arg4, arg5);
 __asm__(
     "stmdb sp!, {r0-r3,lr}\n\t"
     "mov r0, %[arg5]\n\t"
@@ -18,15 +18,17 @@ __asm__(
     "swi %[n]\n\t"
         :
         : [n] "i" (n), [arg1] "ri" (arg1), [arg2] "ri" (arg2), [arg3] "ri" (arg3), [arg4] "ri" (arg4), [arg5] "ri" (arg5)
-        : "r0", "r1", "r2", "r3", "lr");
+        : "r0", "r1", "r2", "r3", "lr", "sp");
 // Store r0 (return value)
-__asm__(
+__asm__ volatile ( // FIXME: why does this need to be volatile? why was gcc dropping it? bc it's reloading lr and sp from fp later anyway?
     "mov %[ret], r0\n\t"
+    "add sp, sp, #4\n\t" // pop arg5
     "ldmia sp!, {r0-r3,lr}\n\t"
     : [ret] "=r"(ret)
     :
-    : "r0", "r1", "r2", "r3", "lr");
+    : "r0", "r1", "r2", "r3", "lr", "sp");
 // Re-load r0-r3
+    LOG("Returned into syscall_5");
     return ret;
 }
 
@@ -68,4 +70,3 @@ int Receive(int * restrict tid, void * restrict msg, int msglen){
 int Reply(int tid, void *reply, int rplen){
     return syscall_3(SYSCALL_REPLY, tid, (int) reply, rplen);
 }
-
