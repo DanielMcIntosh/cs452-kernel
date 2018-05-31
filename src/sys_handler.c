@@ -143,7 +143,6 @@ static inline void handle_interrupt(TD *task){
     LOGF("int reg: %d\r\n", vic1->IRQStatus);
     vic1->SoftIntClear = 1;
     LOGF("int reg: %d\r\n", vic1->IRQStatus);
-    bwputstr(COM2, "========================================================================================================================================================================================================================================================================================================================================================");
     // figure out what interrupt it is
     // turn off that interrupt
     // unblock task waiting for that interrupt?

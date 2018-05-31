@@ -97,12 +97,13 @@ int main(){
         for (int i = 0; i < 25; i++) {
             LOGF("SP[%d] = %d\r\n", i, task->sp[i])
         }
-        if (f == SYSCALL_INTERRUPT){
+        if (task->last_syscall == SYSCALL_INTERRUPT){
             task->lr -= 4;
         } else {
             task->sp[0] = task->r0; // TODO ?? is there a better way to do this?
         }
-        int f = activate((int) task);
+        f = activate((int) task);
+        task->last_syscall = f;
         LOGF("SYSCALL: %d\r\n", f);
 
         handle(f, task, task_pool, &task_ready_queue);

@@ -46,6 +46,7 @@ typedef struct taskdesc {
     // Thus ends offsets that matter.
 
     int r0; //return value, since we might not be returning immediately to this task which called 
+    int last_syscall;
     int use_counter;
     State state;
     Priority priority;
