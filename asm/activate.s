@@ -7,28 +7,30 @@ activate:
     stmdb sp!, {r4-r12,lr} @ Not Saved: PC, SP
     MRS r4, CPSR
     stmdb sp!, {r4}
-    stmdb sp!, {r0}
-    @ r0 contains a pointer to the task struct
+    stmdb sp!, {r0} @ r0 contains a pointer to the task struct
+
     ldr r4, [r0, #24] @ CSPR_USR
-    MSR SPSR_cxsf, r4 @ Set SPSR_svc to CPSR_user, which will return it to user mode once movs is called.
-       
+    MSR SPSR, r4 @ Set SPSR_svc to CPSR_user, which will return it to user mode once movs is called.
     ldr lr, [r0, #16] @LR
 
     MSR CPSR_c,#0xDF @ System mode
-    ldr sp, [r0, #20] @ Stack Pointer 
-    ldmia sp!, {r0-r12,lr} @ Reload registers from User Stack
+        ldr sp, [r0, #20] @ Stack Pointer 
+        ldmia sp!, {r0-r12,lr} @ Reload registers from User Stack
     MSR CPSR_c, #0xD3 @ Supervisor Mode
 
-    @ldr r0, [r0, #28] @ Return Value
-
     movs pc, lr
+
     mov pc, #0
+    .globl IRQ_ENTRY_POINT
+IRQ_ENTRY_POINT:
+    mov sp, #1 @ leave something in IRQ sp
+
     .globl KERNEL_ENTRY_POINT
 KERNEL_ENTRY_POINT:
     MSR CPSR_c, #0xDF @ System mode
-    stmdb sp!, {r0-r12,lr}@ Push user registers onto active task stack
-    mov r4, sp  @Save Stack Pointer
-    MSR CPSR_c, #0xD3 @ Supervisor Mode
+        stmdb sp!, {r0-r12,lr}@ Push user registers onto active task stack
+        mov r4, sp  @Save Stack Pointer
+    MSR CPSR_c, #0xD3 @ Supervisor Mode - even if we were in IRQ mode, we return to svc mode.
 
     ldmia sp!, {r5} @load the task we're coming out of's TD*
 
@@ -37,10 +39,25 @@ KERNEL_ENTRY_POINT:
     MRS r4, SPSR
     str r4, [r5, #24] @CPSR_usr
     
+    
+@ Retrieve syscall ID
+    MSR CPSR_c, #0xD2 @ IRQ mode
+        mov r0, sp
+        mov sp, #0
+    MSR CPSR_c, #0xD3 @ SVC mode
+
+    teq r0, #1
+    beq irq
+    @ If this isn't IRQ, we get the value from here
     ldr r0, [lr, #-4]
     and r0, r0, #0xFFFFFF @ Mask SWI bits from Return Value
+    b after
+irq:
+    @ If this is an IRQ, we use the IRQ return value
+    mov r0, #100
+after:
 
     ldmia sp!, {r4}
-    MSR CPSR_cxsf, r4
+    MSR CPSR, r4
     ldmia sp!, {r4-r12,lr}
     mov pc, lr

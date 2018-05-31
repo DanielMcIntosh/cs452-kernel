@@ -132,6 +132,13 @@ static inline void handle_reply(TD *task, TD *task_pool, TaskQueue *task_ready_q
     task_react_to_state(sender, task_ready_queue);
 }
 
+static inline void handle_await(TD *task){}
+static inline void handle_interrupt(TD *task){
+    // figure out what interrupt it is
+    // turn off that interrupt
+    // unblock task waiting for that interrupt?
+}
+
 Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) {
     LOGF("HANDLE: %d, %d\t", a, task);
     LOGF("ARGS: %d, %d, %d, %d, %d\t", TD_arg(task, 0), TD_arg(task, 1), TD_arg(task, 2), TD_arg(task, 3), TD_arg(task, 4))
@@ -174,6 +181,16 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) 
         case SYSCALL_REPLY:
         {
             handle_reply(task, task_pool, task_ready_queue);
+            break;
+        }
+        case SYSCALL_AWAIT:
+        {
+            handle_await(task); // TODO
+            break;
+        }
+        case SYSCALL_INTERRUPT:
+        {
+            handle_interrupt(task);
             break;
         }
         default:

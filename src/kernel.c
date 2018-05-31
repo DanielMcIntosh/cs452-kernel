@@ -11,9 +11,16 @@
 
 int kernel_init(){
     __asm__(
-        "ldr r0, =KERNEL_ENTRY_POINT\n\t"\
-        "ldr r1, =0x28\n\t"\
-        "str r0, [r1]");
+        "ldr r0, =KERNEL_ENTRY_POINT\n\t"
+        "ldr r1, =0x28\n\t"
+        "str r0, [r1]\n\t"
+        "ldr r0, =IRQ_ENTRY_POINT\n\t"
+        "ldr r1, =0x2c\n\t"\
+        "str r0, [r1]\n\t"
+        );
+
+        // Initialize Timer
+        // Unmask timer interrupt
     return 0;
 }
 
@@ -24,17 +31,15 @@ TD* schedule(TaskQueue *task_ready_queue){
 
 extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
+extern void IRQ_ENTRY_POINT(void);
 
 void fut(){
-    LOGF("Expected Args: %d, %d, 0, 0, 0\r\n", PRIORITY_WAREHOUSE, &task_nameserver);
-    Pass();
-    Pass();
-    LOGC('F');
     int r = Create(PRIORITY_WAREHOUSE, &task_nameserver);
     r = RegisterAs("FUT");
     /*
     r = Create(PRIORITY_HIGH, &task_msg_metrics);
     //*/
+    //*
     r = Create(PRIORITY_HIGH, &task_rps);
     bwprintf(COM2, "Created RPS Server: %d\r\n", r);
     r = Create(PRIORITY_LOW, &task_rps_client);
@@ -88,7 +93,7 @@ int main(){
         for (int i = 0; i < 25; i++) {
             LOGF("SP[%d] = %d\r\n", i, task->sp[i])
         }
-        task->sp[0] = task->r0; // TODO ??
+        task->sp[0] = task->r0; // TODO ?? is there a better way to do this? iunno
         int f = activate((int) task);
         LOGC(f);
         LOG("\r\n");

@@ -5,7 +5,7 @@
 
 // FIXME: Optimize number of arguments for smaller syscalls
 inline static __attribute__((always_inline)) int syscall_5(const int n, const int arg1, const int arg2, const int arg3, const int arg4, const int arg5){
-    int ret, lr;
+    int ret;
     LOGF("Expected Arguments: %d, %d, %d, %d, %d\r\n", arg1, arg2, arg3, arg4, arg5);
 __asm__(
     "stmdb sp!, {r0-r3,lr}\n\t"
@@ -22,7 +22,7 @@ __asm__(
 // Store r0 (return value)
 __asm__ volatile ( // FIXME: why does this need to be volatile? why was gcc dropping it? bc it's reloading lr and sp from fp later anyway?
     "mov %[ret], r0\n\t"
-    "add sp, sp, #4\n\t" // pop arg5
+    "add sp, sp, #4\n\t" // FIXME: pop arg5 in activate?
     "ldmia sp!, {r0-r3,lr}\n\t"
     : [ret] "=r"(ret)
     :
@@ -32,6 +32,9 @@ __asm__ volatile ( // FIXME: why does this need to be volatile? why was gcc drop
     return ret;
 }
 
+inline static __attribute__((always_inline)) int syscall_0(const int n){
+    return syscall_5(n, 0, 0, 0, 0, 0);
+}
 inline static __attribute__((always_inline)) int syscall_2(const int n, const int arg1, const int arg2){
     return syscall_5(n, arg1, arg2, 0, 0, 0);
 }
@@ -40,19 +43,19 @@ inline static __attribute__((always_inline)) int syscall_3(const int n, const in
 }
 
 void Pass(){
-    syscall_2(SYSCALL_PASS, 0, 0);
+    syscall_0(SYSCALL_PASS);
 }
 
 void Exit(){
-    syscall_2(SYSCALL_EXIT, 0, 0);
+    syscall_0(SYSCALL_EXIT);
 }
 
 int MyTid(){
-    return syscall_2(SYSCALL_TID, 0, 0);
+    return syscall_0(SYSCALL_TID);
 }
 
 int MyParentTID(){
-    return syscall_2(SYSCALL_PTID, 0, 0);
+    return syscall_0(SYSCALL_PTID);
 }
 
 int Create(int priority, void (*code)()){
@@ -69,4 +72,8 @@ int Receive(int * restrict tid, void * restrict msg, int msglen){
 
 int Reply(int tid, void *reply, int rplen){
     return syscall_3(SYSCALL_REPLY, tid, (int) reply, rplen);
+}
+
+int AwaitEvent(int eventType){
+    return syscall_0(SYSCALL_AWAIT);
 }

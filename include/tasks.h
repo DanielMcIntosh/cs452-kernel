@@ -43,10 +43,10 @@ typedef struct taskdesc {
     // The offsets are hard coded into asm/activate.s, so changing the fields WILL break the kernel.
     int* sp;
     int spsr;
-    int r0; //return value, since we might not be returning to this task which called 
+    // Thus ends offsets that matter.
 
+    int r0; //return value, since we might not be returning immediately to this task which called 
     int use_counter;
-
     State state;
     Priority priority;
 
