@@ -1,5 +1,6 @@
 #ifndef TASKS_H
 #define TASKS_H
+#include "event.h"
 
 #define TASK_COUNTER_OFFSET 8
 #define TASK_POOL_SIZE (0x1 << (TASK_COUNTER_OFFSET - 1))
@@ -18,9 +19,10 @@ typedef enum {
 
 typedef enum {
     STATE_READY,
-    STATE_REPLY_BLOCKED,
-    STATE_SEND_BLOCKED,
-    STATE_RECEIVE_BLOCKED,
+    STATE_BLK_REPLY,
+    STATE_BLK_SEND,
+    STATE_BLK_RECEIVE,
+    STATE_BLK_EVENT,
     STATE_ZOMBIE,
     STATE_DESTROYED,
 } State;
@@ -61,6 +63,7 @@ typedef struct {
     TD *heads[NUM_PRIORITIES];
     TD *tails[NUM_PRIORITIES];
     TD *free_queue;
+    TD *event_wait[NUM_EVENTS];
     unsigned int ready_bitfield : NUM_PRIORITIES;
 } TaskQueue;
 

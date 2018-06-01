@@ -5,6 +5,8 @@
 #include <tasks.h>
 #include <util.h>
 #include <vic.h>
+#include <clock.h>
+#include <event.h>
 
 static inline void handle_create(TD *task, TaskQueue *task_ready_queue) {
     LOGF("TASK CREATE: %d, %d, %d\r\n", task_getTid(task), TD_arg(task, 0), TD_arg(task, 1));
@@ -48,7 +50,7 @@ static inline void handle_send(TD *task, TD *task_pool, TaskQueue *task_ready_qu
 
 
     //reciever is already waiting for a message
-    if (receiver->state == STATE_SEND_BLOCKED)
+    if (receiver->state == STATE_BLK_SEND)
     {
         *((int *)(TD_arg(receiver, 0))) = task_getTid(task); //set the tid of the receive caller
         if (TD_arg(task, 2) != TD_arg(receiver, 2)){
@@ -59,11 +61,11 @@ static inline void handle_send(TD *task, TD *task_pool, TaskQueue *task_ready_qu
         memcpy((int *)(TD_arg(receiver, 1)), (int *)(TD_arg(task, 1)), MIN(TD_arg(task, 2), TD_arg(receiver, 2)));
 
         receiver->state = STATE_READY;
-        task->state = STATE_REPLY_BLOCKED; // sender state will be reacted to after returning from this method
+        task->state = STATE_BLK_REPLY; // sender state will be reacted to after returning from this method
         task_react_to_state(receiver, task_ready_queue);
     }
     else {
-        task->state = STATE_RECEIVE_BLOCKED;
+        task->state = STATE_BLK_RECEIVE;
         // Put task into receiver queue.
         if (receiver->rcv_queue == NULL){
             receiver->rcv_queue = task;
@@ -98,12 +100,12 @@ static inline void handle_receive(TD *task) {
         }
         memcpy((void *)(TD_arg(task, 1)), msg, MIN(len, TD_arg(task, 2)));
 
-        sender->state = STATE_REPLY_BLOCKED;
+        sender->state = STATE_BLK_REPLY;
         task->state = STATE_READY;
     }
     else
     {
-        task->state = STATE_SEND_BLOCKED;
+        task->state = STATE_BLK_SEND;
     }
 }
 
@@ -115,7 +117,7 @@ static inline void handle_reply(TD *task, TD *task_pool, TaskQueue *task_ready_q
         task->r0 = ERR_TASK_DOES_NOT_EXIST;
         return;
     }
-    if (sender->state != STATE_REPLY_BLOCKED) {
+    if (sender->state != STATE_BLK_REPLY) {
         task->r0 = ERR_TASK_NOT_REPLY_BLOCKED;
         return;
     }
@@ -137,21 +139,52 @@ static inline void handle_reply(TD *task, TD *task_pool, TaskQueue *task_ready_q
 //////////////////////////////////////////////////////////////////////////////////////////////
 //                                  INTERRUPTS
 //////////////////////////////////////////////////////////////////////////////////////////////
-static inline void handle_await(TD *task){}
-static inline void handle_interrupt(TD *task){
-    LOG("HANDLE INTERRUPT\r\n");
-    LOGF("int reg: %d\r\n", vic1->IRQStatus);
-    vic1->SoftIntClear = 1;
-    LOGF("int reg: %d\r\n", vic1->IRQStatus);
-    // figure out what interrupt it is
-    // turn off that interrupt
-    // unblock task waiting for that interrupt?
+static inline void handle_await(TD *task, TaskQueue *task_ready_queue){
+    int event = TD_arg(task, 0);
+
+    if (task_ready_queue->event_wait[event]) {
+        task->r0 = ERR_EVENT_ALREADY_HAS_TASK_WAITING;
+    }
+
+    task_ready_queue->event_wait[event] = task;
+
+    task->state = STATE_BLK_EVENT;
 }
 
+static inline void handle_interrupt(TD *task, TaskQueue *task_ready_queue){
+    LOG("HANDLE INTERRUPT\r\n");
+    LOGF("vic1 status: %x, vic2 status: %x\r\n", vic1->IRQStatus, vic2->IRQStatus);
 
+    // figure out what interrupt it is
+    unsigned long long IRQStatus = vic1->IRQStatus | (unsigned long long)(vic2->IRQStatus) << VIC_SIZE;
+    Event event;
+    for (event = 0; event < NUM_EVENTS; ++event) {
+        if (0x1ULL << IRQ_MAP[event] | IRQStatus) {
+            break;
+        }
+    }
+    ASSERT(event < NUM_EVENTS, "Interrupt doesn't correspond to an event",);
+
+    // turn off that interrupt
+    event_turn_off(event);
+
+    // unblock task waiting for that interrupt?
+    TD *waiting = task_ready_queue->event_wait[event];
+    if (!waiting) {
+        return;
+    }
+
+    waiting->state = STATE_READY;
+    //TODO set return value of waiting
+    task_react_to_state(waiting, task_ready_queue);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+//                                     MAIN
+//////////////////////////////////////////////////////////////////////////////////////////////
 Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) {
     LOGF("HANDLE: %d, %d\t", a, task);
-    LOGF("ARGS: %d, %d, %d, %d, %d\t", TD_arg(task, 0), TD_arg(task, 1), TD_arg(task, 2), TD_arg(task, 3), TD_arg(task, 4))
+    LOGF("ARGS: %d, %d, %d, %d, %d\t", TD_arg(task, 0), TD_arg(task, 1), TD_arg(task, 2), TD_arg(task, 3), TD_arg(task, 4));
     switch(a) {
         case SYSCALL_CREATE:
         {
@@ -195,12 +228,12 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) 
         }
         case SYSCALL_AWAIT:
         {
-            handle_await(task); // TODO
+            handle_await(task, task_ready_queue);
             break;
         }
         case SYSCALL_INTERRUPT:
         {
-            handle_interrupt(task);
+            handle_interrupt(task, task_ready_queue);
             break;
         }
         default:

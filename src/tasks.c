@@ -1,6 +1,8 @@
 #include <tasks.h>
 #include <bwio.h>
 #include <debug.h>
+#include <syscall.h>
+#include <event.h>
 
 //////////////////////////////////////////////////////
 //  HELPERS
@@ -74,6 +76,7 @@ int task_init(TD *task_pool, TaskQueue * restrict queue, char * restrict stack_s
         task_lookup(task_pool, i)->state = STATE_DESTROYED;
         task_lookup(task_pool, i)->tid = i;
         task_lookup(task_pool, i)->use_counter = 0;
+        task_lookup(task_pool, i)->last_syscall = SYSCALL_EXIT;
     }
 
     for (int i = 0; i < TASK_POOL_SIZE - 1; ++i) {
@@ -86,6 +89,9 @@ int task_init(TD *task_pool, TaskQueue * restrict queue, char * restrict stack_s
         queue->tails[i] = 0;
     }
     queue->free_queue = task_pool;
+    for (int i = 0; i < NUM_EVENTS; ++i) {
+        queue->event_wait[i] = 0;
+    }
     return 0;
 }
 
@@ -121,12 +127,10 @@ void task_react_to_state(TD * restrict task, TaskQueue * restrict queue) {
             insert(queue, task, task->priority);
             break;
         }
-        case STATE_SEND_BLOCKED:
-        case STATE_RECEIVE_BLOCKED:
-        case STATE_REPLY_BLOCKED:
-        {
-            break;
-        }
+        case STATE_BLK_SEND:
+        case STATE_BLK_RECEIVE:
+        case STATE_BLK_REPLY:
+        case STATE_BLK_EVENT:
         case STATE_ZOMBIE:
         {
             break;
@@ -136,6 +140,10 @@ void task_react_to_state(TD * restrict task, TaskQueue * restrict queue) {
             task->rdynext = queue->free_queue;
             queue->free_queue = task;
             break;
+        }
+        default:
+        {
+            PANIC("unrecognized state",);
         }
     }
 }
