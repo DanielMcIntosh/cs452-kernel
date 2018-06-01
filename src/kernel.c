@@ -9,6 +9,7 @@
 #include <vic.h>
 #include <util.h>
 #include <msg_metrics.h>
+#include <clock.h>
 
 extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
@@ -37,8 +38,10 @@ TD* schedule(TaskQueue *task_ready_queue){
 void fut(){
     LOG("First User Task: Start\r\n");
     software_interrupt(1);
-    int r = Create(PRIORITY_WAREHOUSE, &task_nameserver);
-    r = RegisterAs("FUT");
+    int r = RegisterAs("FUT");
+    r = Create(PRIORITY_WAREHOUSE, &task_nameserver);
+    r = Create(PRIORITY_WAREHOUSE, &task_clockserver);
+
     /*
     r = Create(PRIORITY_HIGH, &task_msg_metrics);
     //*/
