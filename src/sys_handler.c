@@ -85,6 +85,7 @@ static inline void handle_receive(TD *task) {
     if (sender != NULL) {
         //pop sender from queue
         task->rcv_queue = sender->rdynext;
+        sender->rdynext = NULL;
         if (task->rcv_queue == NULL){
             task->rcv_queue_tail = NULL;
         }
@@ -163,7 +164,7 @@ static inline void handle_interrupt(TD *task, TaskQueue *task_ready_queue){
             break;
         }
     }
-    ASSERT(event < NUM_EVENTS, "Interrupt doesn't correspond to an event",);
+    ASSERT(event < NUM_EVENTS, "Interrupt doesn't correspond to an event");
 
     // turn off that interrupt
     event_turn_off(event);
@@ -238,7 +239,7 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) 
         }
         default:
         {
-            bwputstr(COM2, "UNKNOWN SYSCALL\r\n");
+            PANIC("UNKNOWN SYSCALL");
             break;
         }
     }

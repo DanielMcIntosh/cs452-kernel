@@ -58,7 +58,7 @@ void ht_init(Hashtable *ht){
 int ht_insert(Hashtable *ht, char key[static HT_KEY_SIZE], int value){
     LOGF("HT Insert: %d, %s, %d\r\n", ht, key, value);
     int hsh = hash(key), n = 0;
-    ASSERT(hsh < HT_SIZE, "Hash Invariant", ERR_INVARIANT_BROKEN);
+    ASSERT(hsh < HT_SIZE, "Hash Invariant");
     while ((*ht)[hsh].value != -1) {
         hsh++; n++;
         if (hsh >= HT_SIZE){
@@ -77,7 +77,7 @@ int ht_insert(Hashtable *ht, char key[static HT_KEY_SIZE], int value){
 
 int ht_lookup(Hashtable *ht, char key[static HT_KEY_SIZE]){
     int hsh = hash(key), n = 0;
-    ASSERT(hsh < HT_SIZE, "Hash Invariant", ERR_INVARIANT_BROKEN);
+    ASSERT(hsh < HT_SIZE, "Hash Invariant");
     while (streq((*ht)[hsh].key, key) == 0) {
         hsh++; n++;
         if (hsh >= HT_SIZE){

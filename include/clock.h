@@ -8,6 +8,7 @@
 #define CYCLES_PER_HUNDRED_MILLIS (CYCLES_PER_MILLI*100)
 
 #define NAME_CLOCK "CLK"
+#define CLOCK_MH_SIZE 40
 
 extern struct clock {
     volatile unsigned int load;

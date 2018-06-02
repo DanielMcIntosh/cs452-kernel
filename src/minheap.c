@@ -1,6 +1,7 @@
 #include <minheap.h>
 #include <util.h>
 #include <debug.h>
+#include <err.h>
 
 void mh_init(minheap_t *mh, entry_t * entries, unsigned int size){
     mh->entries = entries;
@@ -46,7 +47,7 @@ static void mh_bubble_down(minheap_t *mh, unsigned int idx) {
 
 int mh_add(minheap_t *mh, int item, unsigned int value) {
     if (mh->count >= mh->size){
-        return 1;
+        return ERR_MH_FULL;
     }
     mh->entries[mh->count].item= item;
     mh->entries[mh->count++].value = value;
@@ -57,8 +58,8 @@ int mh_add(minheap_t *mh, int item, unsigned int value) {
 }
 
 int mh_remove_min(minheap_t *mh, entry_t* min){
-    ASSERT(min != 0, "Return ptr cannot be null",);
-    ASSERT(mh->count > 0, "Cannot remove min from empty minheap",);
+    ASSERT(min != 0, "Return ptr cannot be null");
+    ASSERT(mh->count > 0, "Cannot remove min from empty minheap");
 
     entry_t item;
     if (mh->count > 1){
@@ -74,9 +75,9 @@ int mh_remove_min(minheap_t *mh, entry_t* min){
 }
 
 int mh_peek_min(minheap_t *mh, entry_t* min){
-    ASSERT(min != 0, "Return ptr cannot be null",);
+    ASSERT(min != 0, "Return ptr cannot be null");
     if (mh -> count == 0){
-        return 1; // TODO err value
+        return ERR_MH_EMPTY;
     }
 
     *min = mh->entries[0];

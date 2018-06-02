@@ -11,6 +11,7 @@
 #include <msg_metrics.h>
 #include <event.h>
 #include <clock.h>
+#include <message.h>
 
 extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
@@ -45,35 +46,48 @@ void task_idle(){
         }
     }
 }
+
+typedef struct ttmsg {
+    int MessageType;
+    int t;
+    int n;
+} TTMsg;
+
 void task_timetest(){
+    int tid = MyTid();
+    int fut_tid = WhoIs(NAME_FUT);
+    TTMsg tm;
+    tm.MessageType = MESSAGE_TT;
+    Send(fut_tid, &tm, sizeof(tm), &tm, sizeof(tm));
     int clk_tid = WhoIs(NAME_CLOCK);
-    FOREVER {
-        int time = Time(clk_tid);
-        bwprintf(COM2,"Time: %d\r\n", time);
-        int err = Delay(clk_tid, 10);
-        bwprintf(COM2, "Delay error: %d\r\n", err);
+    for (volatile int i = 0; i < tm.n; i++){ // FIXME: This is volatile because weird things happen with O2/3 on if it isn't. We should look into that, but this temporarily fixes it.
+        int err = Delay(clk_tid, tm.t);
+        ASSERT(err == 0, "Error Delaying");
+        bwprintf(COM2, "%d: %d, %d/%d\r\n", tid, tm.t, i+1, tm.n);
     }
     Exit();
 }
 
 void fut(){
     LOG("First User Task: Start\r\n");
-    int r = Create(PRIORITY_WAREHOUSE, &task_nameserver);
-    r = RegisterAs("FUT");
-    r = Create(PRIORITY_WAREHOUSE, &task_clockserver);
-    Create(PRIORITY_LOW, &task_timetest);
+    Create(PRIORITY_WAREHOUSE, &task_nameserver);
+    Create(PRIORITY_WAREHOUSE, &task_clockserver);
+    RegisterAs(NAME_FUT);
+
     Create(PRIORITY_IDLE, &task_idle);
-    /*
-    r = Create(PRIORITY_HIGH, &task_msg_metrics);
-    //*/
-    /*
-    r = Create(PRIORITY_HIGH, &task_rps);
-    bwprintf(COM2, "Created RPS Server: %d\r\n", r);
-    r = Create(PRIORITY_LOW, &task_rps_client);
-    bwprintf(COM2, "Created RPS Client 1: %d\r\n", r);
-    r = Create(PRIORITY_LOW, &task_rps_client);
-    bwprintf(COM2, "Created RPS Client 2: %d\r\n", r);
-    //*/
+
+    for (int i = 0; i < 4; i++){
+        Create(3 + i, &task_timetest);
+    }
+    TTMsg tm;
+    int tid, t[] = {10, 23, 33, 71}, n[] = {20, 9, 6, 3};
+    for (int i = 0; i < 4; i++){
+        Receive(&tid, &tm, sizeof(tm));
+        tm.t = t[i];
+        tm.n = n[i];
+        Reply(tid, &tm, sizeof(tm));
+    }
+
     Exit();
 }
 

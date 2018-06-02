@@ -9,4 +9,6 @@
 
 #define DUMPR(x) "mov r0, #1\n\tmov r1, "x"\n\t bl bwputr\n\t"
 
+#define NAME_FUT "FUT"
+
 #endif

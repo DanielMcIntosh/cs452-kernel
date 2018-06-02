@@ -3,6 +3,7 @@
 #include <debug.h>
 #include <syscall.h>
 #include <event.h>
+#include <util.h>
 
 //////////////////////////////////////////////////////
 //  HELPERS
@@ -106,12 +107,11 @@ int task_getParentTid(TD *task) {
 TD *task_nextActive(TaskQueue * restrict queue) {
     for (int ready = 0; ready < NUM_PRIORITIES; ++ready) {
         if (queue->heads[ready]) {
-
             TD * restrict active = queue->heads[ready];
             queue->heads[ready] = active->rdynext;
-
+            active->rdynext = NULL;
             if (!queue->heads[ready]) {
-                queue->tails[ready] = 0;
+                queue->tails[ready] = NULL;
             }
 
             return active;
@@ -171,6 +171,7 @@ int task_create(TaskQueue * restrict queue, int parent_tid, Priority priority, i
     LOGF("New task = %x\t", task);
     LOGF("lr = %x\t", task->lr);
     LOGF("sp = %x\r\n", task->sp);
+    task->rdynext = NULL;
     //insert the new task into the queues, the old one will be handled in task_react_to_state
     insert(queue, task, priority);
 

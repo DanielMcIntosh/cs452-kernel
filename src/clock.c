@@ -35,8 +35,8 @@ typedef struct clockmessage{
 void task_clockserver(){
     LOG("ClockServer init\r\n");
 
-    entry_t mh_array[50]; // TODO: array size
-    ClockServer cs = {0, {mh_array, 0, 50}};
+    entry_t mh_array[CLOCK_MH_SIZE];
+    ClockServer cs = {0, {mh_array, 0, CLOCK_MH_SIZE}};
     ClockMessage cm;
     ReplyMessage rm;
     int tid, err;
@@ -56,7 +56,7 @@ void task_clockserver(){
             // reply to all tasks to wakeup now
             err = mh_peek_min(&cs.mh, &mh_entry);
             while (err == 0 && mh_entry.value <= cs.ticks){
-                bwprintf(COM2, "ITEM: %d, VALUE: %d\r\n", mh_entry.item, mh_entry.value);
+                LOGF(COM2, "CLockServer replying to: ITEM: %d, VALUE: %d\r\n", mh_entry.item, mh_entry.value);
                 Reply(mh_entry.item, &rm, sizeof(rm));
                 mh_remove_min(&cs.mh, &mh_entry);
                 err = mh_peek_min(&cs.mh, &mh_entry);
@@ -70,12 +70,12 @@ void task_clockserver(){
         case DELAY:
             LOGF("Delay: %d\r\n", cm.argument);
             err = mh_add(&cs.mh, tid, cm.argument + cs.ticks);
-            ASSERT(err == 0, "MINHEAP ADD ERROR",);
+            ASSERT(err == 0, "MINHEAP ADD ERROR");
             break;
         case DELAYUNTIL:
             LOGF("DELAY UNTIL: %d\r\n", cm.argument);
             err = mh_add(&cs.mh, tid, cm.argument);
-            ASSERT(err == 0, "MINHEAP ADD ERROR",);
+            ASSERT(err == 0, "MINHEAP ADD ERROR");
             break;
         default:
            rm.ret = ERR_NOT_IMPLEMENTED;
@@ -83,8 +83,9 @@ void task_clockserver(){
         }
     }
 }
+
 void task_clocknotifier(){
-    LOG("ClockNotifier init \r\n");
+    LOG("ClockNotifier init\r\n");
     int clk_tid = WhoIs(NAME_CLOCK);
     ClockMessage cm;
     cm.id = MESSAGE_CLOCK;
@@ -92,46 +93,35 @@ void task_clocknotifier(){
     ReplyMessage rm;
 
     // Initialize Timer
-    clk3->load = CYCLES_PER_TEN_MILLIS; // ?? what precision do we need
+    clk3->load = CYCLES_PER_TEN_MILLIS;
     clk3->control |= 0xD8; // TODO disable first? unclear
 
     FOREVER {
         AwaitEvent(EVENT_CLK_3);
         int err = Send(clk_tid, &cm, sizeof(cm), &rm, sizeof(rm));
-        ASSERT(err >= 0, "Error sending to clock server",);
-        ASSERT(rm.ret == 0, "Error return from clock server",);
+        ASSERT(err >= 0, "Error sending to clock server");
+        ASSERT(rm.ret == 0, "Error return from clock server");
     }
 }
 
-int Time(int tid_clk){ // FIXME: cleanup duplicated code here?
+int clockSend(int tid_clk, int req, int arg){
     ClockMessage cm;
     cm.id = MESSAGE_CLOCK;
-    cm.request = TIME;
+    cm.request = req;
+    cm.argument = arg;
     ReplyMessage rm;
-    bwputstr(COM2, "Sending Time Msg");
     int r = Send(tid_clk, &cm, sizeof(cm), &rm, sizeof(rm));
-    bwputstr(COM2, "Returned from sending Time Msg");
     return (r >= 0 ? rm.ret : r);
+}
+
+int Time(int tid_clk){
+    return clockSend(tid_clk, TIME, 0);
 }
 
 int Delay(int tid_clk, int ticks){
-    ClockMessage cm;
-    cm.id = MESSAGE_CLOCK;
-    cm.request = DELAY;
-    cm.argument = ticks;
-    ReplyMessage rm;
-    bwputstr(COM2, "Delay Send\r\n");
-    int r = Send(tid_clk, &cm, sizeof(cm), &rm, sizeof(rm));
-    bwputstr(COM2, "Delay Return\r\n");
-    return (r >= 0 ? rm.ret : r);
+    return clockSend(tid_clk, DELAY, ticks);
 }
 
 int DelayUntil(int tid_clk, int ticks){
-    ClockMessage cm;
-    cm.id = MESSAGE_CLOCK;
-    cm.request = DELAYUNTIL;
-    cm.argument = ticks;
-    ReplyMessage rm;
-    int r = Send(tid_clk, &cm, sizeof(cm), &rm, sizeof(rm));
-    return (r >= 0 ? rm.ret : r);
+    return clockSend(tid_clk, DELAYUNTIL, ticks);
 }

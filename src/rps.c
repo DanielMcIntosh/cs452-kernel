@@ -66,7 +66,7 @@ void task_rps(){
     LOG("RPS Server Init");
     FOREVER {
         size = Receive(&tid, &msg, sizeof(msg));
-        ASSERT(size == sizeof(msg), "Error recieving complete message",);
+        ASSERT(size == sizeof(msg), "Error recieving complete message");
         LOGF("RPS Server recieved: %d, %d\r\n", msg.type, msg.move);
         tid &= TASK_BASE_TID_MASK;
         switch (msg.type) {
@@ -89,7 +89,7 @@ void task_rps(){
             if (opp == -1) {
                 rply.ret = ERR_NO_OPPONENT;
                 err = Reply(opp, &rply, sizeof(rply));
-                ASSERT(err == 0, "Error replying to message",);
+                ASSERT(err == 0, "Error replying to message");
                 break;
             }
             play = rps.plays[opp];
@@ -102,16 +102,16 @@ void task_rps(){
                     rps.games[opp] = tid;
                     LOGF("RPS Server replying to: %d\r\n", tid);
                     err = Reply(tid, &rply, sizeof(rply));
-                    ASSERT(err == 0, "Error replying to message",);
+                    ASSERT(err == 0, "Error replying to message");
                 } else {
                     rply.ret = wins(play, msg.move);
                     LOGF("RPS Server replying to: %d\r\n", opp);
                     err = Reply(opp, &rply, sizeof(rply));
-                    ASSERT(err == 0, "Error replying to message",);
+                    ASSERT(err == 0, "Error replying to message");
                     rply.ret = wins(msg.move, play);
                     LOGF("RPS Server replying to: %d\r\n", tid);
                     err = Reply(tid, &rply, sizeof(rply));
-                    ASSERT(err == 0, "Error replying to message",);
+                    ASSERT(err == 0, "Error replying to message");
                     rps.plays[opp] = -1;
                 }
             } else {

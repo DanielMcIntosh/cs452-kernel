@@ -11,5 +11,7 @@
 #define ERR_HT_FULL -8
 #define ERR_HT_NOT_FOUND -9
 #define ERR_EVENT_ALREADY_HAS_TASK_WAITING -10
+#define ERR_MH_EMPTY -11
+#define ERR_MH_FULL -12
 #define ERR_NOT_IMPLEMENTED -99;
 #endif //ERR_H

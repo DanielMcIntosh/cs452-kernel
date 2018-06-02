@@ -13,7 +13,7 @@ typedef enum {
     PRIORITY_MID,
     PRIORITY_LOW,
     PRIORITY_LOWEST,
-    PRIORITY_IDLE,
+    PRIORITY_IDLE = 15,
     NUM_PRIORITIES
 } Priority;
 
