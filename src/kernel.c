@@ -9,6 +9,7 @@
 #include <vic.h>
 #include <util.h>
 #include <msg_metrics.h>
+#include <event.h>
 #include <clock.h>
 
 extern int activate(int task);
@@ -25,9 +26,13 @@ int kernel_init(){
         "str r0, [r1]\n\t"
         );
 
-    // Initialize Timer
     // Unmask timer interrupt
-    vic1->IntEnable |= 1;
+    vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_CLK_3] - 32);
+
+    // Initialize Timer
+    // TODO: move to somewhere more appropriate, here for demonstration only
+    clk3->load = 508000;
+    clk3->control |= 0xD8;
     return 0;
 }
 
@@ -37,11 +42,11 @@ TD* schedule(TaskQueue *task_ready_queue){
 
 void fut(){
     LOG("First User Task: Start\r\n");
-    software_interrupt(1);
     int r = RegisterAs("FUT");
     r = Create(PRIORITY_WAREHOUSE, &task_nameserver);
     r = Create(PRIORITY_WAREHOUSE, &task_clockserver);
 
+    //software_interrupt(IRQ_MAP[EVENT_CLK_3]);
     /*
     r = Create(PRIORITY_HIGH, &task_msg_metrics);
     //*/
@@ -96,10 +101,7 @@ int main(){
         LOGF("task = %x\t", (int) task);
         LOGF("task->r0 = %d\t", task->r0);
         LOGF("task->lr = %x\r\n", task->lr);
-        LOGF("Task Stack: \r\n");
-        for (int i = 0; i < 25; i++) {
-            LOGF("SP[%d] = %d\r\n", i, task->sp[i])
-        }
+
         if (task->last_syscall == SYSCALL_INTERRUPT){
             task->lr -= 4;
         } else {
@@ -107,7 +109,6 @@ int main(){
         }
         f = activate((int) task);
         task->last_syscall = f;
-        LOGF("SYSCALL: %d\r\n", f);
 
         handle(f, task, task_pool, &task_ready_queue);
         LOG("\r\n");

@@ -28,7 +28,6 @@ __asm__ volatile ( // FIXME: why does this need to be volatile? why was gcc drop
     :
     : "r0", "r1", "r2", "r3", "lr", "sp");
 // Re-load r0-r3
-    LOG("Returned into syscall_5");
     return ret;
 }
 
