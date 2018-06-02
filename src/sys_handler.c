@@ -171,6 +171,7 @@ static inline void handle_interrupt(TD *task, TaskQueue *task_ready_queue){
 
     // unblock task waiting for that interrupt?
     TD *waiting = task_ready_queue->event_wait[event];
+    task_ready_queue->event_wait[event] = NULL;
     if (!waiting) {
         return;
     }

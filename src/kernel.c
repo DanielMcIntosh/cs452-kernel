@@ -60,7 +60,7 @@ void task_timetest(){
     tm.MessageType = MESSAGE_TT;
     Send(fut_tid, &tm, sizeof(tm), &tm, sizeof(tm));
     int clk_tid = WhoIs(NAME_CLOCK);
-    for (volatile int i = 0; i < tm.n; i++){ // FIXME: This is volatile because weird things happen with O2/3 on if it isn't. We should look into that, but this temporarily fixes it.
+    for (int i = 0; i < tm.n; i++){
         int err = Delay(clk_tid, tm.t);
         ASSERT(err == 0, "Error Delaying");
         bwprintf(COM2, "%d: %d, %d/%d\r\n", tid, tm.t, i+1, tm.n);

@@ -38,13 +38,13 @@ void task_clockserver(){
     entry_t mh_array[CLOCK_MH_SIZE];
     ClockServer cs = {0, {mh_array, 0, CLOCK_MH_SIZE}};
     ClockMessage cm;
-    ReplyMessage rm;
+    ReplyMessage rm = {MESSAGE_REPLY, 0};
     int tid, err;
     entry_t mh_entry;
     
     RegisterAs(NAME_CLOCK);
     Create(PRIORITY_NOTIFIER, &task_clocknotifier);
-    FOREVER{
+    FOREVER {
         Receive(&tid, &cm, sizeof(cm));
         switch(cm.request){
         case NOTIFIER:
@@ -56,7 +56,7 @@ void task_clockserver(){
             // reply to all tasks to wakeup now
             err = mh_peek_min(&cs.mh, &mh_entry);
             while (err == 0 && mh_entry.value <= cs.ticks){
-                LOGF(COM2, "CLockServer replying to: ITEM: %d, VALUE: %d\r\n", mh_entry.item, mh_entry.value);
+                LOGF("Clock Server replying to: ITEM: %d, VALUE: %d\r\n", mh_entry.item, mh_entry.value);
                 Reply(mh_entry.item, &rm, sizeof(rm));
                 mh_remove_min(&cs.mh, &mh_entry);
                 err = mh_peek_min(&cs.mh, &mh_entry);
@@ -85,12 +85,13 @@ void task_clockserver(){
 }
 
 void task_clocknotifier(){
+    ReplyMessage rm = {0, 0};
     LOG("ClockNotifier init\r\n");
     int clk_tid = WhoIs(NAME_CLOCK);
     ClockMessage cm;
     cm.id = MESSAGE_CLOCK;
     cm.request = NOTIFIER;
-    ReplyMessage rm;
+
 
     // Initialize Timer
     clk3->load = CYCLES_PER_TEN_MILLIS;
