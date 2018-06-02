@@ -17,7 +17,7 @@ void event_turn_off(int event) {
         }
         default:
         {
-            PANIC("unknown event",);
+            PANIC("unknown event");
         }
     }
 }

@@ -143,7 +143,7 @@ void task_react_to_state(TD * restrict task, TaskQueue * restrict queue) {
         }
         default:
         {
-            PANIC("unrecognized state",);
+            PANIC("unrecognized state");
         }
     }
 }

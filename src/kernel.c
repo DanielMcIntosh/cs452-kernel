@@ -29,10 +29,7 @@ int kernel_init(){
     // Unmask timer interrupt
     vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_CLK_3] - 32);
 
-    // Initialize Timer
-    // TODO: move to somewhere more appropriate, here for demonstration only
-    clk3->load = 508000;
-    clk3->control |= 0xD8;
+
     return 0;
 }
 
@@ -40,17 +37,36 @@ TD* schedule(TaskQueue *task_ready_queue){
     return task_nextActive(task_ready_queue);
 }
 
+void task_idle(){
+    FOREVER {
+        char c = bwgetc(COM2);
+        if (c == 'q'){
+            Exit();
+        }
+    }
+}
+void task_timetest(){
+    int clk_tid = WhoIs(NAME_CLOCK);
+    FOREVER {
+        int time = Time(clk_tid);
+        bwprintf(COM2,"Time: %d\r\n", time);
+        int err = Delay(clk_tid, 10);
+        bwprintf(COM2, "Delay error: %d\r\n", err);
+    }
+    Exit();
+}
+
 void fut(){
     LOG("First User Task: Start\r\n");
-    int r = RegisterAs("FUT");
-    r = Create(PRIORITY_WAREHOUSE, &task_nameserver);
+    int r = Create(PRIORITY_WAREHOUSE, &task_nameserver);
+    r = RegisterAs("FUT");
     r = Create(PRIORITY_WAREHOUSE, &task_clockserver);
-
-    //software_interrupt(IRQ_MAP[EVENT_CLK_3]);
+    Create(PRIORITY_LOW, &task_timetest);
+    Create(PRIORITY_IDLE, &task_idle);
     /*
     r = Create(PRIORITY_HIGH, &task_msg_metrics);
     //*/
-    //*
+    /*
     r = Create(PRIORITY_HIGH, &task_rps);
     bwprintf(COM2, "Created RPS Server: %d\r\n", r);
     r = Create(PRIORITY_LOW, &task_rps_client);
