@@ -26,7 +26,6 @@ void snd_task() {
     int time_end = clk4->value_low;
     int time_total = time_end - time_start;
     bwprintf(COM2, "Send Time: %d, Send Avg: %d\r\n", time_total, time_total/ITERATIONS);
-    Exit();
 }
 
 void rcv_task() {
@@ -52,7 +51,6 @@ void rcv_task() {
     int time_end = clk4->value_low;
     int time_total = time_end - time_start;
     bwprintf(COM2, "Recv Time: %d, Recv Avg: %d\r\n", time_total, time_total/ITERATIONS);
-    Exit();
 }
 
 void task_msg_metrics() {
@@ -61,6 +59,5 @@ void task_msg_metrics() {
     //in order to ensure that rcv has registered before send queries,
     //we actually start snd_task from rcv_task
     Create(PRIORITY_RCV, &rcv_task);
-    Exit();
 }
 
