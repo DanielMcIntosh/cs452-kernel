@@ -56,7 +56,7 @@ void task_idle() {
         int time_end = clk4->value_low;
         int time_total = time_end - time_start;
         int percent_idle = 39320 * 100 / time_total;
-        bwprintf(COM2, "%d\r\n", percent_idle);
+        bwprintf(COM2, "\0337\033[H%d%% \0338", percent_idle);
     }
 }
 #undef IDLE_ITERATIONS
