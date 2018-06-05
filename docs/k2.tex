@@ -19,8 +19,6 @@ Once run, the program will initialize the kernel, and then create the first user
 
 \section{Program Description}
 Note that each referenced file corresponds to a header file of the same name in the \verb|include| folder (for example, \verb|src/kernel.c| to \verb|include/kernel.h|)
-
-\section{Program Structure}
 \subsection{Message Passing}
 Each task struct now has a recieve queue (implemented via head and tail pointers). The handling for message passing syscalls is in \verb|sys_handler.c|.
 \subsubsection{Send}

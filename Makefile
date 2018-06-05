@@ -31,15 +31,17 @@ LDFLAGS = -init main -Map $(BINDIR)/kernel.map -N -T $(TOOLSDIR)/orex.ld -L/u/wb
 
 SRCFILES = $(wildcard $(SRCDIR)/*.c)
 SRCASM = $(wildcard $(ASMDIR)/*.s)
+SRCDOCS = $(wildcard $(DOCSDIR)/*.tex)
 OBJFILES = $(patsubst $(SRCDIR)/%.c, $(BINDIR)/%.o, $(SRCFILES))
 ASMFILES = $(patsubst $(SRCDIR)/%.c, $(BINDIR)/%.s, $(SRCFILES))
 HANDASM = $(patsubst $(ASMDIR)/%.s, $(BINDIR)/%.o, $(SRCASM))
+DOCS = $(patsubst $(DOCSDIR)/%.tex, $(DOCSDIR)/%.pdf, $(SRCDOCS))
 
 POSTCOMPILE = @mv -f $(DEPDIR)/$*.Td $(DEPDIR)/$*.d && touch $@
 
 .PHONY = clean build
 
-all: $(BINDIR)/kernel.elf
+all: $(BINDIR)/kernel.elf $(DOCS)
 
 $(BINDIR)/%.s: $(SRCDIR)/%.c $(DEPDIR)/%.d $(INCLUDEDIR)/%.h
 	$(XCC) -S $(CFLAGS) -o $@ $<
@@ -72,6 +74,6 @@ install: all
 rebuild: clean all
 reinstall: clean install
 
-docs: $(DOCSDIR)/k1.pdf $(DOCSDIR)/k2.pdf
+docs: $(DOCS)
 
 include $(wildcard $(patsubst %,$(DEPDIR)/%.d,$(basename $(SRCS))))

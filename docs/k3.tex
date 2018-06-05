@@ -1,0 +1,76 @@
+\documentclass{article}
+\usepackage{hyperref}
+\begin{document}
+
+\title{CS 452 Kernel 2}
+\author{Brian Forbes \& Daniel McIntosh \\ 20617899 \& 20632796}
+\date{\today}
+
+\maketitle
+
+\section{Building, Running, and Usage}
+
+The repository for the code can be found at \url{https://git.uwaterloo.ca/baforbes/cs452-kernel/tree/k2}.
+To build the executable, run the following command from the root directory: \begin{verbatim} make \end{verbatim}
+To build this document, run the following command from the root directory: \begin{verbatim} make docs \end{verbatim}
+The executable will be built to \verb|<repo_root>/bin/kernel.elf|\\
+
+Once run, the program will initialize the kernel, and then create the first user task. This task will then create 3 other tasks: the Rock Paper Scissors (RPS) server, and 2 RPS clients. The clients will play $10$ RPS games against each other, awaiting user input when they recieve replies from the RPS server so the game results are displayed.
+
+\section{Program Description}
+Note that each referenced file corresponds to a header file of the same name in the \verb|include| folder (for example, \verb|src/kernel.c| to \verb|include/kernel.h|)
+\subsection{Context Switch}
+    To facilitate interrupts, the context switch was updated to now push all user registers onto the stack (except PC and SP, which are saved separately). As a part of this, syscall arguments are now saved on the user stack as well (they are pushed as registers r0-r3, with the fifth argument pushed onto the stack before the syscall. Previously, these were being saved into the task struct.
+
+    A second kernel entry point has been added to \verb|asm/activate.s| for interrupt requests: \verb|IRQ_ENTRY_POINT|. It saves the value 1 in the IRQ Stack Pointer. Later in the context switch, this value is checked. If the syscall is an IRQ, the IRQ LR is saved before returning to the kernel. If it is not an IRQ, the SWI Lr is saved instead, as previously.
+
+\subsection{IRQ Handling}
+%TODO Daniel
+\subsection{Clock Server}
+The clock server is implemented in \verb|src/clock.c|
+
+It stores the current time (in 10ms ticks), and a minheap of the TIDs of tasks that have called delay.
+After initializing this data, it spawns a Notifier process. 
+The notifier awaits the clock interrupt event, and then sends a notification to the clock server.
+
+Once the clock server has finished both of these initialization steps, it begins an infinite loop of receiving, and then handling messages.
+There are four different message types:
+\begin{enumerate}
+    \item[NOTIFIER] Upon reception, the clock server replies to the notifier task, and adds a tick to the current time.
+    It then notifies all tasks which have delay deadlines which end before the current time, by replying to them.
+    \item [TIME] The clock server replies to the requesting task with the current time.
+    \item[DELAY] The clock server adds the task and the deadline (calculated as current time + delay time) to the minheap of waiting tasks.
+    \item[DELAYUNTIL] The clock server adds the task and the deadline (provided by the requester) to the minheap of waiting tasks.
+\end{enumerate}
+\subsection{Idle Time}
+%TODO Daniel
+\subsection{Changes from Kernel 2}
+    The only major change to the Kernel $2$ architecture was the updates to \verb|asm/activate.s|, as described in the Context Switch section.
+\subsection{New Data Structures}
+    A minheap was used in the clock server to effeciently store the waiting tasks. It was implemented on top of a constant-size array. It has three operations: \verb|add|, \verb|remove_min|, \verb|peek_min|.
+\begin{enumerate}
+    \item[add] The element is added to the end of the array, and then bubbled upwards. This is logarithmic in the size of the array, which is a constant - so this takes constant time.
+    \item[peek\_min] The element at the $0^{th}$ index is returned. This takes constant time.
+    \item[remove\_min] The element at the $0^{th}$ index is swapped with the last element, and then removed. The new $0^{th}$ element is bubbled down. The removed element is then returned.
+    Similarly to \verb|add|, this is logatirhmic in the size of the array, which is still constant.
+\end{enumerate}
+
+    We chose a minheap for this purpose because it was more efficient compared to a sorted linked list, and more simple to implement without dynamic memory allocation. We felt as though implementing a pool of linked list nodes was more complex and error-prone than our minheap implementaion.
+\section{Explanation of Program Output}
+    In the top-left corner, the idle time is displayed. The rest of the program outputs lines of the form:\\
+    \verb|$(TID): $(DELAY). $(I)/$(N)|\\
+    Where \verb|$(I)| is the current number of delays this task has completed, and \verb|$(N)| is the total number of delays for this task. 
+\section{Known Limitations}
+    At the moment, the program cannot be run twice in a row without resetting the ARM box.
+\section{File Hashes and Commit hash}
+\begin{minipage}{\textwidth}
+Output of \verb|sha1sum src/* include/* asm/*|
+
+\begin{tabular}{|c|l|}
+\hline
+Hash & File\\
+\hline
+\hline
+\end{tabular}
+\end{minipage}
+\end{document}
