@@ -162,12 +162,12 @@ int task_create(TaskQueue * restrict queue, int parent_tid, Priority priority, i
     init_task(task, parent_tid, priority, lr);
 
     // Store registers on stack
-    int *task_sp = task->sp;
-    for (int i = 1; i <= 15; i++){// 14 registers, 1 arg5
-        task_sp--;
-        *task_sp = i;
+    task->sp -= 15; // 14 registers, 1 arg5
+    int *sp = task->sp; 
+    for (int cur_reg = 0; cur_reg <= 12; ++cur_reg){
+        *sp++ = cur_reg;
     }
-    task->sp = task_sp;
+    *sp++ = (int)(&Exit);
     LOGF("New task = %x\t", task);
     LOGF("lr = %x\t", task->lr);
     LOGF("sp = %x\r\n", task->sp);

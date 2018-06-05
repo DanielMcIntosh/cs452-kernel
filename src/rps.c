@@ -123,7 +123,6 @@ void task_rps(){
             Reply(tid, &rply, sizeof(rply));
         }
     }
-    Exit();
 }
 
 void task_rps_client(){
@@ -133,7 +132,6 @@ void task_rps_client(){
     RPSStatus reply;
     if (err){
         bwprintf(COM2, "%d: Error with RPS Signup: %d\r\n", mytid, err);
-        Exit();
     }
     for (int i = 0; i < 10; i++){
         RPS move = clk4->value_low % 3; //randomization using clock time
@@ -152,5 +150,4 @@ void task_rps_client(){
         bwgetc(COM2);
     }
     Quit(rps_tid);
-    Exit();
 }

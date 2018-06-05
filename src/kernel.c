@@ -79,7 +79,6 @@ void task_timetest(){
         ASSERT(err == 0, "Error Delaying");
         bwprintf(COM2, "%d: %d, %d/%d\r\n", tid, tm.t, i+1, tm.n);
     }
-    Exit();
 }
 
 void fut(){
@@ -101,8 +100,6 @@ void fut(){
         tm.n = n[i];
         Reply(tid, &tm, sizeof(tm));
     }
-
-    Exit();
 }
 
 

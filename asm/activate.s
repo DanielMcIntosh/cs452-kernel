@@ -6,8 +6,8 @@ activate:
     @ save kernel state
     stmdb sp!, {r4-r12,lr} @ Not Saved: PC, SP
     MRS r4, CPSR
-    stmdb sp!, {r4}
-    stmdb sp!, {r0} @ r0 contains a pointer to the task struct
+    str r4, [sp, #-4]!
+    str r0, [sp, #-4]! @ r0 contains a pointer to the task struct
 
     ldr r4, [r0, #24] @ CSPR_USR
     MSR SPSR, r4 @ Set SPSR_svc to CPSR_user, which will return it to user mode once movs is called.
@@ -20,7 +20,7 @@ activate:
 
     movs pc, lr
 
-    mov pc, #0
+    mov pc, #0 @ should never get here
     .globl IRQ_ENTRY_POINT
 IRQ_ENTRY_POINT:
     mov sp, #1 @ leave something in IRQ sp
