@@ -105,24 +105,24 @@ void task_clocknotifier(){
     }
 }
 
-int clockSend(int tid_clk, int req, int arg){
+int clockSend(int req, int arg){
     ClockMessage cm;
     cm.id = MESSAGE_CLOCK;
     cm.request = req;
     cm.argument = arg;
     ReplyMessage rm;
-    int r = Send(tid_clk, &cm, sizeof(cm), &rm, sizeof(rm));
+    int r = Send(WhoIs(NAME_CLOCK), &cm, sizeof(cm), &rm, sizeof(rm));
     return (r >= 0 ? rm.ret : r);
 }
 
 int Time(int tid_clk){
-    return clockSend(tid_clk, TIME, 0);
+    return clockSend(TIME, 0);
 }
 
-int Delay(int tid_clk, int ticks){
-    return clockSend(tid_clk, DELAY, ticks);
+int Delay(int ticks){
+    return clockSend(DELAY, ticks);
 }
 
-int DelayUntil(int tid_clk, int ticks){
-    return clockSend(tid_clk, DELAYUNTIL, ticks);
+int DelayUntil(int ticks){
+    return clockSend(DELAYUNTIL, ticks);
 }

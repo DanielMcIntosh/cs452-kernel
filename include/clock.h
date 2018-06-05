@@ -27,8 +27,8 @@ extern struct debugclock {
 void task_clockserver();
 void task_clocknotifier();
 
-int Time(int tid_clk);
-int Delay(int tid_clk, int ticks);
-int DelayUntil(int tid_clk, int ticks);
+int Time();
+int Delay(int ticks);
+int DelayUntil(int ticks); //FIXME: pass in tid_clk
 
 #endif

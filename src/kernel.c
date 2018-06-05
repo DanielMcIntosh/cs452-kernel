@@ -59,9 +59,8 @@ void task_timetest(){
     TTMsg tm;
     tm.MessageType = MESSAGE_TT;
     Send(fut_tid, &tm, sizeof(tm), &tm, sizeof(tm));
-    int clk_tid = WhoIs(NAME_CLOCK);
     for (int i = 0; i < tm.n; i++){
-        int err = Delay(clk_tid, tm.t);
+        int err = Delay(tm.t);
         ASSERT(err == 0, "Error Delaying");
         bwprintf(COM2, "%d: %d, %d/%d\r\n", tid, tm.t, i+1, tm.n);
     }
