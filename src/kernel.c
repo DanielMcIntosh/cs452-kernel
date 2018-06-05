@@ -38,14 +38,28 @@ TD* schedule(TaskQueue *task_ready_queue){
     return task_nextActive(task_ready_queue);
 }
 
-void task_idle(){
+#define IDLE_ITERATIONS 500000
+void task_idle() {
+    int i, j = 0;
     FOREVER {
-        char c = bwgetc(COM2);
-        if (c == 'q'){
-            Exit();
-        }
+        i = IDLE_ITERATIONS;
+        int time_start = clk4->value_low;        
+        __asm__ volatile (
+            "idle_loop:\n\t"
+            "subs %[i], %[i], #1\n\t"
+            "mov %[j], %[i]\n\t"
+            "mov %[i], %[j]\n\t"
+            "mov %[j], %[i]\n\t"
+            "mov %[i], %[j]\n\t"
+            "bne idle_loop\n\t"
+            : [i] "+r" (i), [j] "+r" (j));
+        int time_end = clk4->value_low;
+        int time_total = time_end - time_start;
+        int percent_idle = 39320 * 100 / time_total;
+        bwprintf(COM2, "%d\r\n", percent_idle);
     }
 }
+#undef IDLE_ITERATIONS
 
 typedef struct ttmsg {
     int MessageType;
