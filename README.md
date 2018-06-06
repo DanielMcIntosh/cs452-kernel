@@ -1,4 +1,4 @@
-# Kernel 2
+# Kernel 3
 ## Downloading the Executable
 
 The executable file for Kernel 1 is `bin/kernel.elf`.

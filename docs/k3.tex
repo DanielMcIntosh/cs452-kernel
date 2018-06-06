@@ -15,7 +15,12 @@ To build the executable, run the following command from the root directory: \beg
 To build this document, run the following command from the root directory: \begin{verbatim} make docs \end{verbatim}
 The executable will be built to \verb|<repo_root>/bin/kernel.elf|\\
 
-Once run, the program will initialize the kernel, and then create the first user task. This task will then create 7 other tasks: the Name server, the Idle task, the clock server, and 4 clock clients. The clients will behave as specified in the assignment description.
+Once run, the program will initialize the kernel, and then create the first user task. This task will then create 7 other tasks: the Name server, the Idle task, the clock server, and 4 clock clients.
+
+Each client will send a message to the first user task, waiting for the delay and iteration parameters from the first user task. 
+Upon reception of those parameters, each client loops for the recieved number of iterations, waiting the recieved delay and printing the delay and the current iteration number each loop.
+
+The parameters provided to the clients are, in order, delay times of $[10, 23, 33, 71]$ and iteration numbers of $[20, 9, 6, 3]$.
 
 \section{Program Description}
 Note that each referenced file corresponds to a header file of the same name in the \verb|include| folder (for example, \verb|src/kernel.c| to \verb|include/kernel.h|)
