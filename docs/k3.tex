@@ -15,7 +15,7 @@ To build the executable, run the following command from the root directory: \beg
 To build this document, run the following command from the root directory: \begin{verbatim} make docs \end{verbatim}
 The executable will be built to \verb|<repo_root>/bin/kernel.elf|\\
 
-Once run, the program will initialize the kernel, and then create the first user task. This task will then create 3 other tasks: the Rock Paper Scissors (RPS) server, and 2 RPS clients. The clients will play $10$ RPS games against each other, awaiting user input when they recieve replies from the RPS server so the game results are displayed.
+Once run, the program will initialize the kernel, and then create the first user task. This task will then create 7 other tasks: the Name server, the Idle task, the clock server, and 4 clock clients. The clients will behave as specified in the assignment description.
 
 \section{Program Description}
 Note that each referenced file corresponds to a header file of the same name in the \verb|include| folder (for example, \verb|src/kernel.c| to \verb|include/kernel.h|)
@@ -25,7 +25,10 @@ Note that each referenced file corresponds to a header file of the same name in 
     A second kernel entry point has been added to \verb|asm/activate.s| for interrupt requests: \verb|IRQ_ENTRY_POINT|. It saves the value 1 in the IRQ Stack Pointer. Later in the context switch, this value is checked. If the syscall is an IRQ, the IRQ LR is saved before returning to the kernel. If it is not an IRQ, the SWI Lr is saved instead, as previously.
 
 \subsection{IRQ Handling}
-%TODO Daniel
+In our \verb|TaskQueue| struct, we added another array of task descriptor pointers to store which task, if any, is waiting on an event.
+We use a constant array to map the event values passed to AwaitEvent to an interrupt type/value. The only event value we currently have is \verb|EVENT_CLK_3| = 0, for the clock 3 timer interrupt (ie. interrupt 51). We will add more as we need them. Event values will always be consecutive integer values, starting at 0. Doing it this way allows us to control which interrupts we handle first, and allows us the aforementioned array as small as possible, thereby increasing cache locality.
+
+Curently, we don't need to return anything from AwaitEvent, so we dont. If we did, that would be managed by setting the return value in the task descriptor after the interrupt has been handled.
 \subsection{Clock Server}
 The clock server is implemented in \verb|src/clock.c|
 
@@ -43,7 +46,15 @@ There are four different message types:
     \item[DELAYUNTIL] The clock server adds the task and the deadline (provided by the requester) to the minheap of waiting tasks.
 \end{enumerate}
 \subsection{Idle Time}
-%TODO Daniel
+To measure idle time, we create a task with the lowest possible priority early in the first user task. The task runs an infinite loop in which it:
+\begin{itemize}
+    \item reads the current time from the 40-bit debug timer
+    \item runs an 8 instruction cycle loop (5 Data Ops + 1 branch), 500 000 times
+    \item reads the current time from the 40-bit debug timer again
+    \item compares the two times to get the time it took
+    \item outputs 39321/total\_time as a percentage at the top of the terminal
+\end{itemize}
+The time it takes for the inner loop to complete when not interrupted, 39321, was calculated experimentally and theoretically. First, we calculated that, for a total of 4 000 000 cpu cycles, running at a cpu clock speed of 100 MHz, it would take 0.04 seconds, or 39321.6 ticks of the 983.04 kHz debug timer. Then, to verify our theoretical calculations, we ran the kernel, with first user task only starting the idle task, all interupts off, and the idle task just outputing the difference in times instead of doing the division. The output from this confirmed our calculations and demonstrated that the time, as expected, the CPU is not clocked to run faster than it can load a cached instruction. While this approach does not account for any extra time potentially taken to re-load the 6 instructions into cache after the idle task is interrupted, we decided that the increased accuracy we would gain by locking those 6 instructions into the cache was not worth the effort, nor was the idle task important enough to sacrifice performance in the rest of the kernel.
 \subsection{Changes from Kernel 2}
     The only major change to the Kernel $2$ architecture was the updates to \verb|asm/activate.s|, as described in the Context Switch section.
 \subsection{New Data Structures}
