@@ -167,7 +167,8 @@ static inline void handle_interrupt(TD *task, TaskQueue *task_ready_queue){
     ASSERT(event < NUM_EVENTS, "Interrupt doesn't correspond to an event");
 
     // turn off that interrupt
-    event_turn_off(event);
+    int data = event_turn_off(event, &event);
+    // event is updated to the handled event - specifically for uart send & recieve
 
     // unblock task waiting for that interrupt?
     TD *waiting = task_ready_queue->event_wait[event];
@@ -177,7 +178,7 @@ static inline void handle_interrupt(TD *task, TaskQueue *task_ready_queue){
     }
 
     waiting->state = STATE_READY;
-    //TODO set return value of waiting
+    waiting->r0 = data;
     task_react_to_state(waiting, task_ready_queue);
 }
 

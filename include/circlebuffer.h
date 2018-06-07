@@ -1,13 +1,13 @@
 #ifndef CIRCLEBUFFER_H
 #define CIRCLEBUFFER_H
 
-struct circlebuffer {
+typedef struct circlebuffer {
     char *buf;
     int size;
     int rd; // rd is the index of the next space to read
     int wr; // wr is the index of the next space to write.
     int empty;
-};
+} circlebuffer_t;
 
 void cb_init(struct circlebuffer *cb, char * buf, int size);
 int cb_full(struct circlebuffer *cb);

@@ -9,7 +9,8 @@ typedef enum {
     MESSAGE_RPS_PLAY,
     MESSAGE_RPS_QUIT,
     MESSAGE_CLOCK,
-    MESSAGE_TT
+    MESSAGE_TT,
+    MESSAGE_UART
 } MessageType;
 
 typedef struct {

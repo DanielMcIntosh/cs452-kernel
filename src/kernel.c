@@ -29,6 +29,10 @@ int kernel_init(){
 
     // Unmask timer interrupt
     vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_CLK_3] - 32);
+    vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_UART_1_SEND] - 32);
+    vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_UART_1_RCV] - 32);
+    vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_UART_2_SEND] - 32);
+    vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_UART_2_RCV] - 32);
 
 
     return 0;

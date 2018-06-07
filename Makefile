@@ -63,7 +63,10 @@ $(DOCSDIR)/%.pdf: $(DOCSDIR)/%.tex
 	pdflatex -output-directory $(DOCSDIR) $<
 
 clean:
-	-rm -f $(BINDIR)/* $(DEPDIR)/*
+	-rm -f $(BINDIR)/* $(DEPDIR)/* $(DOCSDIR)/*.aux $(DOCSDIR)/*.log $(DOCSDIR)/*.out
+cleand:
+	-rm -f $(DOCSDIR)/*.pdf $(DOCSDIR)/*.aux $(DOCSDIR)/*.log $(DOCSDIR)/*.out
+
 
 build: all clean
 
