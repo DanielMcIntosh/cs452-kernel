@@ -29,7 +29,7 @@ typedef struct uartmessage{
     int argument;
 } UARTMessage;
 
-void generic_uart_rcv_notifier(int servertid, int uart){
+static inline void generic_uart_rcv_notifier(int servertid, int uart){
     int event = (uart == 1? EVENT_UART_1_RCV : EVENT_UART_2_RCV);
     UARTMessage msg = {MESSAGE_UART, NOTIFY_RCV, 0};
     ReplyMessage rm = {0, 0};
@@ -51,7 +51,22 @@ void task_uart2_rcv_notifier(){
     generic_uart_rcv_notifier(WhoIs(NAME_UART2_RCV), 1);
 }
 
-void generic_uart_rcv_server(int uart){
+void generic_uart_send_notifier(int servertid, int uart){
+    int event = (uart == 1? EVENT_UART_1_RCV : EVENT_UART_2_RCV);
+    UARTMessage msg = {MESSAGE_UART, NOTIFY_SEND, 0};
+    ReplyMessage rm = {0, 0};
+
+    // initialize uart happens here fn (TODO)
+    FOREVER {
+        msg.argument = AwaitEvent(event);
+        int err = Send(servertid, &msg, sizeof(msg), &rm, sizeof(rm));
+        ASSERT(err >= 0, "Error sending to server");
+        ASSERT(rm.ret == 0, "Error return from server");
+    }
+
+}
+
+static inline void generic_uart_rcv_server(int uart){
     char rcvQ_buf[RCVQ_BUF_SIZE];
     char getQ_buf[GETQ_BUF_SIZE]; 
     circlebuffer_t cb_rcv;
