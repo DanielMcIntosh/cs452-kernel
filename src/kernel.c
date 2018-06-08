@@ -12,6 +12,7 @@
 #include <event.h>
 #include <clock.h>
 #include <message.h>
+#include <uart.h>
 
 extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
@@ -88,6 +89,7 @@ void fut(){
     LOG("First User Task: Start\r\n");
     Create(PRIORITY_WAREHOUSE, &task_nameserver);
     Create(PRIORITY_WAREHOUSE, &task_clockserver);
+    Create(PRIORITY_INIT, &task_init_uart_servers);
     RegisterAs(NAME_FUT);
 
     Create(PRIORITY_IDLE, &task_idle);
