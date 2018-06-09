@@ -74,5 +74,5 @@ int Reply(int tid, void *reply, int rplen){
 }
 
 int AwaitEvent(int eventType){
-    return syscall_0(SYSCALL_AWAIT);
+    return syscall_2(SYSCALL_AWAIT, eventType, 0);
 }

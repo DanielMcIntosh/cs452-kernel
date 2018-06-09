@@ -7,7 +7,7 @@
 #define DEBUG 0
 #define bwio 1
 
-#define PANIC(x) bwputstr(COM2, x);\
+#define PANIC(x) bwputstr(COM1, x);\
     __asm__("swi #0x123");\
     //__asm__("mov pc, #0x00");
 

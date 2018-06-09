@@ -41,9 +41,7 @@ static inline void generic_uart_rcv_notifier(int servertid, int uart){
 
     // initialize uart happens here fn (TODO)
     FOREVER {
-        bwputstr(COM1, "AwaitEvent called in UART Rcv\r\n");
         msg.argument = AwaitEvent(event);
-        bwputstr(COM1, "AwaitEvent called in UART Rcv\r\n");
         int err = Send(servertid, &msg, sizeof(msg), &rm, sizeof(rm));
         ASSERT(err >= 0, "Error sending to server");
         ASSERT(rm.ret == 0, "Error return from server");
@@ -192,9 +190,9 @@ void task_uart2send(){
 
 void task_init_uart_servers(){
     //Create(PRIORITY_WAREHOUSE, &task_uart1send);
-    Create(PRIORITY_WAREHOUSE, &task_uart2send);
     //Create(PRIORITY_WAREHOUSE, &task_uart1rcv);
-    //Create(PRIORITY_WAREHOUSE, &task_uart2rcv);
+    Create(PRIORITY_WAREHOUSE, &task_uart2send);
+    Create(PRIORITY_WAREHOUSE, &task_uart2rcv);
 }
 
 int Getc(int servertid, int channel){

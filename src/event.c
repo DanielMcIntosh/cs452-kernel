@@ -10,10 +10,9 @@ int IRQ_MAP[NUM_EVENTS] = {
     [EVENT_CLK_3] = 51,
     [EVENT_UART_1_SEND] = 52,
     [EVENT_UART_1_RCV] = 52,
-    [EVENT_UART_2_SEND] = 53,
-    [EVENT_UART_2_RCV] = 53
+    [EVENT_UART_2_SEND] = 54,
+    [EVENT_UART_2_RCV] = 54
 };
-
 
 int event_turn_off(int event, int * handled_event) {
     int data = 0;
@@ -30,11 +29,10 @@ int event_turn_off(int event, int * handled_event) {
             if (uart1->intidclr & UART_RIS_MASK) {
                  // recieve interrupt
                 data = uart1->data;
-                ASSERT(uart1->intidclr & UART_RIS_MASK, "interrupt not turned off?");
                 *handled_event = EVENT_UART_1_RCV;
             } else if (uart1->intidclr & UART_TIS_MASK) {
                 // transmit interrupt
-                uart1->ctrl &= ~TIEN_MASK; // TODO Must disable this interrupt to turn it off?
+                uart1->ctrl &= ~TIEN_MASK; 
                 *handled_event = EVENT_UART_1_SEND;
             }
             break;
@@ -45,11 +43,11 @@ int event_turn_off(int event, int * handled_event) {
             if (uart2->intidclr & UART_RIS_MASK) {
                  // recieve interrupt
                 data = uart2->data;
-                *handled_event = EVENT_UART_2_SEND;
+                *handled_event = EVENT_UART_2_RCV;
             } else if (uart2->intidclr & UART_TIS_MASK) {
                 // transmit interrupt
-                uart2->ctrl &= ~TIEN_MASK; // TODO Must disable this interrupt to turn it off?
-                *handled_event = EVENT_UART_2_RCV;
+                uart2->ctrl &= ~TIEN_MASK; 
+                *handled_event = EVENT_UART_2_SEND;
             }
             break;
         }

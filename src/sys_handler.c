@@ -146,6 +146,7 @@ static inline void handle_await(TD *task, TaskQueue *task_ready_queue){
 
     if (task_ready_queue->event_wait[event]) {
         task->r0 = ERR_EVENT_ALREADY_HAS_TASK_WAITING;
+        return;
     }
     if (event == EVENT_UART_2_SEND){
         uart2->ctrl |= TIEN_MASK; // TODO: better way? Does the interrupt need to be turned on here?
@@ -154,26 +155,24 @@ static inline void handle_await(TD *task, TaskQueue *task_ready_queue){
     }
 
     task_ready_queue->event_wait[event] = task;
-
     task->state = STATE_BLK_EVENT;
 }
 
 static inline void handle_interrupt(TD *task, TaskQueue *task_ready_queue){
     LOG("HANDLE INTERRUPT\r\n");
-    LOGF("vic1 status: %x, vic2 status: %x\r\n", vic1->IRQStatus, vic2->IRQStatus);
-
     // figure out what interrupt it is
-    unsigned long long IRQStatus = vic1->IRQStatus | (unsigned long long)(vic2->IRQStatus) << VIC_SIZE;
+    unsigned long long IRQStatus = ((unsigned long long) vic1->IRQStatus) | ((unsigned long long)(vic2->IRQStatus) << VIC_SIZE);
     Event event;
     for (event = 0; event < NUM_EVENTS; ++event) {
-        if (0x1ULL << IRQ_MAP[event] | IRQStatus) {
+        if ((0x1ULL << IRQ_MAP[event]) & IRQStatus) {
             break;
         }
     }
     ASSERT(event < NUM_EVENTS, "Interrupt doesn't correspond to an event");
+    LOGF("EVENT: %d | STATUS: %x|%x\r\n", event, vic1->IRQStatus, vic2->IRQStatus);
 
     // turn off that interrupt
-    int handled_event;
+    int handled_event = 0;
     int data = event_turn_off(event, &handled_event);
     event = (Event) handled_event;
     // event is updated to the handled event - specifically for uart send & recieve

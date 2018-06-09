@@ -29,14 +29,9 @@ int kernel_init(){
         );
 
     // Unmask timer interrupt
-    vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_CLK_3] - 32);
-    vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_UART_1_SEND] - 32);
-    vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_UART_1_RCV] - 32);
-    vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_UART_2_SEND] - 32);
-    vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_UART_2_RCV] - 32);
+    vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_CLK_3] - 32) | ( 0x1 << (IRQ_MAP[EVENT_UART_1_SEND] - 32)) | (0x1 << (IRQ_MAP[EVENT_UART_1_RCV] - 32)) | (0x1 << (IRQ_MAP[EVENT_UART_2_SEND] - 32)) | (0x1 << (IRQ_MAP[EVENT_UART_2_RCV] - 32));
 
     uart2->linctrlhigh &= ~FEN_MASK;
-
 
     return 0;
 }
@@ -63,7 +58,7 @@ void task_idle() {
         int time_end = clk4->value_low;
         int time_total = time_end - time_start;
         int percent_idle = 39320 * 100 / time_total;
-        bwprintf(COM2, "\0337\033[H%d%% \0338", percent_idle);
+        bwprintf(COM1, "\0337\033[H%d%% \0338", percent_idle);
     }
 }
 #undef IDLE_ITERATIONS
@@ -98,8 +93,8 @@ void fut(){
     int u2snd = WhoIs(NAME_UART2_SEND);
     int u2rcv = WhoIs(NAME_UART2_RCV);
     Putc(u2snd, 2, 'f');
-    for (int i = 0; i < 10; i++){
-        int f  = Getc(u2rcv, 2);
+    for (int i = 0; i < 300; i++){
+        int f = Getc(u2rcv, 2);
         Putc(u2snd, 2, (char) f);
     }
 }
