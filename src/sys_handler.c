@@ -7,6 +7,7 @@
 #include <vic.h>
 #include <clock.h>
 #include <event.h>
+#include <uart.h>
 
 static inline void handle_create(TD *task, TaskQueue *task_ready_queue) {
     LOGF("TASK CREATE: %d, %d, %d\r\n", task_getTid(task), TD_arg(task, 0), TD_arg(task, 1));
@@ -146,6 +147,11 @@ static inline void handle_await(TD *task, TaskQueue *task_ready_queue){
     if (task_ready_queue->event_wait[event]) {
         task->r0 = ERR_EVENT_ALREADY_HAS_TASK_WAITING;
     }
+    if (event == EVENT_UART_2_SEND){
+        uart2->ctrl |= TIEN_MASK; // TODO: better way? Does the interrupt need to be turned on here?
+    } else if (event == EVENT_UART_1_SEND){
+        uart2->ctrl |= TIEN_MASK; // TODO: better way? Does the interrupt need to be turned on here?
+    }
 
     task_ready_queue->event_wait[event] = task;
 
@@ -167,7 +173,9 @@ static inline void handle_interrupt(TD *task, TaskQueue *task_ready_queue){
     ASSERT(event < NUM_EVENTS, "Interrupt doesn't correspond to an event");
 
     // turn off that interrupt
-    int data = event_turn_off(event, &event);
+    int handled_event;
+    int data = event_turn_off(event, &handled_event);
+    event = (Event) handled_event;
     // event is updated to the handled event - specifically for uart send & recieve
 
     // unblock task waiting for that interrupt?

@@ -35,12 +35,15 @@ typedef struct uartmessage{
 
 static inline void generic_uart_rcv_notifier(int servertid, int uart){
     int event = (uart == 1? EVENT_UART_1_RCV : EVENT_UART_2_RCV);
+    (uart == 1 ? uart1 : uart2)->ctrl |= RIEN_MASK;
     UARTMessage msg = {MESSAGE_UART, NOTIFY_RCV, 0};
     ReplyMessage rm = {0, 0};
 
     // initialize uart happens here fn (TODO)
     FOREVER {
+        bwputstr(COM1, "AwaitEvent called in UART Rcv\r\n");
         msg.argument = AwaitEvent(event);
+        bwputstr(COM1, "AwaitEvent called in UART Rcv\r\n");
         int err = Send(servertid, &msg, sizeof(msg), &rm, sizeof(rm));
         ASSERT(err >= 0, "Error sending to server");
         ASSERT(rm.ret == 0, "Error return from server");
@@ -51,7 +54,7 @@ void task_uart1_rcv_notifier() {
     generic_uart_rcv_notifier(WhoIs(NAME_UART1_RCV), 1);
 }
 void task_uart2_rcv_notifier(){
-    generic_uart_rcv_notifier(WhoIs(NAME_UART2_RCV), 1);
+    generic_uart_rcv_notifier(WhoIs(NAME_UART2_RCV), 2);
 }
 
 void generic_uart_send_notifier(int servertid, int uart){
@@ -61,8 +64,7 @@ void generic_uart_send_notifier(int servertid, int uart){
     ReplyMessage rm = {0, 0};
 
     FOREVER {
-        msg.argument = AwaitEvent(event); // TODO: should the act of awaiting a rcv enable that interrupt? might make more sense
-        // interrupt is disabled as a method of turning it off
+        msg.argument = AwaitEvent(event); // TODO: awaiting uart send enables that interrupt - is this doing too much in the kernel?
         int err = Send(servertid, &msg, sizeof(msg), &rm, sizeof(rm));
         ASSERT(err >= 0, "Error sending to server");
         ASSERT(rm.ret == 0, "Error return from server");
@@ -74,7 +76,7 @@ void task_uart1_send_notifier() {
     generic_uart_send_notifier(WhoIs(NAME_UART1_SEND), 1);
 }
 void task_uart2_send_notifier(){
-    generic_uart_send_notifier(WhoIs(NAME_UART2_SEND), 1);
+    generic_uart_send_notifier(WhoIs(NAME_UART2_SEND), 2);
 }
 
 static inline void generic_uart_rcv_server(int uart){
@@ -172,22 +174,40 @@ static inline void generic_uart_send_server(int uart){
 }
 
 void task_uart1rcv(){ // FIXME: is there a cleaner way to do this?
+    RegisterAs(NAME_UART1_RCV);
     generic_uart_rcv_server(1);
 }
 void task_uart2rcv(){
+    RegisterAs(NAME_UART2_RCV);
     generic_uart_rcv_server(2);
 }
 void task_uart1send(){
+    RegisterAs(NAME_UART1_SEND);
     generic_uart_send_server(1);
 }
 void task_uart2send(){
+    RegisterAs(NAME_UART2_SEND);
     generic_uart_send_server(2);
 }
 
 void task_init_uart_servers(){
-    Create(PRIORITY_WAREHOUSE, &task_uart1send);
+    //Create(PRIORITY_WAREHOUSE, &task_uart1send);
     Create(PRIORITY_WAREHOUSE, &task_uart2send);
-    Create(PRIORITY_WAREHOUSE, &task_uart1rcv);
-    Create(PRIORITY_WAREHOUSE, &task_uart2rcv);
+    //Create(PRIORITY_WAREHOUSE, &task_uart1rcv);
+    //Create(PRIORITY_WAREHOUSE, &task_uart2rcv);
+}
+
+int Getc(int servertid, int channel){
+    UARTMessage um = {MESSAGE_UART, GETCH, 0};
+    ReplyMessage rm = {0, 0};
+    int r = Send(servertid, &um, sizeof(um), &rm, sizeof(rm));
+    return (r >= 0 ? rm.ret : r);
+}
+
+int Putc(int servertid, int channel, char ch){
+    UARTMessage um = {MESSAGE_UART, PUTCH, ch};
+    ReplyMessage rm = {0, 0};
+    int r = Send(servertid, &um, sizeof(um), &rm, sizeof(rm));
+    return (r >= 0 ? rm.ret : r);
 }
 

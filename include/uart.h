@@ -1,10 +1,10 @@
 #ifndef UART_H
 #define UART_H
 
-#define NAME_UART1_SEND "UART1SEND"
-#define NAME_UART1_RCV  "UART1RCV"
-#define NAME_UART2_SEND "UART2SEND"
-#define NAME_UART2_RCV " UART2RCV"
+#define NAME_UART1_SEND "U1SND"
+#define NAME_UART1_RCV  "U1RCV"
+#define NAME_UART2_SEND "U2SND"
+#define NAME_UART2_RCV " U2RCV"
 
 #define RCVQ_BUF_SIZE 50 // TODO calculate these based on stack size
 #define TXQ_BUF_SIZE 100

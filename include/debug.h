@@ -5,9 +5,18 @@
 #include <bwio.h>
 
 #define DEBUG 0
+#define bwio 1
 
 #define PANIC(x) bwputstr(COM2, x);\
-    __asm__("mov pc, #0");
+    __asm__("swi #0x123");\
+    //__asm__("mov pc, #0x00");
+
+#if !(bwio)
+#define bwputc(...)
+#define bwputstr(...)
+#define bwprintf(...)
+#endif
+
 
 #define IS(x) #x
 #define S(x) IS(x) 
@@ -17,9 +26,9 @@ if (!(x) && DEBUG) {\
 }
 
 #if DEBUG
-#define LOGF(...) bwprintf(COM2, __VA_ARGS__);
-#define LOGC(c) bwputc(COM2, (c));
-#define LOG(str) bwputstr(COM2, str);
+#define LOGF(...) bwprintf(COM1, __VA_ARGS__);
+#define LOGC(c) bwputc(COM1, (c));
+#define LOG(str) bwputstr(COM1, str);
 #else
 #define LOGF(...)
 #define LOGC(c)

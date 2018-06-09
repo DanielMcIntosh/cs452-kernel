@@ -35,6 +35,8 @@ int kernel_init(){
     vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_UART_2_SEND] - 32);
     vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_UART_2_RCV] - 32);
 
+    uart2->linctrlhigh &= ~FEN_MASK;
+
 
     return 0;
 }
@@ -90,20 +92,15 @@ void fut(){
     Create(PRIORITY_WAREHOUSE, &task_nameserver);
     Create(PRIORITY_WAREHOUSE, &task_clockserver);
     Create(PRIORITY_INIT, &task_init_uart_servers);
+    Create(PRIORITY_IDLE, &task_idle);
     RegisterAs(NAME_FUT);
 
-    Create(PRIORITY_IDLE, &task_idle);
-
-    for (int i = 0; i < 4; i++){
-        Create(3 + i, &task_timetest);
-    }
-    TTMsg tm;
-    int tid, t[] = {10, 23, 33, 71}, n[] = {20, 9, 6, 3};
-    for (int i = 0; i < 4; i++){
-        Receive(&tid, &tm, sizeof(tm));
-        tm.t = t[i];
-        tm.n = n[i];
-        Reply(tid, &tm, sizeof(tm));
+    int u2snd = WhoIs(NAME_UART2_SEND);
+    int u2rcv = WhoIs(NAME_UART2_RCV);
+    Putc(u2snd, 2, 'f');
+    for (int i = 0; i < 10; i++){
+        int f  = Getc(u2rcv, 2);
+        Putc(u2snd, 2, (char) f);
     }
 }
 
