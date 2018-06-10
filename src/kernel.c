@@ -58,7 +58,8 @@ void task_idle() {
         int time_end = clk4->value_low;
         int time_total = time_end - time_start;
         int percent_idle = 39320 * 100 / time_total;
-        bwprintf(COM1, "\0337\033[H%d%% \0338", percent_idle);
+        //bwprintf(COM1, "\0337\033[H%d%% \0338", percent_idle);
+        // TODO how do we print it lmao
     }
 }
 #undef IDLE_ITERATIONS
@@ -92,10 +93,11 @@ void fut(){
 
     int u2snd = WhoIs(NAME_UART2_SEND);
     int u2rcv = WhoIs(NAME_UART2_RCV);
-    Putc(u2snd, 2, 'f');
-    for (int i = 0; i < 300; i++){
+    int u1snd = WhoIs(NAME_UART1_SEND);
+    FOREVER{
         int f = Getc(u2rcv, 2);
         Putc(u2snd, 2, (char) f);
+        Putc(u1snd, 1, (char) f);
     }
 }
 

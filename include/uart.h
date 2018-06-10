@@ -10,6 +10,9 @@
 #define TXQ_BUF_SIZE 100
 #define GETQ_BUF_SIZE 5 // expected that not many different tasks will want to pull from any given uart - most likely 1, no?
 
+#define F_UARTCLK 7372800
+#define TC_BAUD 2400
+#define TM_BAUD 115200
 
 extern struct uart {
     volatile unsigned int data          : 8;

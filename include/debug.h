@@ -17,7 +17,6 @@
 #define bwprintf(...)
 #endif
 
-
 #define IS(x) #x
 #define S(x) IS(x) 
 #define ASSERT(x, y) \

@@ -151,7 +151,7 @@ static inline void handle_await(TD *task, TaskQueue *task_ready_queue){
     if (event == EVENT_UART_2_SEND){
         uart2->ctrl |= TIEN_MASK; // TODO: better way? Does the interrupt need to be turned on here?
     } else if (event == EVENT_UART_1_SEND){
-        uart2->ctrl |= TIEN_MASK; // TODO: better way? Does the interrupt need to be turned on here?
+        uart1->ctrl |= TIEN_MASK; // TODO: better way? Does the interrupt need to be turned on here?
     }
 
     task_ready_queue->event_wait[event] = task;

@@ -7,6 +7,7 @@ typedef enum {
     EVENT_UART_2_SEND,
     EVENT_UART_1_RCV,
     EVENT_UART_2_RCV,
+    EVENT_UART_1_MODEM,
     NUM_EVENTS
 } Event;
 
