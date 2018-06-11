@@ -5,11 +5,12 @@
 #include <bwio.h>
 
 #define DEBUG 0
+#define DEBUG_UART 0
 #define bwio 1
 
 #define PANIC(x) bwputstr(COM1, x);\
-    __asm__("swi #0x123");\
-    //__asm__("mov pc, #0x00");
+    __asm__("mov pc, #0x00");
+    //__asm__("swi #0x123");
 
 #if !(bwio)
 #define bwputc(...)
@@ -34,5 +35,12 @@ if (!(x) && DEBUG) {\
 #define LOG(str)
 #endif
 
+#if DEBUG_UART
+#define DLOGC(c) if (uart == 1) Putc(WhoIs(NAME_UART2_SEND), c);
+#define DLOG(str) if (uart == 1) Puts(WhoIs(NAME_UART2_SEND), #str, sizeof(#str));
+#else
+#define DLOGC(c)
+#define DLOG(str)
+#endif
 
 #endif

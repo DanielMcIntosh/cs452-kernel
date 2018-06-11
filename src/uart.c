@@ -8,6 +8,7 @@
 #include <name.h>
 #include <tasks.h>
 #include <circlebuffer.h>
+#include <util.h>
 
 struct uart *uart1 = (struct uart*) UART1_BASE, *uart2 = (struct uart*) UART2_BASE;
 
@@ -16,7 +17,8 @@ typedef enum uartrequest{
     NOTIFY_RCV,
     NOTIFY_MODEM,
     GETCH,
-    PUTCH
+    PUTCH,
+    PUTSTR
 } UARTRequest;
 
 
@@ -41,7 +43,20 @@ typedef struct uartmessage{
     MessageType id;
     UARTRequest request;
     int argument;
+    char argumentstr[UART_STR_MAX]; // TODO use the union struct for efficiency i guess
 } UARTMessage;
+
+typedef struct uartstrmessage{
+    MessageType id;
+    UARTRequest request;
+    char argument[UART_STR_MAX];
+    int alen;
+} UARTStrMessage;
+
+typedef union umsg{
+    UARTMessage chmsg;
+    UARTStrMessage strmsg;
+} UnionUARTMsg;
 
 static inline void generic_uart_rcv_notifier(int servertid, int uart){
     int event = (uart == 1? EVENT_UART_1_RCV : EVENT_UART_2_RCV);
@@ -155,16 +170,21 @@ static inline void generic_uart_send_server(int uart){
     SendServer ss = {cb_tx, 0, CTS_ASSERTED};
 
     UARTMessage um;
+
     ReplyMessage rm = {MESSAGE_REPLY, 0};
     int tid, err;
     RegisterAs(uart == 1 ? NAME_UART1_SEND : NAME_UART2_SEND);
-    if (uart == 1) Create(PRIORITY_NOTIFIER, &task_uart1_modem_notifier);
+    if (uart == 1) {
+        Create(PRIORITY_NOTIFIER, &task_uart1_modem_notifier);
+        ss.cts = (uart1->flag & CTS_MASK) ? CTS_ASSERTED : CTS_NEGATED;
+    }
     Create(PRIORITY_NOTIFIER, (uart == 1 ? &task_uart1_send_notifier : &task_uart2_send_notifier));
     FOREVER{
         Receive(&tid, &um, sizeof(um));
         switch(um.request){
         case NOTIFY_SEND:
         {
+            DLOG("NOTIFIER");
             rm.ret = 0;
             if (!cb_empty(&ss.txQ) && (ss.cts == CTS_ASSERTED || uart == 2)){
                 err = cb_read(&ss.txQ, (char *) &rm.ret);
@@ -178,6 +198,7 @@ static inline void generic_uart_send_server(int uart){
         }
         case NOTIFY_MODEM:
         {
+            DLOG("MODEM");
             if (!cb_empty(&ss.txQ) && ss.notifier != 0 && ss.cts == CTS_NEGATED){
                 err = cb_read(&ss.txQ, (char *) &rm.ret);
                 ASSERT(err == 0, "CB Read failure");
@@ -196,9 +217,13 @@ static inline void generic_uart_send_server(int uart){
                     PANIC("INVALID STATE");
                 }
             }
+            rm.ret = 0;
+            Reply(tid, &rm, sizeof(rm));
+            break;
         }
         case PUTCH:
         {
+            DLOG("PUTCH");
             if (ss.notifier != 0 && (ss.cts == CTS_ASSERTED || uart == 2)){
                 rm.ret = um.argument;
                 Reply(ss.notifier, &rm, sizeof(rm));
@@ -211,6 +236,22 @@ static inline void generic_uart_send_server(int uart){
             Reply(tid, &rm, sizeof(rm));
             break;
         } 
+        case PUTSTR:
+        {
+            int i = 0;
+            if (ss.notifier != 0 && (ss.cts == CTS_ASSERTED || uart == 2)){
+                rm.ret = um.argumentstr[i++];
+                Reply(ss.notifier, &rm, sizeof(rm));
+                ss.notifier = 0;
+                ss.cts = SEND_COMPLETE;
+            } 
+            for (; i < um.argument; i++){
+                cb_write(&ss.txQ, um.argumentstr[i]);
+            }
+            rm.ret = i;
+            Reply(tid, &rm, sizeof(rm));
+            break;
+        }
         default:
             PANIC("UNHANDLED REQUEST TYPE")
         }
@@ -237,16 +278,22 @@ void task_uart2send(){
 void task_init_uart_servers(){
     for (int i = 0; i < 2; i++){
         struct uart *u = (i == 0 ? uart1 : uart2);
+
         int brd = F_UARTCLK / (16 * (i == 0 ? TC_BAUD : TM_BAUD)) - 1;
         int brd_hi = brd / 256;
         int brd_lo = brd % 256;
-
         u->baudratehigh = brd_hi;
         u->baudratelow = brd_lo;
-        u->linctrlhigh = ((u->linctrlhigh) & ~FEN_MASK) | STP2_MASK; // FIFO off, 2 stop bits
+        if (i == 0) {
+            u->linctrlhigh = ((u->linctrlhigh) & ~FEN_MASK) | STP2_MASK; // FIFO off, 2 stop bits
+        } else {
+           u->linctrlhigh = ((u->linctrlhigh) & ~(FEN_MASK | STP2_MASK)); // FIFO off, 1 stop bit.
+        }
+        for (int k = 0; k < 55; k++)
+            __asm__ volatile("mov r0, r0");
         // enable
-        u->ctrl |= UARTEN_MASK | RIEN_MASK | MSIEN_MASK; //(uart == 1 ? MSIEN_MASK : 0); // TODO: disable first?
-        //TODO 55 NOPs here?
+        u->ctrl |= UARTEN_MASK | RIEN_MASK | (i == 0 ? MSIEN_MASK : 0); // TODO: disable first?
+
     }
     Create(PRIORITY_WAREHOUSE, &task_uart1send);
     Create(PRIORITY_WAREHOUSE, &task_uart1rcv);
@@ -255,16 +302,24 @@ void task_init_uart_servers(){
 }
 
 int Getc(int servertid, int channel){
-    UARTMessage um = {MESSAGE_UART, GETCH, 0};
+    UARTMessage um = {MESSAGE_UART, GETCH, 0, {0}};
     ReplyMessage rm = {0, 0};
     int r = Send(servertid, &um, sizeof(um), &rm, sizeof(rm));
     return (r >= 0 ? rm.ret : r);
 }
 
 int Putc(int servertid, int channel, char ch){
-    UARTMessage um = {MESSAGE_UART, PUTCH, ch};
+    UARTMessage um = {MESSAGE_UART, PUTCH, ch, {0}};
     ReplyMessage rm = {0, 0};
     int r = Send(servertid, &um, sizeof(um), &rm, sizeof(rm));
     return (r >= 0 ? rm.ret : r);
 }
 
+int Puts(int servertid, char *st, int len){
+    UARTMessage um = {MESSAGE_UART, PUTSTR, len, {0}};
+    ReplyMessage rm = {0, 0};
+    ASSERT(len < UART_STR_MAX, "invalid str length");
+    memcpy(um.argumentstr, st, len);
+    int r = Send(servertid, &um, sizeof(um), &rm, sizeof(rm));
+    return (r >= 0 ? rm.ret : r);
+}

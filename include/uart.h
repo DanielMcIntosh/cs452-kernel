@@ -14,6 +14,8 @@
 #define TC_BAUD 2400
 #define TM_BAUD 115200
 
+#define UART_STR_MAX 20
+
 extern struct uart {
     volatile unsigned int data          : 8;
     volatile unsigned int               : 24;
@@ -54,6 +56,7 @@ extern struct uart {
 
 int Getc(int servertid, int channel);
 int Putc(int servertid, int channel, char ch);
+int Puts(int servertid, char *st, int len);
 
 void task_init_uart_servers();
 
