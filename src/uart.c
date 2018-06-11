@@ -58,7 +58,7 @@ typedef union umsg{
     UARTStrMessage strmsg;
 } UnionUARTMsg;
 
-static inline void generic_uart_rcv_notifier(int servertid, int uart){
+static inline void generic_uart_rcv_notifier(int servertid, int uart) {
     int event = (uart == 1? EVENT_UART_1_RCV : EVENT_UART_2_RCV);
     UARTMessage msg = {MESSAGE_UART, NOTIFY_RCV, 0};
     ReplyMessage rm = {0, 0};
@@ -75,11 +75,11 @@ static inline void generic_uart_rcv_notifier(int servertid, int uart){
 void task_uart1_rcv_notifier() {
     generic_uart_rcv_notifier(WhoIs(NAME_UART1_RCV), 1);
 }
-void task_uart2_rcv_notifier(){
+void task_uart2_rcv_notifier() {
     generic_uart_rcv_notifier(WhoIs(NAME_UART2_RCV), 2);
 }
 
-void generic_uart_send_notifier(int servertid, int uart){
+void generic_uart_send_notifier(int servertid, int uart) {
     int event = (uart == 1? EVENT_UART_1_SEND : EVENT_UART_2_SEND);
     struct uart *u = (uart == 1 ? uart1 : uart2);
     UARTMessage msg = {MESSAGE_UART, NOTIFY_SEND, 0};
@@ -94,7 +94,7 @@ void generic_uart_send_notifier(int servertid, int uart){
     }
 }
 
-void task_uart1_modem_notifier(){
+void task_uart1_modem_notifier() {
     UARTMessage msg = {MESSAGE_UART, NOTIFY_MODEM, 0};
     ReplyMessage rm = {0, 0};
 
@@ -110,11 +110,11 @@ void task_uart1_modem_notifier(){
 void task_uart1_send_notifier() {
     generic_uart_send_notifier(WhoIs(NAME_UART1_SEND), 1);
 }
-void task_uart2_send_notifier(){
+void task_uart2_send_notifier() {
     generic_uart_send_notifier(WhoIs(NAME_UART2_SEND), 2);
 }
 
-static inline void generic_uart_rcv_server(int uart){
+static inline void generic_uart_rcv_server(int uart) {
     char rcvQ_buf[RCVQ_BUF_SIZE];
     char getQ_buf[GETQ_BUF_SIZE]; 
     circlebuffer_t cb_rcv;
@@ -131,13 +131,13 @@ static inline void generic_uart_rcv_server(int uart){
     Create(PRIORITY_NOTIFIER, (uart == 1 ? &task_uart1_rcv_notifier : &task_uart2_rcv_notifier));
     FOREVER{
         Receive(&tid, &um, sizeof(um));
-        switch(um.request){
+        switch(um.request) {
         case NOTIFY_RCV:
         {
             rm.ret = 0;
             Reply(tid, &rm, sizeof(rm)); // reply to notifier
             rm.ret = um.argument;
-            if (!cb_empty(&rs.getQ)){
+            if (!cb_empty(&rs.getQ)) {
                 err = cb_read(&rs.getQ, (char *) &tid);
                 ASSERT(err == 0, "CB Read failure");
                 Reply(tid, &rm, sizeof(rm));
@@ -148,7 +148,7 @@ static inline void generic_uart_rcv_server(int uart){
         }
         case GETCH:
         {
-            if (!cb_empty(&rs.rcvQ)){
+            if (!cb_empty(&rs.rcvQ)) {
                 err = cb_read(&rs.rcvQ, (char *) &rm.ret);
                 ASSERT(err == 0, "CB read failure");
                 Reply(tid, &rm, sizeof(rm));
@@ -163,7 +163,7 @@ static inline void generic_uart_rcv_server(int uart){
     }
 }
 
-static inline void generic_uart_send_server(int uart){
+static inline void generic_uart_send_server(int uart) {
     char txQ_buf[TXQ_BUF_SIZE];
     circlebuffer_t cb_tx;
     cb_init(&cb_tx, txQ_buf, TXQ_BUF_SIZE);
@@ -181,16 +181,16 @@ static inline void generic_uart_send_server(int uart){
     Create(PRIORITY_NOTIFIER, (uart == 1 ? &task_uart1_send_notifier : &task_uart2_send_notifier));
     FOREVER{
         Receive(&tid, &um, sizeof(um));
-        switch(um.request){
+        switch(um.request) {
         case NOTIFY_SEND:
         {
             DLOG("NOTIFIER");
             rm.ret = 0;
-            if (!cb_empty(&ss.txQ) && (ss.cts == CTS_ASSERTED || uart == 2)){
+            if (!cb_empty(&ss.txQ) && (ss.cts == CTS_ASSERTED || uart == 2)) {
                 err = cb_read(&ss.txQ, (char *) &rm.ret);
                 ASSERT(err == 0, "CB Read failure");
-                Reply(tid, &rm, sizeof(rm));
                 ss.cts = SEND_COMPLETE;
+                Reply(tid, &rm, sizeof(rm));
             } else {
                 ss.notifier = tid;
             }
@@ -199,13 +199,14 @@ static inline void generic_uart_send_server(int uart){
         case NOTIFY_MODEM:
         {
             DLOG("MODEM");
-            if (!cb_empty(&ss.txQ) && ss.notifier != 0 && ss.cts == CTS_NEGATED){
+            if (!cb_empty(&ss.txQ) && ss.notifier != 0 && ss.cts == CTS_NEGATED) {
                 err = cb_read(&ss.txQ, (char *) &rm.ret);
                 ASSERT(err == 0, "CB Read failure");
-                Reply(ss.notifier, &rm, sizeof(rm));
                 ss.cts = SEND_COMPLETE;
+                Reply(ss.notifier, &rm, sizeof(rm));
+                ss.notifier = 0;
             } else {
-                switch (ss.cts){
+                switch (ss.cts) {
                 case SEND_COMPLETE:
                 case CTS_ASSERTED:
                     ss.cts = CTS_NEGATED;
@@ -224,11 +225,11 @@ static inline void generic_uart_send_server(int uart){
         case PUTCH:
         {
             DLOG("PUTCH");
-            if (ss.notifier != 0 && (ss.cts == CTS_ASSERTED || uart == 2)){
+            if (ss.notifier != 0 && (ss.cts == CTS_ASSERTED || uart == 2)) {
                 rm.ret = um.argument;
+                ss.cts = SEND_COMPLETE;
                 Reply(ss.notifier, &rm, sizeof(rm));
                 ss.notifier = 0;
-                ss.cts = SEND_COMPLETE;
             } else {
                 cb_write(&ss.txQ, um.argument);
             }
@@ -239,13 +240,13 @@ static inline void generic_uart_send_server(int uart){
         case PUTSTR:
         {
             int i = 0;
-            if (ss.notifier != 0 && (ss.cts == CTS_ASSERTED || uart == 2)){
+            if (ss.notifier != 0 && (ss.cts == CTS_ASSERTED || uart == 2)) {
                 rm.ret = um.argumentstr[i++];
+                ss.cts = SEND_COMPLETE;
                 Reply(ss.notifier, &rm, sizeof(rm));
                 ss.notifier = 0;
-                ss.cts = SEND_COMPLETE;
             } 
-            for (; i < um.argument; i++){
+            for (; i < um.argument; i++) {
                 cb_write(&ss.txQ, um.argumentstr[i]);
             }
             rm.ret = i;
@@ -258,25 +259,25 @@ static inline void generic_uart_send_server(int uart){
     }
 }
 
-void task_uart1rcv(){ // FIXME: is there a cleaner way to do this?
+void task_uart1rcv() { // FIXME: is there a cleaner way to do this?
     RegisterAs(NAME_UART1_RCV);
     generic_uart_rcv_server(1);
 }
-void task_uart2rcv(){
+void task_uart2rcv() {
     RegisterAs(NAME_UART2_RCV);
     generic_uart_rcv_server(2);
 }
-void task_uart1send(){
+void task_uart1send() {
     RegisterAs(NAME_UART1_SEND);
     generic_uart_send_server(1);
 }
-void task_uart2send(){
+void task_uart2send() {
     RegisterAs(NAME_UART2_SEND);
     generic_uart_send_server(2);
 }
 
-void task_init_uart_servers(){
-    for (int i = 0; i < 2; i++){
+void task_init_uart_servers() {
+    for (int i = 0; i < 2; i++) {
         struct uart *u = (i == 0 ? uart1 : uart2);
 
         int brd = F_UARTCLK / (16 * (i == 0 ? TC_BAUD : TM_BAUD)) - 1;
@@ -287,7 +288,7 @@ void task_init_uart_servers(){
         if (i == 0) {
             u->linctrlhigh = ((u->linctrlhigh) & ~FEN_MASK) | STP2_MASK; // FIFO off, 2 stop bits
         } else {
-           u->linctrlhigh = ((u->linctrlhigh) & ~(FEN_MASK | STP2_MASK)); // FIFO off, 1 stop bit.
+            u->linctrlhigh = ((u->linctrlhigh) & ~(FEN_MASK | STP2_MASK)); // FIFO off, 1 stop bit.
         }
         for (int k = 0; k < 55; k++)
             __asm__ volatile("mov r0, r0");
@@ -301,21 +302,21 @@ void task_init_uart_servers(){
     Create(PRIORITY_WAREHOUSE, &task_uart2rcv);
 }
 
-int Getc(int servertid, int channel){
+int Getc(int servertid, int channel) {
     UARTMessage um = {MESSAGE_UART, GETCH, 0, {0}};
     ReplyMessage rm = {0, 0};
     int r = Send(servertid, &um, sizeof(um), &rm, sizeof(rm));
     return (r >= 0 ? rm.ret : r);
 }
 
-int Putc(int servertid, int channel, char ch){
+int Putc(int servertid, int channel, char ch) {
     UARTMessage um = {MESSAGE_UART, PUTCH, ch, {0}};
     ReplyMessage rm = {0, 0};
     int r = Send(servertid, &um, sizeof(um), &rm, sizeof(rm));
     return (r >= 0 ? rm.ret : r);
 }
 
-int Puts(int servertid, char *st, int len){
+int Puts(int servertid, char *st, int len) {
     UARTMessage um = {MESSAGE_UART, PUTSTR, len, {0}};
     ReplyMessage rm = {0, 0};
     ASSERT(len < UART_STR_MAX, "invalid str length");

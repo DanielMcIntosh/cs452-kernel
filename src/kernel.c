@@ -13,7 +13,7 @@
 #include <clock.h>
 #include <message.h>
 #include <uart.h>
-
+#include <terminal.h> 
 extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
 extern void IRQ_ENTRY_POINT(void);
@@ -42,7 +42,12 @@ TD* schedule(TaskQueue *task_ready_queue){
 
 #define IDLE_ITERATIONS 500000
 void task_idle() {
+    int snd_tid = WhoIs(NAME_UART2_SEND);
     int i, j = 0;
+    char * idledisplay = "\0337\033[H@@\0338";
+    int idledisplaylen = 9; // TODO: better way than counting?
+    int pct_hi_idx = 5;
+    int pct_lo_idx = 6;
     FOREVER {
         i = IDLE_ITERATIONS;
         int time_start = clk4->value_low;        
@@ -58,8 +63,11 @@ void task_idle() {
         int time_end = clk4->value_low;
         int time_total = time_end - time_start;
         int percent_idle = 39320 * 100 / time_total;
-        //bwprintf(COM1, "\0337\033[H%d%%\0338", percent_idle);
-        // TODO how do we print it lmao
+        idledisplay[pct_hi_idx] = '0' + (percent_idle / 10);
+        idledisplay[pct_lo_idx] = '0' + (percent_idle % 10);
+        //bwputstr(COM1, idledisplay);
+        //Puts(snd_tid, idledisplay, idledisplaylen);
+        // TODO figure out how to display this
     }
 }
 #undef IDLE_ITERATIONS
@@ -89,20 +97,13 @@ void fut(){
     Create(PRIORITY_WAREHOUSE, &task_clockserver);
     Create(PRIORITY_INIT, &task_init_uart_servers);
     Create(PRIORITY_IDLE, &task_idle);
+    Create(PRIORITY_LOW, &task_terminal);
     RegisterAs(NAME_FUT);
-
-    int u2snd = WhoIs(NAME_UART2_SEND);
-    int u2rcv = WhoIs(NAME_UART2_RCV);
-    int u1snd = WhoIs(NAME_UART1_SEND);
-    FOREVER{
-        int f = Getc(u2rcv, 2);
-        Putc(u2snd, 2, (char) f);
-        Putc(u1snd, 1, (char) f);
-    }
 }
 
 
 int main(){
+    //bwprintf(COM2, "%d, %d\r\n", sizeof("\033H \033H"), sizeof("\0337\033[H@@\0338"));
 #if CACHE
     __asm__(
         "ldr r1, %[bits]\n\t"
@@ -114,8 +115,8 @@ int main(){
             : "r0", "r1"
         );
 #endif //CACHE
-
     LOG("Start!");
+
 
     kernel_init();
     char stack_space[STACK_SPACE_SIZE];

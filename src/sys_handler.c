@@ -150,6 +150,7 @@ static inline void handle_await(TD *task, TaskQueue *task_ready_queue){
     }
     if (event == EVENT_UART_2_SEND){
         uart2->ctrl |= TIEN_MASK; // TODO: better way? Does the interrupt need to be turned on here?
+        // TODO also maybe do this in the VIC so you don't need to ensure 55 clock cycles
     } else if (event == EVENT_UART_1_SEND){
         uart1->ctrl |= TIEN_MASK; // TODO: better way? Does the interrupt need to be turned on here?
     }
