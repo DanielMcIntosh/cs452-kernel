@@ -43,7 +43,7 @@ typedef struct uartmessage{
     MessageType id;
     UARTRequest request;
     int argument;
-    char argumentstr[UART_STR_MAX]; // TODO use the union struct for efficiency i guess
+    char argumentstr[UART_STR_MAX];
 } UARTMessage;
 
 typedef struct uartstrmessage{

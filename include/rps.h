@@ -18,9 +18,9 @@ typedef enum {
     OPPONENT_QUIT
 } RPSStatus;
 
-int Signup(int rps_tid);
-int Play(int rps_tid, RPS move, RPSStatus* reply);
-int Quit(int rps_tid);
+int RPS_Signup(int rps_tid);
+int RPS_Play(int rps_tid, RPS move, RPSStatus* reply);
+int RPS_Quit(int rps_tid);
 
 void task_rps();
 void task_rps_client();

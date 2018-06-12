@@ -13,13 +13,13 @@ typedef struct {
     RPS move;
 } RPSMessage;
 
-int Signup(int rps_tid){
+int RPS_Signup(int rps_tid){
     RPSMessage msg;
     msg.type = MESSAGE_RPS_SIGNUP;
     int size = Send(rps_tid, &msg, sizeof(msg), &msg, sizeof(msg));
     return (size == sizeof(msg)) ? 0 : size;
 }
-int Play(int rps_tid, RPS move, RPSStatus* reply){
+int RPS_Play(int rps_tid, RPS move, RPSStatus* reply){
     RPSMessage msg;
     ReplyMessage rply;
     msg.type = MESSAGE_RPS_PLAY;
@@ -28,7 +28,7 @@ int Play(int rps_tid, RPS move, RPSStatus* reply){
     *reply = rply.ret;
     return (size == sizeof(rply)) ? 0 : size;
 }
-int Quit(int rps_tid){
+int RPS_Quit(int rps_tid){
     RPSMessage msg;
     msg.type = MESSAGE_RPS_PLAY;
     msg.move = QUIT;
@@ -128,14 +128,14 @@ void task_rps(){
 void task_rps_client(){
     int rps_tid = WhoIs(RPS_NAME);
     int mytid = MyTid();
-    int err = Signup(rps_tid);
+    int err = RPS_Signup(rps_tid);
     RPSStatus reply;
     if (err){
         bwprintf(COM2, "%d: Error with RPS Signup: %d\r\n", mytid, err);
     }
     for (int i = 0; i < 10; i++){
         RPS move = clk4->value_low % 3; //randomization using clock time
-        err = Play(rps_tid, move, &reply);
+        err = RPS_Play(rps_tid, move, &reply);
         if (err){
             bwprintf(COM2, "%d: Error playing RPS Move: %d\r\n", mytid,  err);
             break;
@@ -149,5 +149,5 @@ void task_rps_client(){
             (reply == WIN ? "WIN" : (reply == LOSE ? "LOSE" : "TIE")));
         bwgetc(COM2);
     }
-    Quit(rps_tid);
+    RPS_Quit(rps_tid);
 }

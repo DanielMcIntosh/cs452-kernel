@@ -8,9 +8,10 @@
 #define DEBUG_UART 0
 #define bwio 1
 
-#define PANIC(x) bwputstr(COM1, x);\
-    __asm__("mov pc, #0x00");
-    //__asm__("swi #0x123");
+#define PANIC(x) \
+    EnterCriticalSection();\
+    bwputstr(COM1, x);\
+    Quit();
 
 #if !(bwio)
 #define bwputc(...)

@@ -14,6 +14,8 @@
 #include <message.h>
 #include <uart.h>
 #include <terminal.h> 
+#include <command.h>
+
 extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
 extern void IRQ_ENTRY_POINT(void);
@@ -44,8 +46,8 @@ TD* schedule(TaskQueue *task_ready_queue){
 void task_idle() {
     int snd_tid = WhoIs(NAME_UART2_SEND);
     int i, j = 0;
-    char * idledisplay = "\0337\033[H@@\0338";
-    int idledisplaylen = 9; // TODO: better way than counting?
+    char idledisplay[] = "\0337\033[H__\0338";
+    int idledisplaylen = sizeof("\0337\033[H__\0338");
     int pct_hi_idx = 5;
     int pct_lo_idx = 6;
     FOREVER {
@@ -65,9 +67,13 @@ void task_idle() {
         int percent_idle = 39320 * 100 / time_total;
         idledisplay[pct_hi_idx] = '0' + (percent_idle / 10);
         idledisplay[pct_lo_idx] = '0' + (percent_idle % 10);
-        //bwputstr(COM1, idledisplay);
-        //Puts(snd_tid, idledisplay, idledisplaylen);
-        // TODO figure out how to display this
+        /*
+        EnterCriticalSection();
+        for (int i = 0; i < idledisplaylen; i++) {
+            Putc(snd_tid, 2, idledisplay[i]);
+        }
+        ExitCriticalSection();
+        */ // TODO idle display time
     }
 }
 #undef IDLE_ITERATIONS
@@ -97,6 +103,7 @@ void fut(){
     Create(PRIORITY_WAREHOUSE, &task_clockserver);
     Create(PRIORITY_INIT, &task_init_uart_servers);
     Create(PRIORITY_IDLE, &task_idle);
+    Create(PRIORITY_HIGH, &task_commandserver);
     Create(PRIORITY_LOW, &task_terminal);
     RegisterAs(NAME_FUT);
 }

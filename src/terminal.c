@@ -5,23 +5,7 @@
 #include <uart.h>
 #include <err.h>
 #include <debug.h>
-
-typedef enum cmdtype{
-    COMMAND_GO,
-    COMMAND_ALL,
-    COMMAND_TR,
-    COMMAND_RV,
-    COMMAND_SW,
-    COMMAND_QUIT,
-    NO_COMMAND,
-    INVALID_COMMAND
-} CommandType;
-
-typedef struct command{
-    CommandType type;
-    int arg1;
-    int arg2;
-} Command;
+#include <command.h>
 
 typedef struct terminal{
     circlebuffer_t input;
@@ -90,8 +74,6 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input){
         if (err)
             break;
         // sw <number> <direction>
-        // 33 = straight
-        // 34 = curved
         cmd->type = COMMAND_SW;
         cmd->arg1 = swarg;
         cmd->arg2 = number;
@@ -104,22 +86,6 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input){
             break;
         cmd->type = COMMAND_GO;
         return 0;
-    case 'a': // all
-        if (cb_empty(cb_input))
-            break;
-        cb_read(cb_input, &c);
-        if (c != 'l')
-            break;
-        cb_read(cb_input, &c);
-        if (c != 'l')
-            break;
-        cb_read(cb_input, &c); // the space
-        err = cb_read(cb_input, &swarg);
-        if (err)
-            break;
-        cmd->type = COMMAND_ALL;
-        cmd->arg1 = swarg;
-        return 0;
     default:
         break;
     }
@@ -131,6 +97,7 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input){
 void task_terminal(){
     int rcv_tid = WhoIs(NAME_UART2_RCV);
     int snd_tid = WhoIs(NAME_UART2_SEND);
+    int command_tid = WhoIs(NAME_COMMANDSERVER);
     int err = 0; char c;
 
     char cb_input_buf[CB_INPUT_BUF_SIZE];
@@ -145,7 +112,7 @@ void task_terminal(){
         if (c == '\15'){
             err = parse_command(&t.cmd, &t.input);
             Puts(snd_tid, L(STR_NEWLINE));
-            //send t.cmd somewhere to command server
+            SendCommand(command_tid, t.cmd);
         } else if (c == 8) { //backspace
             cb_backspace(&t.input);
             Puts(snd_tid, L(STR_BACKSPACE));

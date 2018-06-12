@@ -76,3 +76,19 @@ int Reply(int tid, void *reply, int rplen){
 int AwaitEvent(int eventType){
     return syscall_2(SYSCALL_AWAIT, eventType, 0);
 }
+
+int Quit(){
+    return syscall_0(SYSCALL_QUIT);
+}
+
+int EnterCriticalSection(){
+    return syscall_0(SYSCALL_INTERRUPTS_OFF);
+}
+
+int ExitCriticalSection(){
+    return syscall_0(SYSCALL_INTERRUPTS_ON);
+}
+
+int Destroy(){
+    return syscall_0(SYSCALL_DESTROY);
+}

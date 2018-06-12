@@ -191,6 +191,29 @@ static inline void handle_interrupt(TD *task, TaskQueue *task_ready_queue){
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
+//                                      K4
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+static inline void handle_quit() {
+    __asm__ volatile("mov pc, #0");
+}
+
+static inline void handle_enter_critical_section(TD *task) {
+    task->spsr |= 0x80;
+}
+
+static inline void handle_exit_critical_section(TD *task) {
+    task->spsr &= ~(0x80);
+}
+
+static inline void handle_destroy(TD *task){
+    LOG("DESTROY called\r\n");
+    //don't re-queue the task, let it become a zombie task.
+    //it will still be accessible by it's TID, since that gives us an index in the task pool
+    task->state = STATE_DESTROYED;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////
 //                                     MAIN
 //////////////////////////////////////////////////////////////////////////////////////////////
 Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) {
@@ -230,9 +253,7 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) 
         case SYSCALL_RECEIVE:
         {
             handle_receive(task);
-            break;
-        }
-        case SYSCALL_REPLY:
+            break; } case SYSCALL_REPLY:
         {
             handle_reply(task, task_pool, task_ready_queue);
             break;
@@ -247,6 +268,24 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) 
             handle_interrupt(task, task_ready_queue);
             break;
         }
+        case SYSCALL_QUIT:
+        {
+            handle_quit();
+            break;
+        }
+        case SYSCALL_INTERRUPTS_OFF:
+        {
+            handle_enter_critical_section(task);
+            break;
+        }
+        case SYSCALL_INTERRUPTS_ON:
+        {
+            handle_exit_critical_section(task);
+            break;
+        }
+        case SYSCALL_DESTROY:
+            handle_destroy(task);
+            break;
         default:
         {
             PANIC("UNKNOWN SYSCALL");

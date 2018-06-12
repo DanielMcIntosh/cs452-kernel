@@ -11,6 +11,10 @@ typedef enum {
 	SYSCALL_RECEIVE,
 	SYSCALL_REPLY,
     SYSCALL_AWAIT,
+    SYSCALL_QUIT,
+    SYSCALL_INTERRUPTS_OFF,
+    SYSCALL_INTERRUPTS_ON,
+    SYSCALL_DESTROY,
 
     SYSCALL_INTERRUPT = 100
 } Syscall;
@@ -29,5 +33,11 @@ int Reply(int tid, void *reply, int rplen);
 
 // ==== K3 ====
 int AwaitEvent(int eventType);
+
+// ==== K4 ====
+int Quit();
+int EnterCriticalSection();
+int ExitCriticalSection();
+int Destroy();
 
 #endif
