@@ -133,7 +133,7 @@ int main(){
 
     task_init(task_pool, &task_ready_queue, stack_space, STACK_SPACE_SIZE);
 
-    int err = task_create(&task_ready_queue, 1, 4, (int) &fut);
+    int err = task_create(&task_ready_queue, 1, 4, (int) &fut, 0);
     if (err < 0) {
         bwprintf(COM2, "-=-=-=-=-=-=ERR = %d=-=-=-=-=-=-=-\r\n", err);
         return -1;

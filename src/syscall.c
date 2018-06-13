@@ -92,3 +92,7 @@ int ExitCriticalSection(){
 int Destroy(){
     return syscall_0(SYSCALL_DESTROY);
 }
+
+int CreateWithArgument(int priority, void (*code)(int), int argument){
+    return syscall_3(SYSCALL_CREATE_ARGUMENT, priority, (int) code, argument);
+}

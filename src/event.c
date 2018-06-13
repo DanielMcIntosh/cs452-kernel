@@ -5,6 +5,7 @@
 #include <uart.h>
 #include <ts7200.h>
 #include <debug.h>
+#include <syscall.h>
 
 int IRQ_MAP[NUM_EVENTS] = {
     [EVENT_CLK_3] = 51,

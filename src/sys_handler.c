@@ -11,7 +11,7 @@
 
 static inline void handle_create(TD *task, TaskQueue *task_ready_queue) {
     LOGF("TASK CREATE: %d, %d, %d\r\n", task_getTid(task), TD_arg(task, 0), TD_arg(task, 1));
-    task->r0 = task_create(task_ready_queue, task_getTid(task), TD_arg(task, 0), TD_arg(task, 1));
+    task->r0 = task_create(task_ready_queue, task_getTid(task), TD_arg(task, 0), TD_arg(task, 1), 0);
 }
 
 static inline void handle_tid(TD *task) {
@@ -213,6 +213,11 @@ static inline void handle_destroy(TD *task){
     task->state = STATE_DESTROYED;
 }
 
+static inline void handle_create_argument(TD *task, TaskQueue *task_ready_queue){
+    LOGF("TASK CREATE ARG: %d, %d, %d, %d\r\n", task_getTid(task), TD_arg(task, 0), TD_arg(task, 1), TD_arg(task, 2));
+    task->r0 = task_create(task_ready_queue, task_getTid(task), TD_arg(task, 0), TD_arg(task, 1), TD_arg(task, 2));
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////
 //                                     MAIN
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -253,7 +258,9 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) 
         case SYSCALL_RECEIVE:
         {
             handle_receive(task);
-            break; } case SYSCALL_REPLY:
+            break;
+        }
+        case SYSCALL_REPLY:
         {
             handle_reply(task, task_pool, task_ready_queue);
             break;
@@ -284,8 +291,15 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) 
             break;
         }
         case SYSCALL_DESTROY:
+        {
             handle_destroy(task);
             break;
+        }
+        case SYSCALL_CREATE_ARGUMENT:
+        {
+            handle_create_argument(task, task_ready_queue);
+            break;
+        }
         default:
         {
             PANIC("UNKNOWN SYSCALL");

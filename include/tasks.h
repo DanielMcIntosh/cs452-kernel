@@ -76,7 +76,7 @@ int task_getParentTid(TD *task);
 
 TD *task_nextActive(TaskQueue *queue);
 void task_react_to_state(TD *task, TaskQueue *queue);
-int task_create(TaskQueue *queue, int parent_tid, Priority priority, int lr);
+int task_create(TaskQueue *queue, int parent_tid, Priority priority, int lr, int arg);
 
 static inline __attribute__((always_inline)) TD *task_lookup(TD *task_pool, int tid) {
     return &(task_pool[tid & TASK_BASE_TID_MASK]);

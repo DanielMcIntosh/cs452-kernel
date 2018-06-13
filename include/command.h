@@ -3,6 +3,13 @@
 
 #define NAME_COMMANDSERVER "CMDS"
 
+/*
+typedef enum direction{
+    FORWARD,
+    BACKWARD
+} Direction;
+*/
+
 typedef enum cmdtype{
     // PARSED COMMANDS
     COMMAND_GO,

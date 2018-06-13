@@ -2,6 +2,7 @@
 #include <util.h>
 #include <err.h>
 #include <debug.h>
+#include <syscall.h>
 
 
 static int hash(char * key) {

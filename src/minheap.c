@@ -2,6 +2,7 @@
 #include <util.h>
 #include <debug.h>
 #include <err.h>
+#include <syscall.h>
 
 void mh_init(minheap_t *mh, entry_t * entries, unsigned int size){
     mh->entries = entries;

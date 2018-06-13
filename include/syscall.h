@@ -15,6 +15,7 @@ typedef enum {
     SYSCALL_INTERRUPTS_OFF,
     SYSCALL_INTERRUPTS_ON,
     SYSCALL_DESTROY,
+    SYSCALL_CREATE_ARGUMENT,
 
     SYSCALL_INTERRUPT = 100
 } Syscall;
@@ -39,5 +40,6 @@ int Quit();
 int EnterCriticalSection();
 int ExitCriticalSection();
 int Destroy();
+int CreateWithArgument(int priority, void (*code)(int), int argument);
 
 #endif
