@@ -10,7 +10,7 @@
 
 #define PANIC(x) \
     EnterCriticalSection();\
-    bwputstr(COM1, x);\
+    bwputstr(COM2, x);\
     Quit();
 
 #if !(bwio)

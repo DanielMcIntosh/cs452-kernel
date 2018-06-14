@@ -195,7 +195,6 @@ static inline void handle_interrupt(TD *task, TaskQueue *task_ready_queue){
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 static inline void handle_quit() {
-    __asm__ volatile("mov pc, #0");
 }
 
 static inline void handle_enter_critical_section(TD *task) {

@@ -43,14 +43,10 @@ TD* schedule(TaskQueue *task_ready_queue){
     return task_nextActive(task_ready_queue);
 }
 
-#define IDLE_ITERATIONS 5000000
+#define IDLE_ITERATIONS 500000
 void task_idle() {
     int snd_tid = WhoIs(NAME_UART2_SEND);
     int i, j = 0;
-    char idledisplay[] = "IDLE:__%\r\n";//"\0337\033[H__\0338";
-    int idledisplaylen = sizeof(idledisplay)/sizeof(char) + 1;//sizeof("\0337\033[H__\0338");
-    int pct_hi_idx = 5;
-    int pct_lo_idx = 6;
     FOREVER {
         i = IDLE_ITERATIONS;
         int time_start = clk4->value_low;        
@@ -65,9 +61,21 @@ void task_idle() {
             : [i] "+r" (i), [j] "+r" (j));
         int time_end = clk4->value_low;
         int time_total = time_end - time_start;
-        int percent_idle = 393200 * 100 / time_total;
-        idledisplay[pct_hi_idx] = '0' + (percent_idle / 10);
-        idledisplay[pct_lo_idx] = '0' + (percent_idle % 10);
+        int percent_idle = 39320 * 100 / time_total;
+
+        // TODO: put idle time somewhere to print later
+        /*
+        Putc(snd_tid, 2, '\033');
+        Putc(snd_tid, 2, '7');
+        Putc(snd_tid, 2, '\033');
+        Putc(snd_tid, 2, '[');
+        Putc(snd_tid, 2, 'H');
+        Putc(snd_tid, 2, '0' + (percent_idle / 10));
+        Putc(snd_tid, 2, '0' + (percent_idle % 10));
+        Putc(snd_tid, 2, '\033');
+        Putc(snd_tid, 2, '8');
+        */
+
         //Puts(snd_tid, idledisplay, idledisplaylen);
         /*
         //EnterCriticalSection();
@@ -107,14 +115,13 @@ void fut(){
     init_uart_servers();
     Create(PRIORITY_IDLE, &task_idle);
     Create(PRIORITY_HIGH, &task_commandserver);
-    Create(PRIORITY_LOW, &task_terminal);
-    Create(PRIORITY_HIGHER, &task_sensor_server);
+    Create(PRIORITY_HIGH, &task_terminal);
+    Create(PRIORITY_HIGH, &task_sensor_server);
     RegisterAs(NAME_FUT);
 }
 
 
 int main(){
-    //bwprintf(COM2, "%d, %d\r\n", sizeof("\033H \033H"), sizeof("\0337\033[H@@\0338"));
 #if CACHE
     __asm__(
         "ldr r1, %[bits]\n\t"
@@ -148,7 +155,7 @@ int main(){
     TD *task = schedule(&task_ready_queue);
     LOGF("OFFSETS: lr %d, sp %d, r0 %d, spsr %d, task %d\r\n", (int) &(task->lr)-(int)task, (int)&(task->sp)-(int)task, (int)&(task->r0)-(int)task, (int)&(task->spsr)-(int)task, task);
     int f = 0;
-    while (task){
+    while (task && f != SYSCALL_QUIT){
         LOGF("Task Scheduled! Pr = %d\t", task->priority);
         LOGF("task = %x\t", (int) task);
         LOGF("task->r0 = %d\t", task->r0);

@@ -46,18 +46,6 @@ typedef struct uartmessage{
     char argumentstr[UART_STR_MAX];
 } UARTMessage;
 
-typedef struct uartstrmessage{
-    MessageType id;
-    UARTRequest request;
-    char argument[UART_STR_MAX];
-    int alen;
-} UARTStrMessage;
-
-typedef union umsg{
-    UARTMessage chmsg;
-    UARTStrMessage strmsg;
-} UnionUARTMsg;
-
 static inline void generic_uart_rcv_notifier(int servertid, int uart) {
     int event = (uart == 1? EVENT_UART_1_RCV : EVENT_UART_2_RCV);
     UARTMessage msg = {MESSAGE_UART, NOTIFY_RCV, 0};
