@@ -15,6 +15,7 @@
 #include <uart.h>
 #include <terminal.h> 
 #include <command.h>
+#include <sensor.h>
 
 extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
@@ -42,12 +43,12 @@ TD* schedule(TaskQueue *task_ready_queue){
     return task_nextActive(task_ready_queue);
 }
 
-#define IDLE_ITERATIONS 500000
+#define IDLE_ITERATIONS 5000000
 void task_idle() {
     int snd_tid = WhoIs(NAME_UART2_SEND);
     int i, j = 0;
-    char idledisplay[] = "\0337\033[H__\0338";
-    int idledisplaylen = sizeof("\0337\033[H__\0338");
+    char idledisplay[] = "IDLE:__%\r\n";//"\0337\033[H__\0338";
+    int idledisplaylen = sizeof(idledisplay)/sizeof(char) + 1;//sizeof("\0337\033[H__\0338");
     int pct_hi_idx = 5;
     int pct_lo_idx = 6;
     FOREVER {
@@ -64,16 +65,18 @@ void task_idle() {
             : [i] "+r" (i), [j] "+r" (j));
         int time_end = clk4->value_low;
         int time_total = time_end - time_start;
-        int percent_idle = 39320 * 100 / time_total;
+        int percent_idle = 393200 * 100 / time_total;
         idledisplay[pct_hi_idx] = '0' + (percent_idle / 10);
         idledisplay[pct_lo_idx] = '0' + (percent_idle % 10);
+        //Puts(snd_tid, idledisplay, idledisplaylen);
         /*
-        EnterCriticalSection();
+        //EnterCriticalSection();
         for (int i = 0; i < idledisplaylen; i++) {
             Putc(snd_tid, 2, idledisplay[i]);
         }
-        ExitCriticalSection();
-        */ // TODO idle display time
+        //*/
+        //ExitCriticalSection();
+        // TODO idle display time
     }
 }
 #undef IDLE_ITERATIONS
@@ -101,10 +104,11 @@ void fut(){
     LOG("First User Task: Start\r\n");
     Create(PRIORITY_WAREHOUSE, &task_nameserver);
     Create(PRIORITY_WAREHOUSE, &task_clockserver);
-    Create(PRIORITY_INIT, &task_init_uart_servers);
+    init_uart_servers();
     Create(PRIORITY_IDLE, &task_idle);
     Create(PRIORITY_HIGH, &task_commandserver);
     Create(PRIORITY_LOW, &task_terminal);
+    Create(PRIORITY_HIGHER, &task_sensor_server);
     RegisterAs(NAME_FUT);
 }
 

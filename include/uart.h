@@ -58,6 +58,6 @@ int Getc(int servertid, int channel);
 int Putc(int servertid, int channel, char ch);
 int Puts(int servertid, char *st, int len);
 
-void task_init_uart_servers();
+void init_uart_servers();
 
 #endif

@@ -276,7 +276,7 @@ void task_uart2send() {
     generic_uart_send_server(2);
 }
 
-void task_init_uart_servers() {
+void init_uart_servers() {
     for (int i = 0; i < 2; i++) {
         struct uart *u = (i == 0 ? uart1 : uart2);
 

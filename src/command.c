@@ -59,6 +59,7 @@ void task_reverse_train(int arg){
     Delay(calcReverseTime(speed));
     Command crv = {COMMAND_NOTIFY_RV_REVERSE, train, 15};
     SendCommand(tid, crv);
+    Delay(10);
     Command cra = {COMMAND_NOTIFY_RV_ACCEL, speed, train};
     SendCommand(tid, cra);
     Destroy();
@@ -131,6 +132,7 @@ void task_commandserver(){
             break;    
         }
         case COMMAND_NOTIFY_SOLENOID_TIMER:
+        {
             if (cs.additional_delay){
                 cs.notifier_waiting = CreateWithArgument(PRIORITY_NOTIFIER, &task_solenoid_off, 100);
                 cs.additional_delay = 0;
@@ -140,6 +142,12 @@ void task_commandserver(){
                 cs.notifier_waiting = 0;
             }
             break;
+        }
+        case COMMAND_SENSOR_REQUEST:
+        {
+            Putc(servertid, 1, 133);
+            break;
+        }
         default:
         {
             PANIC("INVALID COMMAND UNCAUGHT");

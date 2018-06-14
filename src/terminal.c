@@ -15,7 +15,7 @@ typedef struct terminal{
 static inline int parse_command(Command *cmd, circlebuffer_t* cb_input){
     char c;
     if (cb_empty(cb_input)) {
-        cmd->type = NO_COMMAND;
+        cmd->type = INVALID_COMMAND;
         return 0;
     }
     int number, arg, err;
@@ -112,7 +112,8 @@ void task_terminal(){
         if (c == '\15'){
             err = parse_command(&t.cmd, &t.input);
             Puts(snd_tid, L(STR_NEWLINE));
-            SendCommand(command_tid, t.cmd);
+            if (t.cmd.type != INVALID_COMMAND)
+                SendCommand(command_tid, t.cmd);
         } else if (c == 8) { //backspace
             cb_backspace(&t.input);
             Puts(snd_tid, L(STR_BACKSPACE));

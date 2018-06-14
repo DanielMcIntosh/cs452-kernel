@@ -12,6 +12,7 @@ typedef enum {
     MESSAGE_TT,
     MESSAGE_UART,
     MESSAGE_COMMAND,
+    MESSAGE_SENSOR,
     NUM_MESSAGE_TYPES
 } MessageType;
 
