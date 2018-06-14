@@ -272,6 +272,10 @@ void task_terminal(){
         }
         case(TERMINAL_SWITCH):
         {
+            cb_write_string(&t.output, "\0337");
+            cursor_to_position(&t.output, 4+(tm.arg2 > 18 ? tm.arg2 - 134 : tm.arg2), 5);
+            cb_write(&t.output, tm.arg1);
+            cb_write_string(&t.output, "\0338");
             break;
         }
 

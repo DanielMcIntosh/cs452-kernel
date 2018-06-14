@@ -8,6 +8,7 @@
 #include <err.h>
 #include <tasks.h>
 #include <clock.h>
+#include <terminal.h>
 
 typedef struct commandmessage{
     MessageType type;
@@ -68,7 +69,7 @@ void task_reverse_train(int arg){
 void task_commandserver(){
     CommandServer cs = {0, 0, {0}, {0}};
     RegisterAs(NAME_COMMANDSERVER);
-    int servertid = WhoIs(NAME_UART1_SEND), tid;//, uart2tid = WhoIs(NAME_UART2_SEND);
+    int servertid = WhoIs(NAME_UART1_SEND), tid;
     CommandMessage cm;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
 
@@ -109,6 +110,7 @@ void task_commandserver(){
 
             Putc(servertid, 1, cm.command.arg1 == 'C' ? 34 : 33);
             Putc(servertid, 1, cm.command.arg2);
+            SendTerminalRequest(WhoIs(NAME_TERMINAL), TERMINAL_SWITCH, cm.command.arg1, cm.command.arg2); // TODO this is 100% a deadlock.
             break;
         }
         case COMMAND_QUIT:
