@@ -50,15 +50,11 @@ static void output_base_terminal(Terminal *t) {
     cb_write_string(cb, "::> ");
     t->input_col+= 4;
     cursor_to_position(cb, 27, 1);
-    cb_write_string(cb, "MAX : ");
-    cursor_to_position(cb, 28, 1);
-    cb_write_string(cb, "LMAX: ");
-    cursor_to_position(cb, 29, 1);
-    cb_write_string(cb, "AVG : ");
-    cursor_to_position(cb, 30, 1);
-    cb_write_string(cb, "SNSR: ");
-    cursor_to_position(cb, 31, 1);
-    cb_write_string(cb, "FSNR: ");
+    cb_write_string(cb, "MAX : \r\n");
+    cb_write_string(cb, "LMAX: \r\n");
+    cb_write_string(cb, "AVG : \r\n");
+    cb_write_string(cb, "SNSR: \r\n");
+    cb_write_string(cb, "FSNR: \r\n");
 
     cursor_to_position(cb, 4, 1);
     for (i = 1; i <= 18; i++) {
@@ -234,15 +230,19 @@ void task_terminal(){
         case (TERMINAL_ECHO):
         {
             cb_write(&t.output, tm.arg1);
+            t.input_col++;
             break;
         }
         case(TERMINAL_BACKSPACE):
         {
-            cb_write_string(&t.output, "\x08 \x08");
+            if (t.input_col > TERMINAL_INPUT_BASE_COL)
+                cb_write_string(&t.output, "\x08 \x08");
             break;
         }
         case(TERMINAL_NEWLINE):
         {
+            cursor_to_position(&t.output, t.input_line, TERMINAL_INPUT_BASE_COL);
+            cb_write_string(&t.output, "    ");
             t.input_line++;
             if (t.input_line >= TERMINAL_INPUT_MAX_LINE) {
                 t.input_line = TERMINAL_INPUT_BASE_LINE;
@@ -280,14 +280,16 @@ void task_terminal(){
         }
 
         /*
-    TERMINAL_TIME,
-    TERMINAL_IDLE,
+            TERMINAL_TIME,
+            TERMINAL_IDLE,
+        */
+    /*
     TERMINAL_MAX,
     TERMINAL_AVG,
     TERMINAL_LST,
     TERMINAL_SNSR,
     TERMINAL_FNSR,
-    */
+    //*/
 
         case(TERMINAL_NOTIFY_COURIER):
         {
@@ -296,7 +298,7 @@ void task_terminal(){
         }
         default:
         {
-            PANIC("UNHANDLED TERMINAL EXCEPTION");
+            PANIC("UNHANDLED TERMINAL EXCEPTION: %d", tm.rq);
         }
         }
 
@@ -308,6 +310,7 @@ void task_terminal(){
         }
     }
 }
+
 int SendTerminalRequest(int terminaltid, TerminalRequest rq, int arg1, int arg2){
     TerminalMessage tm = {MESSAGE_TERMINAL, rq, arg1, arg2};
     ReplyMessage rm = {0, 0};

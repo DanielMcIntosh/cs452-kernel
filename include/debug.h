@@ -8,9 +8,9 @@
 #define DEBUG_UART 0
 #define bwio 1
 
-#define PANIC(x) \
+#define PANIC(...) \
     EnterCriticalSection();\
-    bwputstr(COM2, x);\
+    bwprintf(COM2, __VA_ARGS__);\
     Quit();
 
 #if !(bwio)

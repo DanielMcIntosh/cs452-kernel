@@ -49,7 +49,7 @@ void task_solenoid_off(int delay){
 }
 
 int calcReverseTime(int speed){
-    return 300 / (15 - speed);
+    return 400 / (15 - speed);
 }
 
 void task_reverse_train(int arg){
@@ -111,6 +111,7 @@ void task_commandserver(){
             Putc(servertid, 1, cm.command.arg1 == 'C' ? 34 : 33);
             Putc(servertid, 1, cm.command.arg2);
             SendTerminalRequest(WhoIs(NAME_TERMINAL), TERMINAL_SWITCH, cm.command.arg1, cm.command.arg2); // TODO this is 100% a deadlock.
+            // plan for this: another courier + cb combo probable
             break;
         }
         case COMMAND_QUIT:

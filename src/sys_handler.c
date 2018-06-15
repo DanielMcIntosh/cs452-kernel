@@ -207,8 +207,6 @@ static inline void handle_exit_critical_section(TD *task) {
 
 static inline void handle_destroy(TD *task){
     LOG("DESTROY called\r\n");
-    //don't re-queue the task, let it become a zombie task.
-    //it will still be accessible by it's TID, since that gives us an index in the task pool
     task->state = STATE_DESTROYED;
 }
 

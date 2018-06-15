@@ -13,12 +13,12 @@
 struct uart *uart1 = (struct uart*) UART1_BASE, *uart2 = (struct uart*) UART2_BASE;
 
 typedef enum uartrequest{
-    NOTIFY_SEND,
-    NOTIFY_RCV,
-    NOTIFY_MODEM,
-    GETCH,
-    PUTCH,
-    PUTSTR
+    NOTIFY_SEND = 0,
+    NOTIFY_RCV = 1,
+    NOTIFY_MODEM = 2,
+    GETCH = 3,
+    PUTCH = 4, 
+    PUTSTR = 5
 } UARTRequest;
 
 
@@ -29,12 +29,12 @@ typedef enum modemstate {
 } CTSState;
 
 typedef struct rcvserver{
-    circlebuffer_t rcvQ;
-    circlebuffer_t getQ;
+    circlebuffer_t *rcvQ;
+    circlebuffer_t *getQ;
 } RcvServer;
 
 typedef struct sendserver{
-    circlebuffer_t txQ;
+    circlebuffer_t *txQ;
     int notifier;
     CTSState cts;
 } SendServer;
@@ -109,7 +109,7 @@ static inline void generic_uart_rcv_server(int uart) {
     cb_init(&cb_rcv, rcvQ_buf, RCVQ_BUF_SIZE);
     circlebuffer_t cb_get;
     cb_init(&cb_get, getQ_buf, GETQ_BUF_SIZE);
-    RcvServer rs = {cb_rcv, cb_get};
+    RcvServer rs = {&cb_rcv, &cb_get};
 
     UARTMessage um;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
@@ -125,28 +125,28 @@ static inline void generic_uart_rcv_server(int uart) {
             rm.ret = 0;
             Reply(tid, &rm, sizeof(rm)); // reply to notifier
             rm.ret = um.argument;
-            if (!cb_empty(&rs.getQ)) {
-                err = cb_read(&rs.getQ, (char *) &tid);
+            if (!cb_empty(rs.getQ)) {
+                err = cb_read(rs.getQ, (char *) &tid);
                 ASSERT(err == 0, "CB Read failure");
                 Reply(tid, &rm, sizeof(rm));
             } else {
-                cb_write(&rs.rcvQ, rm.ret);
+                cb_write(rs.rcvQ, rm.ret);
             }
             break;
         }
         case GETCH:
         {
-            if (!cb_empty(&rs.rcvQ)) {
-                err = cb_read(&rs.rcvQ, (char *) &rm.ret);
+            if (!cb_empty(rs.rcvQ)) {
+                err = cb_read(rs.rcvQ, (char *) &rm.ret);
                 ASSERT(err == 0, "CB read failure");
                 Reply(tid, &rm, sizeof(rm));
             } else {
-                cb_write(&rs.getQ, tid);
+                cb_write(rs.getQ, tid);
             }
             break;
         } 
         default:
-            PANIC("UNHANDLED REQUEST TYPE")
+            PANIC("RCV SERVER %d UNHANDLED REQUEST TYPE: %d", uart, um.request)
         }
     }
 }
@@ -155,7 +155,7 @@ static inline void generic_uart_send_server(int uart) {
     char txQ_buf[TXQ_BUF_SIZE];
     circlebuffer_t cb_tx;
     cb_init(&cb_tx, txQ_buf, TXQ_BUF_SIZE);
-    SendServer ss = {cb_tx, 0, CTS_ASSERTED};
+    SendServer ss = {&cb_tx, 0, CTS_ASSERTED};
 
     UARTMessage um;
 
@@ -174,8 +174,8 @@ static inline void generic_uart_send_server(int uart) {
         {
             DLOG("NOTIFIER");
             rm.ret = 0;
-            if (!cb_empty(&ss.txQ) && (ss.cts == CTS_ASSERTED || uart == 2)) {
-                err = cb_read(&ss.txQ, (char *) &rm.ret);
+            if (!cb_empty(ss.txQ) && (ss.cts == CTS_ASSERTED || uart == 2)) {
+                err = cb_read(ss.txQ, (char *) &rm.ret);
                 ASSERT(err == 0, "CB Read failure");
                 ss.cts = SEND_COMPLETE;
                 Reply(tid, &rm, sizeof(rm));
@@ -187,8 +187,8 @@ static inline void generic_uart_send_server(int uart) {
         case NOTIFY_MODEM:
         {
             DLOG("MODEM");
-            if (!cb_empty(&ss.txQ) && ss.notifier != 0 && ss.cts == CTS_NEGATED) {
-                err = cb_read(&ss.txQ, (char *) &rm.ret);
+            if (!cb_empty(ss.txQ) && ss.notifier != 0 && ss.cts == CTS_NEGATED) {
+                err = cb_read(ss.txQ, (char *) &rm.ret);
                 ASSERT(err == 0, "CB Read failure");
                 ss.cts = SEND_COMPLETE;
                 Reply(ss.notifier, &rm, sizeof(rm));
@@ -219,7 +219,7 @@ static inline void generic_uart_send_server(int uart) {
                 Reply(ss.notifier, &rm, sizeof(rm));
                 ss.notifier = 0;
             } else {
-                cb_write(&ss.txQ, um.argument);
+                cb_write(ss.txQ, um.argument);
             }
             rm.ret = 0;
             Reply(tid, &rm, sizeof(rm));
@@ -235,14 +235,19 @@ static inline void generic_uart_send_server(int uart) {
                 ss.notifier = 0;
             } 
             for (; i < um.argument; i++) {
-                cb_write(&ss.txQ, um.argumentstr[i]);
+                cb_write(ss.txQ, um.argumentstr[i]);
             }
             rm.ret = i;
             Reply(tid, &rm, sizeof(rm));
             break;
         }
         default:
-            PANIC("UNHANDLED REQUEST TYPE")
+            PANIC("SEND SERVER %d UNHANDLED REQUEST TYPE: %d (NS: %d, NR: %d, NM: %d, GC: %d, PC: %d, PS: %d)", uart, NOTIFY_SEND,
+    NOTIFY_RCV,
+    NOTIFY_MODEM,
+    GETCH,
+    PUTCH,
+    PUTSTR, um.request)
         }
     }
 }
