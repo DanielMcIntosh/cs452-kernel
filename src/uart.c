@@ -172,7 +172,7 @@ static inline void generic_uart_send_server(int uart) {
         case NOTIFY_SEND:
         {
             rm.ret = 0;
-            if (!cb_empty(ss.txQ) && (ss.cts == CTS_ASSERTED || uart == 2)) {
+            if (!cb_empty(ss.txQ) && (uart == 2 || ss.cts == CTS_ASSERTED)) {
                 err = cb_read(ss.txQ, (char *) &rm.ret);
                 ASSERT(err == 0, "CB Read failure");
                 ss.cts = SEND_COMPLETE;
@@ -209,7 +209,7 @@ static inline void generic_uart_send_server(int uart) {
         }
         case PUTCH:
         {
-            if (ss.notifier != 0 && (ss.cts == CTS_ASSERTED || uart == 2)) {
+            if (ss.notifier != 0 && (uart == 2 || ss.cts == CTS_ASSERTED)) {
                 rm.ret = um.argument;
                 ss.cts = SEND_COMPLETE;
                 Reply(ss.notifier, &rm, sizeof(rm));
