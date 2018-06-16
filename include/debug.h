@@ -5,19 +5,12 @@
 #include <bwio.h>
 
 #define DEBUG 0
-#define DEBUG_UART 0
-#define bwio 1
+#define DEBUG_COM2 0
 
 #define PANIC(...) \
     EnterCriticalSection();\
     bwprintf(COM2, __VA_ARGS__);\
     Quit();
-
-#if !(bwio)
-#define bwputc(...)
-#define bwputstr(...)
-#define bwprintf(...)
-#endif
 
 #define IS(x) #x
 #define S(x) IS(x) 
@@ -36,12 +29,14 @@ if (!(x) && DEBUG) {\
 #define LOG(str)
 #endif
 
-#if DEBUG_UART
-#define DLOGC(c) if (uart == 1) Putc(WhoIs(NAME_UART2_SEND), c);
-#define DLOG(str) if (uart == 1) Puts(WhoIs(NAME_UART2_SEND), #str, sizeof(#str));
+#if DEBUG_COM2
+#define CLOGC(c) bwputc(COM1, (c));
+#define CLOGF(...) bwputc(COM1, __VA_ARGS__);
+#define CLOG(str) bwputc(COM1, str);
 #else
-#define DLOGC(c)
-#define DLOG(str)
+#define CLOGC(c)
+#define CLOGF(...)
+#define CLOG(str)
 #endif
 
 #endif

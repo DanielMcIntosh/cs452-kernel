@@ -45,8 +45,9 @@ TD* schedule(TaskQueue *task_ready_queue){
 
 #define IDLE_ITERATIONS 500000
 void task_idle() {
-    int snd_tid = WhoIs(NAME_UART2_SEND);
     int i, j = 0;
+    int movingavg = 99;
+    int alpha = 60;
     FOREVER {
         i = IDLE_ITERATIONS;
         int time_start = clk4->value_low;        
@@ -62,29 +63,8 @@ void task_idle() {
         int time_end = clk4->value_low;
         int time_total = time_end - time_start;
         int percent_idle = 39320 * 100 / time_total;
-
-        // TODO: put idle time somewhere to print later
-        /*
-        Putc(snd_tid, 2, '\033');
-        Putc(snd_tid, 2, '7');
-        Putc(snd_tid, 2, '\033');
-        Putc(snd_tid, 2, '[');
-        Putc(snd_tid, 2, 'H');
-        Putc(snd_tid, 2, '0' + (percent_idle / 10));
-        Putc(snd_tid, 2, '0' + (percent_idle % 10));
-        Putc(snd_tid, 2, '\033');
-        Putc(snd_tid, 2, '8');
-        */
-
-        //Puts(snd_tid, idledisplay, idledisplaylen);
-        /*
-        //EnterCriticalSection();
-        for (int i = 0; i < idledisplaylen; i++) {
-            Putc(snd_tid, 2, idledisplay[i]);
-        }
-        //*/
-        //ExitCriticalSection();
-        // TODO idle display time
+        movingavg = (CLAMP(percent_idle, 99, 0) * alpha) / 100 + (movingavg * (100-alpha) / 100);
+        StoreValue(VALUE_IDLE, movingavg);
     }
 }
 #undef IDLE_ITERATIONS

@@ -4,7 +4,7 @@
 #define L(x) x, sizeof(x)
 
 #define CB_INPUT_BUF_SIZE 20
-#define CB_TERMINAL_BUF_SIZE 200
+#define CB_TERMINAL_BUF_SIZE 300
 
 #define STR_BACKSPACE "\033H \033H"
 #define STR_NEWLINE "\r\n"
@@ -29,7 +29,6 @@ typedef enum terminalrequest {
     TERMINAL_SENSOR,
     TERMINAL_SWITCH,
     TERMINAL_TIME,
-    TERMINAL_IDLE,
     TERMINAL_MAX,
     TERMINAL_AVG,
     TERMINAL_LST,

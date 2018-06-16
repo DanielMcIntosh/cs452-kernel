@@ -215,10 +215,22 @@ static inline void handle_create_argument(TD *task, TaskQueue *task_ready_queue)
     task->r0 = task_create(task_ready_queue, task_getTid(task), TD_arg(task, 0), TD_arg(task, 1), TD_arg(task, 2));
 }
 
+static inline void handle_store_value(TD *task, ValueStore *v){
+    LOGF("TASK CREATE ARG: %d %d -> %d\r\n", task_getTid(task), TD_arg(task, 0), TD_arg(task, 1));
+    v->values[TD_arg(task, 0)] = TD_arg(task, 1);
+    task->r0 = TD_arg(task, 1);
+}
+
+static inline void handle_get_value(TD *task, ValueStore *v){
+    LOGF("TASK CREATE ARG: %d %d -> %d\r\n", task_getTid(task), TD_arg(task, 0), TD_arg(task, 1));
+    task->r0 = v->values[TD_arg(task, 0)];
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////
 //                                     MAIN
 //////////////////////////////////////////////////////////////////////////////////////////////
 Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) {
+    static ValueStore values;
     LOGF("HANDLE: %d, %d\t", a, task);
     LOGF("ARGS: %d, %d, %d, %d, %d\t", TD_arg(task, 0), TD_arg(task, 1), TD_arg(task, 2), TD_arg(task, 3), TD_arg(task, 4));
     switch(a) {
@@ -295,6 +307,16 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) 
         case SYSCALL_CREATE_ARGUMENT:
         {
             handle_create_argument(task, task_ready_queue);
+            break;
+        }
+        case SYSCALL_STORE_VALUE:
+        {
+            handle_store_value(task, &values);
+            break;
+        }
+        case SYSCALL_GET_VALUE:
+        {
+            handle_get_value(task, &values);
             break;
         }
         default:

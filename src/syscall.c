@@ -96,3 +96,11 @@ int Destroy(){
 int CreateWithArgument(int priority, void (*code)(int), int argument){
     return syscall_3(SYSCALL_CREATE_ARGUMENT, priority, (int) code, argument);
 }
+
+int StoreValue(StorableValue tag, int value){
+    return syscall_2(SYSCALL_STORE_VALUE, tag, value);
+}
+
+int GetValue(StorableValue tag){
+    return syscall_2(SYSCALL_GET_VALUE, tag, 0);
+}

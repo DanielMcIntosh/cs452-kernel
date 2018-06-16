@@ -9,6 +9,7 @@
 #include <syscall.h>
 #include <tasks.h>
 #include <message.h>
+#include <clock.h>
 
 typedef struct terminalparser {
     circlebuffer_t input;
@@ -55,17 +56,17 @@ static void output_base_terminal(Terminal *t) {
     cb_write_string(cb, "AVG : \r\n");
     cb_write_string(cb, "SNSR: \r\n");
     cb_write_string(cb, "FSNR: \r\n");
+    cb_write_string(cb, "IDLE: \r\n");
 
-    cursor_to_position(cb, 4, 1);
+    cursor_to_position(cb, 5, 1);
     for (i = 1; i <= 18; i++) {
-        cursor_to_position(cb, 4+i, 1);
         cb_write_number(cb, i, 10);
-        cb_write_string(cb, (i < 10 ? "  :?" : " :?"));
+        cb_write_string(cb, (i < 10 ? "  :?\r\n" : " :?\r\n"));
     }
     for (i = 19; i<= 22; i++) {
         cursor_to_position(cb, 4+i, 1);
         cb_write_number(cb, 134+i, 10);
-        cb_write_string(cb, ":?");
+        cb_write_string(cb, ":?\r\n");
     }
     cursor_to_position(cb, t->input_line, t->input_col);
 // 2,1 -> 2, 8 = Time
@@ -210,6 +211,7 @@ void task_terminal(){
     int mytid = MyTid();
     CreateWithArgument(PRIORITY_HIGH, &task_terminal_command_parser, mytid);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_terminal_courier, mytid);
+    CreateWithArgument(PRIORITY_LOW, &task_clockprinter, mytid);
 
     char cb_terminal_buf[CB_TERMINAL_BUF_SIZE];
     circlebuffer_t cb_terminal;
@@ -278,11 +280,25 @@ void task_terminal(){
             cb_write_string(&t.output, "\0338");
             break;
         }
-
-        /*
-            TERMINAL_TIME,
-            TERMINAL_IDLE,
-        */
+        case (TERMINAL_TIME):
+        {
+            int time_hundred_millis = tm.arg1; int idle = tm.arg2; 
+            cb_write_string(&t.output, "\0337\033[2;3H");
+            int m = time_hundred_millis % 10;
+            time_hundred_millis /= 10;
+            int ss = time_hundred_millis % 60;
+            time_hundred_millis /= 60;
+            int mm = time_hundred_millis;
+            cb_write_number(&t.output, mm, 10);
+            cb_write(&t.output, ':');
+            cb_write_number(&t.output, ss, 10);
+            cb_write(&t.output, ':');
+            cb_write_number(&t.output, m, 10);
+            cb_write_string(&t.output, "\033[32;7H");
+            cb_write_number(&t.output, idle, 10);
+            cb_write_string(&t.output, "%\0338");
+            break;
+        }
     /*
     TERMINAL_MAX,
     TERMINAL_AVG,
@@ -301,7 +317,7 @@ void task_terminal(){
             PANIC("UNHANDLED TERMINAL EXCEPTION: %d", tm.rq);
         }
         }
-
+        
         if (t.notifier != 0 && !cb_empty(&t.output)){
             err = cb_read(&t.output, (char *) &c);
             rm.ret = c;

@@ -24,5 +24,9 @@ void * memcpy(void * dest, const void* src, unsigned int sz);
 #define MIN(X, Y) (((X) > (Y)) ? (X) : (Y))
 #endif
 
+#ifndef CLAMP
+#define CLAMP(X, Y, Z) (((X) > (Y)) ? (Y) : (((X) < (Z)) ? (Z) : (X)))
+#endif
+
 
 #endif

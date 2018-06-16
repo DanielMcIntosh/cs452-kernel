@@ -7,6 +7,8 @@
 #define CYCLES_PER_TEN_MILLIS (CYCLES_PER_MILLI*10)
 #define CYCLES_PER_HUNDRED_MILLIS (CYCLES_PER_MILLI*100)
 
+#define TICKS_PER_HUNDRED_MILLIS (10)
+
 #define NAME_CLOCK "CLK"
 #define CLOCK_MH_SIZE 40
 
@@ -26,6 +28,7 @@ extern struct debugclock {
 
 void task_clockserver();
 void task_clocknotifier();
+void task_clockprinter(int terminaltid);
 
 int Time();
 int Delay(int ticks);

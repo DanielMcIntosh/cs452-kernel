@@ -172,7 +172,6 @@ static inline void generic_uart_send_server(int uart) {
         switch(um.request) {
         case NOTIFY_SEND:
         {
-            DLOG("NOTIFIER");
             rm.ret = 0;
             if (!cb_empty(ss.txQ) && (ss.cts == CTS_ASSERTED || uart == 2)) {
                 err = cb_read(ss.txQ, (char *) &rm.ret);
@@ -186,7 +185,6 @@ static inline void generic_uart_send_server(int uart) {
         }
         case NOTIFY_MODEM:
         {
-            DLOG("MODEM");
             if (!cb_empty(ss.txQ) && ss.notifier != 0 && ss.cts == CTS_NEGATED) {
                 err = cb_read(ss.txQ, (char *) &rm.ret);
                 ASSERT(err == 0, "CB Read failure");
@@ -212,7 +210,6 @@ static inline void generic_uart_send_server(int uart) {
         }
         case PUTCH:
         {
-            DLOG("PUTCH");
             if (ss.notifier != 0 && (ss.cts == CTS_ASSERTED || uart == 2)) {
                 rm.ret = um.argument;
                 ss.cts = SEND_COMPLETE;
@@ -289,13 +286,20 @@ void init_uart_servers() {
         u->ctrl |= UARTEN_MASK | RIEN_MASK | (i == 0 ? MSIEN_MASK : 0); // TODO: disable first?
 
     }
-    Create(PRIORITY_WAREHOUSE, &task_uart1send);
-    Create(PRIORITY_WAREHOUSE, &task_uart1rcv);
+    if (!DEBUG_COM2){
+        Create(PRIORITY_WAREHOUSE, &task_uart1send);
+        Create(PRIORITY_WAREHOUSE, &task_uart1rcv);
+    }
     Create(PRIORITY_WAREHOUSE, &task_uart2send);
     Create(PRIORITY_WAREHOUSE, &task_uart2rcv);
 }
 
 int Getc(int servertid, int channel) {
+    #if DEBUG_COM2
+    if (channel == 1){
+        return bwgetc(COM1);
+    }
+    #endif
     UARTMessage um = {MESSAGE_UART, GETCH, 0, {0}};
     ReplyMessage rm = {0, 0};
     int r = Send(servertid, &um, sizeof(um), &rm, sizeof(rm));
@@ -303,6 +307,12 @@ int Getc(int servertid, int channel) {
 }
 
 int Putc(int servertid, int channel, char ch) {
+    #if DEBUG_COM2
+    if (channel == 1){
+        bwputc(COM1, ch);
+        return 1;
+    }
+    #endif
     UARTMessage um = {MESSAGE_UART, PUTCH, ch, {0}};
     ReplyMessage rm = {0, 0};
     int r = Send(servertid, &um, sizeof(um), &rm, sizeof(rm));

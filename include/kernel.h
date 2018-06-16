@@ -12,5 +12,4 @@
 
 #define NAME_FUT "FUT"
 
-
 #endif

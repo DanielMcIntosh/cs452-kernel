@@ -10,6 +10,7 @@
 #include <event.h>
 #include <minheap.h>
 #include <debug.h>
+#include <terminal.h>
 
 struct debugclock *clk4 = (struct debugclock*)TIMER4_BASE; 
 struct clock *clk1 = (struct clock*)TIMER1_BASE, *clk2=(struct clock*)TIMER2_BASE, *clk3 = (struct clock*)TIMER3_BASE;
@@ -125,4 +126,17 @@ int Delay(int ticks){
 
 int DelayUntil(int ticks){
     return clockSend(DELAYUNTIL, ticks);
+}
+
+void task_clockprinter(int terminaltid){
+    LOG("CLOCK PRINTER INIT");
+    int clk_tid = WhoIs(NAME_CLOCK);
+    int time = Time(clk_tid);
+    int time_since_startup_hundred_millis = 0;
+    FOREVER{
+        SendTerminalRequest(terminaltid, TERMINAL_TIME, time_since_startup_hundred_millis, GetValue(VALUE_IDLE));
+        time += TICKS_PER_HUNDRED_MILLIS;
+        DelayUntil(time);
+        time_since_startup_hundred_millis++;
+    }
 }

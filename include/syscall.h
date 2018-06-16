@@ -16,9 +16,18 @@ typedef enum {
     SYSCALL_INTERRUPTS_ON,
     SYSCALL_DESTROY,
     SYSCALL_CREATE_ARGUMENT,
+    SYSCALL_STORE_VALUE,
+    SYSCALL_GET_VALUE,
 
     SYSCALL_INTERRUPT = 100
 } Syscall;
+
+typedef enum {
+    VALUE_IDLE,
+    NUM_VALUES
+} StorableValue;
+
+typedef struct valuestore { int values[NUM_VALUES]; } ValueStore;
 
 // ==== K1 ====
 int Create(int priority, void (*code)());
@@ -41,5 +50,7 @@ int EnterCriticalSection();
 int ExitCriticalSection();
 int Destroy();
 int CreateWithArgument(int priority, void (*code)(int), int argument);
+int StoreValue(StorableValue tag, int value);
+int GetValue(StorableValue tag);
 
 #endif
