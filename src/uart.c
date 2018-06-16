@@ -48,7 +48,7 @@ typedef struct uartmessage{
 
 static inline void generic_uart_rcv_notifier(int servertid, int uart) {
     int event = (uart == 1? EVENT_UART_1_RCV : EVENT_UART_2_RCV);
-    UARTMessage msg = {MESSAGE_UART, NOTIFY_RCV, 0};
+    UARTMessage msg = {MESSAGE_UART, NOTIFY_RCV, 0, {0}};
     ReplyMessage rm = {0, 0};
 
     FOREVER {
@@ -70,7 +70,7 @@ void task_uart2_rcv_notifier() {
 void generic_uart_send_notifier(int servertid, int uart) {
     int event = (uart == 1? EVENT_UART_1_SEND : EVENT_UART_2_SEND);
     struct uart *u = (uart == 1 ? uart1 : uart2);
-    UARTMessage msg = {MESSAGE_UART, NOTIFY_SEND, 0};
+    UARTMessage msg = {MESSAGE_UART, NOTIFY_SEND, 0, {0}};
     ReplyMessage rm = {0, 0};
 
     FOREVER {
@@ -83,7 +83,7 @@ void generic_uart_send_notifier(int servertid, int uart) {
 }
 
 void task_uart1_modem_notifier() {
-    UARTMessage msg = {MESSAGE_UART, NOTIFY_MODEM, 0};
+    UARTMessage msg = {MESSAGE_UART, NOTIFY_MODEM, 0, {0}};
     ReplyMessage rm = {0, 0};
 
     int servertid = WhoIs(NAME_UART1_SEND);

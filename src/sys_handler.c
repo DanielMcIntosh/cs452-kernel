@@ -159,7 +159,7 @@ static inline void handle_await(TD *task, TaskQueue *task_ready_queue){
     task->state = STATE_BLK_EVENT;
 }
 
-static inline void handle_interrupt(TD *task, TaskQueue *task_ready_queue){
+static inline void handle_interrupt(TD __attribute__((unused)) *task, TaskQueue *task_ready_queue){
     LOG("HANDLE INTERRUPT\r\n");
     // figure out what interrupt it is
     unsigned long long IRQStatus = ((unsigned long long) vic1->IRQStatus) | ((unsigned long long)(vic2->IRQStatus) << VIC_SIZE);
@@ -230,7 +230,7 @@ static inline void handle_get_value(TD *task, ValueStore *v){
 //                                     MAIN
 //////////////////////////////////////////////////////////////////////////////////////////////
 Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) {
-    static ValueStore values;
+    static ValueStore values = {{0}};
     LOGF("HANDLE: %d, %d\t", a, task);
     LOGF("ARGS: %d, %d, %d, %d, %d\t", TD_arg(task, 0), TD_arg(task, 1), TD_arg(task, 2), TD_arg(task, 3), TD_arg(task, 4));
     switch(a) {

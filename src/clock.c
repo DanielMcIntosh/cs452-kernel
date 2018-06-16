@@ -23,7 +23,7 @@ typedef enum clockrequest{
 } ClockRequest;
     
 typedef struct clockserver {
-    int ticks;
+    unsigned int ticks;
     minheap_t mh;
 } ClockServer;
 
@@ -116,7 +116,7 @@ int clockSend(int req, int arg){
     return (r >= 0 ? rm.ret : r);
 }
 
-int Time(int tid_clk){
+int Time(){
     return clockSend(TIME, 0);
 }
 

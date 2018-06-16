@@ -57,7 +57,7 @@ void task_sensor_timeout_notifier(int servertid){
 
 void task_sensor_courier(int servertid){
     SensorMessage sm = {MESSAGE_SENSOR, SENSOR_COURIER, 0};
-    CourierMessage cm = {0, {0}};
+    CourierMessage cm = {0, {0, 0, 0}};
     int commandtid = WhoIs(NAME_COMMANDSERVER);
     FOREVER{
         Send(servertid, &sm, sizeof(sm), &cm, sizeof(cm));

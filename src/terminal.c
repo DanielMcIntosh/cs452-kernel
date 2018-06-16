@@ -166,7 +166,7 @@ void task_terminal_command_parser(int terminaltid){
     circlebuffer_t cb_input;
     cb_init(&cb_input, cb_input_buf, CB_INPUT_BUF_SIZE);
     TerminalParser t = {cb_input, {0, 0, 0}};
-    TerminalMessage tm = {MESSAGE_TERMINAL, 0, 0};
+    TerminalMessage tm = {MESSAGE_TERMINAL, 0, 0, 0};
     ReplyMessage rm = {0, 0};
     
     // main loop
@@ -216,9 +216,9 @@ void task_terminal(){
     char cb_terminal_buf[CB_TERMINAL_BUF_SIZE];
     circlebuffer_t cb_terminal;
     cb_init(&cb_terminal, cb_terminal_buf, CB_TERMINAL_BUF_SIZE);
-    Terminal t = {cb_terminal, TERMINAL_INPUT_BASE_LINE, TERMINAL_INPUT_BASE_COL, SENSOR_LINE_BASE};
+    Terminal t = {cb_terminal, TERMINAL_INPUT_BASE_LINE, TERMINAL_INPUT_BASE_COL, SENSOR_LINE_BASE, 0};
     int tid, err; char c;
-    TerminalMessage tm = {0, 0, 0};
+    TerminalMessage tm = {0, 0, 0, 0};
     ReplyMessage rm = {MESSAGE_REPLY, 0};
     output_base_terminal(&t);
 

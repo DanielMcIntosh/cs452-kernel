@@ -90,6 +90,7 @@ void task_timetest(){
 
 void fut(){
     LOG("First User Task: Start\r\n");
+    StoreValue(VALUE_IDLE, 0); // init idle value
     Create(PRIORITY_WAREHOUSE, &task_nameserver);
     Create(PRIORITY_WAREHOUSE, &task_clockserver);
     init_uart_servers();
@@ -97,7 +98,6 @@ void fut(){
     Create(PRIORITY_HIGH, &task_commandserver);
     Create(PRIORITY_HIGH, &task_terminal);
     Create(PRIORITY_HIGH, &task_sensor_server);
-    RegisterAs(NAME_FUT);
 }
 
 
@@ -144,7 +144,7 @@ int main(){
         if (task->last_syscall == SYSCALL_INTERRUPT){
             task->lr -= 4;
         } else {
-            task->sp[0] = task->r0; // TODO ?? is there a better way to do this?
+            task->sp[0] = task->r0; 
         }
         f = activate((int) task);
         task->last_syscall = f;
