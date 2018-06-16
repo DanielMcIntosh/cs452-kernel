@@ -44,12 +44,12 @@ static void output_base_terminal(Terminal *t) {
     circlebuffer_t *cb = &t->output;
     cb_write_string(cb, "\033[2J\033[0;0H");
     int i;
-    for (i = 0; i < TERMINAL_INPUT_MAX_COL+1; i++){
+    for (i = 0; i < TERMINAL_INPUT_MAX_COL+1; i++) {
         cb_write(cb, '=');
     }
     cursor_to_position(cb, t->input_line, t->input_col);
-    cb_write_string(cb, "::> ");
-    t->input_col+= 4;
+    cb_write_string(cb, "> ");
+    t->input_col+= 2;
     cursor_to_position(cb, 27, 1);
     cb_write_string(cb, "MAX : \r\n");
     cb_write_string(cb, "LMAX: \r\n");
@@ -179,9 +179,10 @@ void task_terminal_command_parser(int terminaltid){
             if (t.cmd.type != INVALID_COMMAND)
                 SendCommand(command_tid, t.cmd);
         } else if (c == 8) { //backspace
-            cb_backspace(&t.input);
-            tm.rq = TERMINAL_BACKSPACE;
-            Send(terminaltid, &tm, sizeof(tm), &rm, sizeof(rm));
+            if (cb_backspace(&t.input) == 0) {
+                tm.rq = TERMINAL_BACKSPACE;
+                Send(terminaltid, &tm, sizeof(tm), &rm, sizeof(rm));
+            }
         } else {
             tm.rq = TERMINAL_ECHO;
             tm.arg1 = c;
@@ -191,18 +192,18 @@ void task_terminal_command_parser(int terminaltid){
     }
 }
 
-void task_terminal_courier(int servertid){
-    int snd_tid = WhoIs(NAME_UART2_SEND);
+void task_terminal_courier(int servertid) {
+    int gettid = WhoIs(NAME_UART2_SEND);
     TerminalMessage tm = {MESSAGE_TERMINAL, TERMINAL_NOTIFY_COURIER, 0, 0};
     ReplyMessage rm;
     FOREVER {
         Send(servertid, &tm, sizeof(tm), &rm, sizeof(rm));
-        Putc(snd_tid, 2, rm.ret);
+        Putc(gettid, 2, rm.ret);
     }
 
 }
 
-void task_terminal(){
+void task_terminal() {
     // concept: server is one of the reciever loop ones
     // Has a cb of characters to put (i guess there's 2 buffers now, which is ??
     // alternate solution: have the 1 buffer, just fix Puts i guess?
@@ -224,7 +225,7 @@ void task_terminal(){
 
     FOREVER{
         Receive(&tid, &tm, sizeof(tm));
-        if (tm.rq != TERMINAL_NOTIFY_COURIER){
+        if (tm.rq != TERMINAL_NOTIFY_COURIER) {
             rm.ret = 0;
             Reply(tid, &rm, sizeof(rm));
         }
@@ -244,14 +245,14 @@ void task_terminal(){
         case(TERMINAL_NEWLINE):
         {
             cursor_to_position(&t.output, t.input_line, TERMINAL_INPUT_BASE_COL);
-            cb_write_string(&t.output, "    ");
+            cb_write_string(&t.output, "  ");
             t.input_line++;
             if (t.input_line >= TERMINAL_INPUT_MAX_LINE) {
                 t.input_line = TERMINAL_INPUT_BASE_LINE;
             }
             cursor_to_position(&t.output, t.input_line, TERMINAL_INPUT_BASE_COL);
-            cb_write_string(&t.output, "::> \0337");
-            for (int i = TERMINAL_INPUT_BASE_COL+4; i < TERMINAL_INPUT_MAX_COL; i++) {
+            cb_write_string(&t.output, "> \0337");
+            for (int i = TERMINAL_INPUT_BASE_COL+2; i < TERMINAL_INPUT_MAX_COL; i++) {
                 cb_write(&t.output, ' ');
             }
             cb_write_string(&t.output, "\0338");
@@ -283,14 +284,18 @@ void task_terminal(){
         case (TERMINAL_TIME):
         {
             int time_hundred_millis = tm.arg1; int idle = tm.arg2; 
-            cb_write_string(&t.output, "\0337\033[2;3H");
+            cb_write_string(&t.output, "\0337\033[2;2H");
             int m = time_hundred_millis % 10;
             time_hundred_millis /= 10;
             int ss = time_hundred_millis % 60;
             time_hundred_millis /= 60;
             int mm = time_hundred_millis;
+            if (mm < 10)
+                cb_write(&t.output, '0');
             cb_write_number(&t.output, mm, 10);
             cb_write(&t.output, ':');
+            if (ss < 10)
+                cb_write(&t.output, '0');
             cb_write_number(&t.output, ss, 10);
             cb_write(&t.output, ':');
             cb_write_number(&t.output, m, 10);
@@ -306,7 +311,6 @@ void task_terminal(){
     TERMINAL_SNSR,
     TERMINAL_FNSR,
     //*/
-
         case(TERMINAL_NOTIFY_COURIER):
         {
             t.notifier = tid;
@@ -318,7 +322,7 @@ void task_terminal(){
         }
         }
         
-        if (t.notifier != 0 && !cb_empty(&t.output)){
+        if (t.notifier != 0 && !cb_empty(&t.output)) {
             err = cb_read(&t.output, (char *) &c);
             rm.ret = c;
             Reply(t.notifier, &rm, sizeof(rm));
@@ -327,7 +331,7 @@ void task_terminal(){
     }
 }
 
-int SendTerminalRequest(int terminaltid, TerminalRequest rq, int arg1, int arg2){
+int SendTerminalRequest(int terminaltid, TerminalRequest rq, int arg1, int arg2) {
     TerminalMessage tm = {MESSAGE_TERMINAL, rq, arg1, arg2};
     ReplyMessage rm = {0, 0};
     int r = Send(terminaltid, &tm, sizeof(tm), &rm, sizeof(rm));

@@ -10,7 +10,7 @@
 #include <circlebuffer.h>
 #include <util.h>
 
-struct uart *uart1 = (struct uart*) UART1_BASE, *uart2 = (struct uart*) UART2_BASE;
+struct uart *const uart1 = (struct uart*) UART1_BASE, * const uart2 = (struct uart*) UART2_BASE;
 
 typedef enum uartrequest{
     NOTIFY_SEND = 0,
@@ -128,7 +128,7 @@ static inline void generic_uart_rcv_server(int uart) {
             if (!cb_empty(rs.getQ)) {
                 err = cb_read(rs.getQ, (char *) &tid);
                 ASSERT(err == 0, "CB Read failure");
-                Reply(tid, &rm, sizeof(rm));
+                Reply(tid, &rm, sizeof(rm)); // Reply to thing waiting to send
             } else {
                 cb_write(rs.rcvQ, rm.ret);
             }
