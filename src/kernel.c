@@ -145,9 +145,7 @@ int main(){
         LOGF("task->r0 = %d\t", task->r0);
         LOGF("task->lr = %x\r\n", task->lr);
 
-        if (task->last_syscall == SYSCALL_INTERRUPT){
-            task->lr -= 4;
-        } else {
+        if (task->last_syscall != SYSCALL_INTERRUPT){
             task->sp[0] = task->r0; 
         }
         f = activate((int) task);

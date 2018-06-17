@@ -48,8 +48,8 @@ typedef struct uartmessage{
 
 static inline void generic_uart_rcv_notifier(int servertid, int uart) {
     int event = (uart == 1? EVENT_UART_1_RCV : EVENT_UART_2_RCV);
-    volatile UARTMessage msg = {MESSAGE_UART, NOTIFY_RCV, 0, {0}};
-    volatile ReplyMessage rm = {0, 0};
+    UARTMessage msg = {MESSAGE_UART, NOTIFY_RCV, 0, {0}};
+    ReplyMessage rm = {0, 0};
 
     FOREVER {
         msg.argument = AwaitEvent(event);
@@ -82,8 +82,8 @@ void generic_uart_send_notifier(int servertid, int uart) {
 }
 
 void task_uart1_modem_notifier() {
-    volatile UARTMessage msg = {MESSAGE_UART, NOTIFY_MODEM, 0, {0}};
-    volatile ReplyMessage rm = {0, 0};
+    UARTMessage msg = {MESSAGE_UART, NOTIFY_MODEM, 0, {0}};
+    ReplyMessage rm = {0, 0};
 
     int servertid = WhoIs(NAME_UART1_SEND);
     FOREVER{
@@ -110,8 +110,8 @@ static inline void generic_uart_rcv_server(int uart) {
     cb_init(&cb_get, getQ_buf, GETQ_BUF_SIZE);
     RcvServer rs = {&cb_rcv, &cb_get};
 
-    volatile UARTMessage um;
-    volatile ReplyMessage rm = {MESSAGE_REPLY, 0};
+    UARTMessage um;
+    ReplyMessage rm = {MESSAGE_REPLY, 0};
     int tid, err;
 
     RegisterAs(uart == 1 ? NAME_UART1_RCV : NAME_UART2_RCV);
@@ -156,9 +156,9 @@ static inline void generic_uart_send_server(int uart) {
     cb_init(&cb_tx, txQ_buf, TXQ_BUF_SIZE);
     SendServer ss = {&cb_tx, 0, CTS_ASSERTED};
 
-    volatile UARTMessage um;
+    UARTMessage um;
 
-    volatile ReplyMessage rm = {MESSAGE_REPLY, 0};
+    ReplyMessage rm = {MESSAGE_REPLY, 0};
     int tid, err;
     RegisterAs(uart == 1 ? NAME_UART1_SEND : NAME_UART2_SEND);
     if (uart == 1) {
@@ -283,8 +283,8 @@ int Getc(int servertid, int channel) {
         return bwgetc(COM1);
     }
     #endif
-    volatile UARTMessage um = {MESSAGE_UART, GETCH, 0, {0}};
-    volatile ReplyMessage rm = {0, 0};
+    UARTMessage um = {MESSAGE_UART, GETCH, 0, {0}};
+    ReplyMessage rm = {0, 0};
     int r = Send(servertid, &um, sizeof(um), &rm, sizeof(rm));
     return (r >= 0 ? rm.ret : r);
 }

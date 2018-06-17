@@ -41,7 +41,7 @@ KERNEL_ENTRY_POINT:
     MSR CPSR_c, #0xD2 @ IRQ mode
         mov r0, sp
         mov sp, #0
-        mov r1, lr
+        sub r1, lr, #4
         MRS r2, SPSR
     MSR CPSR_c, #0xD3 @ SVC mode
 
