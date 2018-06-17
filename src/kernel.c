@@ -102,6 +102,12 @@ void fut(){
     CreateWithArgument(PRIORITY_NOTIFIER, &task_switch_courier, cmdtid);
 }
 
+void check_stack_size(TD *task) {
+    int stack_limit = STACK_SPACE_SIZE/TASK_POOL_SIZE - 4;
+    if (task_get_stack_size(task) >= stack_limit) {
+        PANIC("TASK %d RAN PAST IT'S STACK LIMIT", task_getTid(task));
+    }
+}
 
 int main(){
 #if CACHE
@@ -147,6 +153,8 @@ int main(){
         }
         f = activate((int) task);
         task->last_syscall = f;
+
+        check_stack_size(task);
 
         handle(f, task, task_pool, &task_ready_queue);
         LOG("\r\n");

@@ -145,7 +145,10 @@ static inline void generic_uart_rcv_server(int uart) {
             break;
         } 
         default:
-            PANIC("RCV SERVER %d UNHANDLED REQUEST TYPE: %d", uart, um.request)
+        {
+            char name[MAXNAMESIZE] = {0};
+            PANIC("RCV SERVER %d UNHANDLED REQUEST TYPE: %d FROM: %d (%s)", uart, um.request, tid, NameLookup(tid, name));
+        }
         }
     }
 }
@@ -222,12 +225,17 @@ static inline void generic_uart_send_server(int uart) {
             break;
         } 
         default:
-            PANIC("SEND SERVER %d UNHANDLED REQUEST TYPE: %d from %d (NS: %d, NR: %d, NM: %d, GC: %d, PC: %d, PS: %d)", uart, tid, um.request, NOTIFY_SEND,
-    NOTIFY_RCV,
-    NOTIFY_MODEM,
-    GETCH,
-    PUTCH,
-    PUTSTR)
+        {
+            char name[MAXNAMESIZE];
+            NameLookup(tid, name);
+            PANIC("SEND SERVER %d UNHANDLED REQUEST TYPE: %d FROM: %d (%s) (NS: %d, NR: %d, NM: %d, GC: %d, PC: %d, PS: %d)", uart, um.request, tid, name,
+                NOTIFY_SEND,
+                NOTIFY_RCV,
+                NOTIFY_MODEM,
+                GETCH,
+                PUTCH,
+                PUTSTR);
+        }
         }
     }
 }

@@ -73,6 +73,7 @@ int task_init(TD *task_pool, TaskQueue *queue, char *stack_space, unsigned int s
 
 int task_getTid(TD *task);
 int task_getParentTid(TD *task);
+int task_get_stack_size(TD *task);
 
 TD *task_nextActive(TaskQueue *queue);
 void task_react_to_state(TD *task, TaskQueue *queue);

@@ -104,6 +104,10 @@ int task_getParentTid(TD *task) {
     return task->p_tid;
 }
 
+int task_get_stack_size(TD *task) {
+    return (int)task->sp - task->sp_base;
+}
+
 TD *task_nextActive(TaskQueue * restrict queue) {
     for (int ready = 0; ready < NUM_PRIORITIES; ++ready) {
         if (queue->heads[ready]) {

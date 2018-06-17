@@ -32,8 +32,7 @@ typedef struct terminalmessage {
 } TerminalMessage;
 
 static inline void cursor_to_position(struct circlebuffer *cb, int line, int col) {
-    char * s = "\033[";
-    cb_write_string(cb, s);
+    cb_write_string(cb, "\033[");
     cb_write_number(cb, line, 10);
     cb_write(cb, ';');
     cb_write_number(cb, col, 10);
@@ -304,6 +303,7 @@ void task_terminal() {
         
         if (t.notifier != 0 && !cb_empty(&t.output)) {
             err = cb_read(&t.output, (char *) &c);
+            ASSERT(err == 0, "Error reading from circular buffer");
             rm.ret = c;
             Reply(t.notifier, &rm, sizeof(rm));
             t.notifier = 0;

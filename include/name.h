@@ -9,5 +9,6 @@ extern int TID_NS;
 void task_nameserver();
 int RegisterAs(char * name);
 int WhoIs(char * name);
+char *NameLookup(int tid, char *result_buf);
 
 #endif
