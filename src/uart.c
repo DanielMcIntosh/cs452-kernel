@@ -10,15 +10,15 @@
 #include <circlebuffer.h>
 #include <util.h>
 
-struct uart *uart1 = (struct uart*) UART1_BASE, *uart2 = (struct uart*) UART2_BASE;
+struct uart *uart1 = (struct uart*) UART1_BASE, *uart2 = (struct uart*) UART2_BASE, *uart3 = (struct uart*) UART3_BASE;
 
 typedef enum uartrequest{
-    NOTIFY_SEND = 0,
-    NOTIFY_RCV = 1,
-    NOTIFY_MODEM = 2,
-    GETCH = 3,
-    PUTCH = 4, 
-    PUTSTR = 5
+    NOTIFY_SEND,
+    NOTIFY_RCV,
+    NOTIFY_MODEM,
+    GETCH,
+    PUTCH,
+    PUTSTR
 } UARTRequest;
 
 
@@ -146,7 +146,7 @@ static inline void generic_uart_rcv_server(int uart) {
             break;
         } 
         default:
-            PANIC("RCV SERVER %d UNHANDLED REQUEST TYPE: %d", uart, um.request)
+            PANIC("RCV SERVER %d UNHANDLED REQUEST TYPE: %d FROM: %d", uart, um.request, tid);
         }
     }
 }
@@ -242,12 +242,13 @@ static inline void generic_uart_send_server(int uart) {
             break;
         }
         default:
-            PANIC("SEND SERVER %d UNHANDLED REQUEST TYPE: %d (NS: %d, NR: %d, NM: %d, GC: %d, PC: %d, PS: %d)", uart, NOTIFY_SEND,
-    NOTIFY_RCV,
-    NOTIFY_MODEM,
-    GETCH,
-    PUTCH,
-    PUTSTR, um.request)
+            PANIC("SEND SERVER %d UNHANDLED REQUEST TYPE: %d FROM: %d (NS: %d, NR: %d, NM: %d, GC: %d, PC: %d, PS: %d)", uart, um.request, tid,
+                NOTIFY_SEND,
+                NOTIFY_RCV,
+                NOTIFY_MODEM,
+                GETCH,
+                PUTCH,
+                PUTSTR);
         }
     }
 }
@@ -269,16 +270,17 @@ void task_uart2send() {
     generic_uart_send_server(2);
 }
 
-void init_uart_servers() {
-    for (int i = 0; i < 2; i++) {
-        struct uart *u = (i == 0 ? uart1 : uart2);
+void init_uart_flags() {
+    struct uart *const uarts[] = {uart1, uart2, uart3};
+    for (int i = 0; i < 3; i++) {
+        struct uart *u = uarts[i];
 
-        int brd = F_UARTCLK / (16 * (i == 0 ? TC_BAUD : TM_BAUD)) - 1;
+        int brd = F_UARTCLK / (16 * (i == COM1 ? TC_BAUD : TM_BAUD)) - 1;
         int brd_hi = brd / 256;
         int brd_lo = brd % 256;
         u->baudratehigh = brd_hi;
         u->baudratelow = brd_lo;
-        if (i == 0) {
+        if (i == COM1) {
             u->linctrlhigh = ((u->linctrlhigh) & ~FEN_MASK) | STP2_MASK; // FIFO off, 2 stop bits
         } else {
             u->linctrlhigh = ((u->linctrlhigh) & ~(FEN_MASK | STP2_MASK)); // FIFO off, 1 stop bit.
@@ -286,13 +288,21 @@ void init_uart_servers() {
         for (int k = 0; k < 55; k++)
             __asm__ volatile("mov r0, r0");
         // enable
-        u->ctrl |= UARTEN_MASK | RIEN_MASK | (i == 0 ? MSIEN_MASK : 0); // TODO: disable first?
+        u->ctrl |= UARTEN_MASK | ((i != COM3) ? RIEN_MASK : 0) | ((i == COM1) ? MSIEN_MASK : 0); // TODO: disable first?
 
     }
+}
+
+void init_uart_servers() {
     Create(PRIORITY_WAREHOUSE, &task_uart1send);
     Create(PRIORITY_WAREHOUSE, &task_uart1rcv);
     Create(PRIORITY_WAREHOUSE, &task_uart2send);
     Create(PRIORITY_WAREHOUSE, &task_uart2rcv);
+}
+
+void init_uart() {
+    init_uart_flags();
+    init_uart_servers();
 }
 
 int Getc(int servertid, int channel) {

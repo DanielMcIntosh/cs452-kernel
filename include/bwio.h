@@ -16,9 +16,6 @@ typedef char *va_list;
 #define va_arg(ap, t)	\
 		 (((ap) = (ap) + __va_argsiz(t)), *((t*) (void*) ((ap) - __va_argsiz(t))))
 
-#define COM1	0
-#define COM2	1
-
 #define ON	1
 #define	OFF	0
 

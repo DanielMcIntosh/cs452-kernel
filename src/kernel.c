@@ -112,8 +112,9 @@ void fut(){
     LOG("First User Task: Start\r\n");
     Create(PRIORITY_WAREHOUSE, &task_nameserver);
     Create(PRIORITY_WAREHOUSE, &task_clockserver);
-    init_uart_servers();
+    init_uart();
     Create(PRIORITY_IDLE, &task_idle);
+    bwprintf(COM3, "test");
     Create(PRIORITY_HIGH, &task_commandserver);
     Create(PRIORITY_HIGH, &task_terminal);
     Create(PRIORITY_HIGH, &task_sensor_server);

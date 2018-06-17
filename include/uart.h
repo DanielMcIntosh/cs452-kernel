@@ -52,12 +52,12 @@ extern struct uart {
 
     volatile unsigned int dmactrl       : 3;
     volatile unsigned int               : 29;
-} *uart1, *uart2;
+} *uart1, *uart2, *uart3;
 
 int Getc(int servertid, int channel);
 int Putc(int servertid, int channel, char ch);
 int Puts(int servertid, char *st, int len);
 
-void init_uart_servers();
+void init_uart();
 
 #endif

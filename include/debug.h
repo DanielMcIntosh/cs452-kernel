@@ -10,7 +10,7 @@
 
 #define PANIC(...) \
     EnterCriticalSection();\
-    bwprintf(COM2, __VA_ARGS__);\
+    bwprintf(COM3, __VA_ARGS__);\
     Quit();
 
 #if !(bwio)
@@ -20,16 +20,21 @@
 #endif
 
 #define IS(x) #x
-#define S(x) IS(x) 
-#define ASSERT(x, y) \
-if (!(x) && DEBUG) {\
-    PANIC("ASSERT FAILED: " S(x) "\r\nFUNCTION: " S(__func__) "\r\nFILE: "S(__FILE__) "\r\nLINE: " S(__LINE__) "\r\n" S(y) "\r\n")\
-}
+#define S(x) IS(x)
 
 #if DEBUG
-#define LOGF(...) bwprintf(COM1, __VA_ARGS__);
-#define LOGC(c) bwputc(COM1, (c));
-#define LOG(str) bwputstr(COM1, str);
+#define ASSERT(x, y) \
+if (!(x)) {\
+    PANIC("ASSERT FAILED: " S(x) "\r\nFUNCTION: " S(__func__) "\r\nFILE: "S(__FILE__) "\r\nLINE: " S(__LINE__) "\r\n" S(y) "\r\n")\
+}
+#else
+#define ASSERT(x, y)
+#endif
+
+#if DEBUG
+#define LOGF(...) bwprintf(COM3, __VA_ARGS__);
+#define LOGC(c) bwputc(COM3, (c));
+#define LOG(str) bwputstr(COM3, str);
 #else
 #define LOGF(...)
 #define LOGC(c)
