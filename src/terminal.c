@@ -44,9 +44,6 @@ static void output_base_terminal(Terminal *t) {
     circlebuffer_t *cb = &t->output;
     cb_write_string(cb, "\033[2J\033[0;0H");
     int i;
-    for (i = 0; i < TERMINAL_INPUT_MAX_COL+1; i++) {
-        cb_write(cb, '=');
-    }
     cursor_to_position(cb, t->input_line, t->input_col);
     cb_write_string(cb, "> ");
     t->input_col+= 2;
@@ -64,16 +61,10 @@ static void output_base_terminal(Terminal *t) {
         cb_write_string(cb, (i < 10 ? "  :?\r\n" : " :?\r\n"));
     }
     for (i = 19; i<= 22; i++) {
-        cursor_to_position(cb, 4+i, 1);
         cb_write_number(cb, 134+i, 10);
         cb_write_string(cb, ":?\r\n");
     }
     cursor_to_position(cb, t->input_line, t->input_col);
-// 2,1 -> 2, 8 = Time
-// 4,1 -> 24, 5 (box) = Switches
-// 2,10 -> 10, 30 (box) = Terminal Input
-// 2, 32 -> 24, 39 = Sensors
-// 26, 1 -> 28, 1 = debug output
 }
 static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
     char c;

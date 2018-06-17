@@ -115,11 +115,14 @@ int main(){
 #endif //CACHE
     LOG("Start!");
 
-
     kernel_init();
     char stack_space[STACK_SPACE_SIZE];
 
-    TD task_pool[TASK_POOL_SIZE];
+    TD task_pool[TASK_POOL_SIZE]; // fun fact: every time we run the program, addresses move back by 80!
+
+    //bwprintf(COM2, "%d -> %d, %d -> %d\r\n", stack_space, stack_space + STACK_SPACE_SIZE, task_pool, task_pool + TASK_POOL_SIZE);
+    //return 0;
+
     TaskQueue task_ready_queue;
 
     task_init(task_pool, &task_ready_queue, stack_space, STACK_SPACE_SIZE);

@@ -48,8 +48,8 @@ typedef struct uartmessage{
 
 static inline void generic_uart_rcv_notifier(int servertid, int uart) {
     int event = (uart == 1? EVENT_UART_1_RCV : EVENT_UART_2_RCV);
-    UARTMessage msg = {MESSAGE_UART, NOTIFY_RCV, 0, {0}};
-    ReplyMessage rm = {0, 0};
+    volatile UARTMessage msg = {MESSAGE_UART, NOTIFY_RCV, 0, {0}};
+    volatile ReplyMessage rm = {0, 0};
 
     FOREVER {
         msg.argument = AwaitEvent(event);
@@ -77,14 +77,13 @@ void generic_uart_send_notifier(int servertid, int uart) {
         msg.argument = AwaitEvent(event); 
         int err = Send(servertid, &msg, sizeof(msg), &rm, sizeof(rm));
         ASSERT(err >= 0, "Error sending to server");
-        ASSERT(rm.ret == 0, "Error return from server");
         u->data = rm.ret;
     }
 }
 
 void task_uart1_modem_notifier() {
-    UARTMessage msg = {MESSAGE_UART, NOTIFY_MODEM, 0, {0}};
-    ReplyMessage rm = {0, 0};
+    volatile UARTMessage msg = {MESSAGE_UART, NOTIFY_MODEM, 0, {0}};
+    volatile ReplyMessage rm = {0, 0};
 
     int servertid = WhoIs(NAME_UART1_SEND);
     FOREVER{
@@ -111,8 +110,8 @@ static inline void generic_uart_rcv_server(int uart) {
     cb_init(&cb_get, getQ_buf, GETQ_BUF_SIZE);
     RcvServer rs = {&cb_rcv, &cb_get};
 
-    UARTMessage um;
-    ReplyMessage rm = {MESSAGE_REPLY, 0};
+    volatile UARTMessage um;
+    volatile ReplyMessage rm = {MESSAGE_REPLY, 0};
     int tid, err;
 
     RegisterAs(uart == 1 ? NAME_UART1_RCV : NAME_UART2_RCV);
@@ -157,9 +156,9 @@ static inline void generic_uart_send_server(int uart) {
     cb_init(&cb_tx, txQ_buf, TXQ_BUF_SIZE);
     SendServer ss = {&cb_tx, 0, CTS_ASSERTED};
 
-    UARTMessage um;
+    volatile UARTMessage um;
 
-    ReplyMessage rm = {MESSAGE_REPLY, 0};
+    volatile ReplyMessage rm = {MESSAGE_REPLY, 0};
     int tid, err;
     RegisterAs(uart == 1 ? NAME_UART1_SEND : NAME_UART2_SEND);
     if (uart == 1) {
@@ -167,7 +166,7 @@ static inline void generic_uart_send_server(int uart) {
         ss.cts = (uart1->flag & CTS_MASK) ? CTS_ASSERTED : CTS_NEGATED;
     }
     Create(PRIORITY_NOTIFIER, (uart == 1 ? &task_uart1_send_notifier : &task_uart2_send_notifier));
-    FOREVER{
+    FOREVER {
         Receive(&tid, &um, sizeof(um));
         switch(um.request) {
         case NOTIFY_SEND:
@@ -222,29 +221,13 @@ static inline void generic_uart_send_server(int uart) {
             Reply(tid, &rm, sizeof(rm));
             break;
         } 
-        case PUTSTR:
-        {
-            int i = 0;
-            if (ss.notifier != 0 && (ss.cts == CTS_ASSERTED || uart == 2)) {
-                rm.ret = um.argumentstr[i++];
-                ss.cts = SEND_COMPLETE;
-                Reply(ss.notifier, &rm, sizeof(rm));
-                ss.notifier = 0;
-            } 
-            for (; i < um.argument; i++) {
-                cb_write(ss.txQ, um.argumentstr[i]);
-            }
-            rm.ret = i;
-            Reply(tid, &rm, sizeof(rm));
-            break;
-        }
         default:
-            PANIC("SEND SERVER %d UNHANDLED REQUEST TYPE: %d (NS: %d, NR: %d, NM: %d, GC: %d, PC: %d, PS: %d)", uart, NOTIFY_SEND,
+            PANIC("SEND SERVER %d UNHANDLED REQUEST TYPE: %d from %d (NS: %d, NR: %d, NM: %d, GC: %d, PC: %d, PS: %d)", uart, tid, um.request, NOTIFY_SEND,
     NOTIFY_RCV,
     NOTIFY_MODEM,
     GETCH,
     PUTCH,
-    PUTSTR, um.request)
+    PUTSTR)
         }
     }
 }
@@ -300,8 +283,8 @@ int Getc(int servertid, int channel) {
         return bwgetc(COM1);
     }
     #endif
-    UARTMessage um = {MESSAGE_UART, GETCH, 0, {0}};
-    ReplyMessage rm = {0, 0};
+    volatile UARTMessage um = {MESSAGE_UART, GETCH, 0, {0}};
+    volatile ReplyMessage rm = {0, 0};
     int r = Send(servertid, &um, sizeof(um), &rm, sizeof(rm));
     return (r >= 0 ? rm.ret : r);
 }
@@ -315,15 +298,6 @@ int Putc(int servertid, int channel, char ch) {
     #endif
     UARTMessage um = {MESSAGE_UART, PUTCH, ch, {0}};
     ReplyMessage rm = {0, 0};
-    int r = Send(servertid, &um, sizeof(um), &rm, sizeof(rm));
-    return (r >= 0 ? rm.ret : r);
-}
-
-int Puts(int servertid, char *st, int len) {
-    UARTMessage um = {MESSAGE_UART, PUTSTR, len, {0}};
-    ReplyMessage rm = {0, 0};
-    ASSERT(len < UART_STR_MAX, "invalid str length");
-    memcpy(um.argumentstr, st, len);
     int r = Send(servertid, &um, sizeof(um), &rm, sizeof(rm));
     return (r >= 0 ? rm.ret : r);
 }
