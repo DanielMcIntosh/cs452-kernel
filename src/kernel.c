@@ -33,8 +33,9 @@ int kernel_init(){
     // Unmask interrupts
     vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_CLK_3] - 32) | ( 0x1 << (IRQ_MAP[EVENT_UART_1_SEND] - 32)) | (0x1 << (IRQ_MAP[EVENT_UART_1_RCV] - 32)) | (0x1 << (IRQ_MAP[EVENT_UART_2_SEND] - 32)) | (0x1 << (IRQ_MAP[EVENT_UART_2_RCV] - 32));
 
-    uart2->linctrlhigh &= ~FEN_MASK;
-    uart1->linctrlhigh &= ~FEN_MASK;
+    // enable
+    uart2->ctrl &= ~UARTEN_MASK;
+    uart1->ctrl &= ~UARTEN_MASK;
 
     return 0;
 }
