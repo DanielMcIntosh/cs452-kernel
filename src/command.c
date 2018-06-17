@@ -19,6 +19,8 @@ typedef struct commandmessage{
 typedef struct commandserver{
     int notifier_waiting;
     int additional_delay;
+    int courier_waiting;
+    int courier_arg;
     int train_states[NUM_TRAINS];
     int train_speeds[NUM_TRAINS];
 } CommandServer;
@@ -66,8 +68,20 @@ void task_reverse_train(int arg){
     Destroy();
 }
 
+void task_switch_courier(int cmdtid){
+    int terminaltid = WhoIs(NAME_TERMINAL);
+    Command c = {COMMAND_NOTIFY_COURIER, 0, 0};
+    FOREVER {
+        int r = SendCommand(cmdtid, c);
+        // unpack r
+        int arg1 = r >> 16;
+        int arg2 = r & 0xFFFF;
+        SendTerminalRequest(terminaltid, TERMINAL_SWITCH, arg1, arg2);
+    }
+}
+
 void task_commandserver(){
-    CommandServer cs = {0, 0, {0}, {0}};
+    CommandServer cs = {0, 0, 0, -1, {0}, {0}};
     RegisterAs(NAME_COMMANDSERVER);
     int servertid = WhoIs(NAME_UART1_SEND), tid;
     CommandMessage cm;
@@ -80,7 +94,10 @@ void task_commandserver(){
         } else {
             rm.ret = 0;
         }
-        Reply(tid, &rm.ret, sizeof(rm));
+        if (cm.command.type != COMMAND_NOTIFY_COURIER) {
+            Reply(tid, &rm.ret, sizeof(rm));
+        }
+
         switch(cm.command.type) {
         case COMMAND_GO:
         {
@@ -110,13 +127,18 @@ void task_commandserver(){
 
             Putc(servertid, 1, cm.command.arg1 == 'C' ? 34 : 33);
             Putc(servertid, 1, cm.command.arg2);
-            SendTerminalRequest(WhoIs(NAME_TERMINAL), TERMINAL_SWITCH, cm.command.arg1, cm.command.arg2); // TODO this is 100% a deadlock.
-            // plan for this: another courier + cb combo probable
+            if (cs.courier_waiting != 0){
+                rm.ret = (cm.command.arg1 << 16) | cm.command.arg2;
+                Reply(cs.courier_waiting, &rm, sizeof(rm));
+                cs.courier_waiting = 0;
+            } else if (cs.courier_arg == -1) {
+                cs.courier_arg = (cm.command.arg1 << 16) | cm.command.arg2;
+            }
             break;
         }
         case COMMAND_QUIT:
         {
-            Quit(); // TODO
+            Quit();
             break;
         }
 
@@ -149,6 +171,17 @@ void task_commandserver(){
         case COMMAND_SENSOR_REQUEST:
         {
             Putc(servertid, 1, 133);
+            break;
+        }
+        case COMMAND_NOTIFY_COURIER:
+        {
+            if (cs.courier_arg != -1){
+                rm.ret = cs.courier_arg;
+                Reply(tid, &rm, sizeof(rm));
+                cs.courier_arg = -1;
+            } else {
+                cs.courier_waiting = tid;
+            }
             break;
         }
         default:

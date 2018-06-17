@@ -22,6 +22,7 @@ typedef enum cmdtype{
     COMMAND_NOTIFY_RV_ACCEL,
     COMMAND_NOTIFY_RV_REVERSE,
     COMMAND_NOTIFY_SOLENOID_TIMER,
+    COMMAND_NOTIFY_COURIER,
     COMMAND_SENSOR_REQUEST,
     INVALID_COMMAND
 } CommandType;
@@ -35,4 +36,5 @@ typedef struct command{
 int SendCommand(int servertid, Command c);
 
 void task_commandserver();
+void task_switch_courier(int cmdtid);
 #endif

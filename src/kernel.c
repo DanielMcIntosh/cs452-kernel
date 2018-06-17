@@ -29,12 +29,12 @@ int kernel_init(){
         "ldr r0, =IRQ_ENTRY_POINT\n\t"
         "ldr r1, =0x38\n\t"\
         "str r0, [r1]\n\t"
-        );
-
-    // Unmask timer interrupt
+        : : :"r0", "r1");
+    // Unmask interrupts
     vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_CLK_3] - 32) | ( 0x1 << (IRQ_MAP[EVENT_UART_1_SEND] - 32)) | (0x1 << (IRQ_MAP[EVENT_UART_1_RCV] - 32)) | (0x1 << (IRQ_MAP[EVENT_UART_2_SEND] - 32)) | (0x1 << (IRQ_MAP[EVENT_UART_2_RCV] - 32));
 
     uart2->linctrlhigh &= ~FEN_MASK;
+    uart1->linctrlhigh &= ~FEN_MASK;
 
     return 0;
 }
@@ -95,9 +95,10 @@ void fut(){
     Create(PRIORITY_WAREHOUSE, &task_clockserver);
     init_uart_servers();
     Create(PRIORITY_IDLE, &task_idle);
-    Create(PRIORITY_HIGH, &task_commandserver);
+    int cmdtid = Create(PRIORITY_HIGH, &task_commandserver);
     Create(PRIORITY_HIGH, &task_terminal);
     Create(PRIORITY_HIGH, &task_sensor_server);
+    CreateWithArgument(PRIORITY_NOTIFIER, &task_switch_courier, cmdtid);
 }
 
 
@@ -120,8 +121,7 @@ int main(){
 
     TD task_pool[TASK_POOL_SIZE]; // fun fact: every time we run the program, addresses move back by 80!
 
-    //bwprintf(COM2, "%d -> %d, %d -> %d\r\n", stack_space, stack_space + STACK_SPACE_SIZE, task_pool, task_pool + TASK_POOL_SIZE);
-    //return 0;
+//    bwprintf(COM2, "%d -> %d, %d -> %d\r\n", stack_space, stack_space + STACK_SPACE_SIZE, task_pool, task_pool + TASK_POOL_SIZE);
 
     TaskQueue task_ready_queue;
 
