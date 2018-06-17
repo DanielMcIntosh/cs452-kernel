@@ -4,7 +4,7 @@
 #define L(x) x, sizeof(x)
 
 #define CB_INPUT_BUF_SIZE 20
-#define CB_TERMINAL_BUF_SIZE 350
+#define CB_TERMINAL_BUF_SIZE 500
 
 #define STR_BACKSPACE "\033H \033H"
 #define STR_NEWLINE "\r\n"

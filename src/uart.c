@@ -266,7 +266,7 @@ void init_uart_servers() {
         for (int k = 0; k < 55; k++)
             __asm__ volatile("mov r0, r0");
         // enable
-        u->ctrl |= UARTEN_MASK | RIEN_MASK | (i == 0 ? MSIEN_MASK : 0); // TODO: disable first?
+        u->ctrl |= UARTEN_MASK | RIEN_MASK | (i == 0 ? MSIEN_MASK : 0);
 
     }
     if (!DEBUG_COM2){

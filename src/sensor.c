@@ -68,8 +68,7 @@ void task_sensor_courier(int servertid){
 void task_sensor_server(){
     // concept: 2 notifiers - a timeout notifier, and a read notifier
     // server waits for bytes to be sent from com1; if it times out, we send it again
-    // each time we read sensors, we output them i guess (this is definitely hacky rn but fuck it)
-    // not really happy with this design
+    // not really happy with this design, but it works for now. Eventually, I'd like to use individual queries
     SensorServer ss = {{0}, {0}, 0, 0, 0, 1};
     SensorMessage sm;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
@@ -104,7 +103,7 @@ void task_sensor_server(){
                     ss.send_cm = 1;
 
                 ss.current_sensor_query = 0;
-                // TODO remember the off by 1 error from before?
+                // TODO remember the off by 1 error from before? It never showed up, but i'm not sure what to do if it does.
                 // TODO switch to individual queries
             }
             ss.query_complete = 0;

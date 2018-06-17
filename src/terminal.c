@@ -48,11 +48,7 @@ static void output_base_terminal(Terminal *t) {
     cb_write_string(cb, "> ");
     t->input_col+= 2;
     cursor_to_position(cb, 27, 1);
-    cb_write_string(cb, "MAX : \r\n");
-    cb_write_string(cb, "LMAX: \r\n");
-    cb_write_string(cb, "AVG : \r\n");
-    cb_write_string(cb, "SNSR: \r\n");
-    cb_write_string(cb, "FSNR: \r\n");
+    cb_write_string(cb, "\r\n\n\n\n\n");
     cb_write_string(cb, "IDLE: \r\n");
 
     cursor_to_position(cb, 5, 1);
