@@ -13,7 +13,7 @@ activate:
     MSR SPSR, r4 @ Set SPSR_svc to CPSR_user, which will return it to user mode once movs is called.
     ldr lr, [r0, #16] @LR
 
-    MSR CPSR_c,#0xDF @ System mode
+    MSR CPSR_c, #0xDF @ System mode
         ldr sp, [r0, #20] @ Stack Pointer 
         ldmia sp!, {r0-r12,lr} @ Reload registers from User Stack
     MSR CPSR_c, #0xD3 @ Supervisor Mode
@@ -32,7 +32,7 @@ KERNEL_ENTRY_POINT:
         mov r4, sp  @Save Stack Pointer
     MSR CPSR_c, #0xD3 @ Supervisor Mode - even if we were in IRQ mode, we return to svc mode.
 
-    ldmia sp!, {r5} @load the task we're coming out of's TD*
+    ldr r5, [sp], #4 @load the task we're coming out of's TD*
 
     str r4, [r5, #20] @sp
 
@@ -61,7 +61,7 @@ irq:
     str r1, [r5, #16] @ Link Register from IRQ
 after:
 
-    ldmia sp!, {r4}
+    ldr r4, [sp], #4
     MSR CPSR, r4
     ldmia sp!, {r4-r12,lr}
     mov pc, lr

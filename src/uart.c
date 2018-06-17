@@ -52,7 +52,9 @@ static inline void generic_uart_rcv_notifier(int servertid, int uart) {
     ReplyMessage rm = {0, 0};
 
     FOREVER {
-        msg.argument = AwaitEvent(event);
+        int data = AwaitEvent(event);
+        ASSERT(data >= 0, "Error waiting on event");
+        msg.argument = data;
         int err = Send(servertid, &msg, sizeof(msg), &rm, sizeof(rm));
         ASSERT(err >= 0, "Error sending to server");
         ASSERT(rm.ret == 0, "Error return from server");
