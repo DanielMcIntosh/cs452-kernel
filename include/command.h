@@ -2,6 +2,8 @@
 #define COMMAND_H
 
 #define NAME_COMMANDSERVER "CMDS"
+// 2 arguments for each of the 22 switches + 2 extra as buffer space
+#define SWITCHQ_BUF_SIZE (2 *(22 + 2))
 
 /*
 typedef enum direction{

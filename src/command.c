@@ -9,6 +9,7 @@
 #include <tasks.h>
 #include <clock.h>
 #include <terminal.h>
+#include <circlebuffer.h>
 
 typedef struct commandmessage{
     MessageType type;
@@ -18,21 +19,13 @@ typedef struct commandmessage{
 
 typedef struct commandserver{
     int notifier_waiting;
-    int additional_delay;
+    int solenoid_off;
     int courier_waiting;
     int courier_arg;
     int train_states[NUM_TRAINS];
     int train_speeds[NUM_TRAINS];
+    circlebuffer_t *cb_switches;
 } CommandServer;
-/*
-typedef struct reversearg {
-    struct {
-        int train: 16;
-        int speed: 16;
-    } fields;
-    int bits;
-} ReverseArg;
-*/
 
 int SendCommand(int servertid, Command c){
     CommandMessage cm = {MESSAGE_COMMAND, c};
@@ -42,16 +35,28 @@ int SendCommand(int servertid, Command c){
     return r >= 0 ? rm.ret : r;
 }
 
-void task_solenoid_off(int delay){
-    int tid = WhoIs(NAME_COMMANDSERVER);
-    Delay(delay);
+static void init_switches(CommandServer *cs){
+    ASSERT(cb_empty(cs->cb_switches), "Cannot init non-empty cb");
+    for (int i = 1; i <= 18; i++){
+        cb_write(cs->cb_switches, 'C');
+        cb_write(cs->cb_switches, i);
+    }
+    for (int i = 153; i <= 156; i++){
+        cb_write(cs->cb_switches, (i % 2 == 0 ? 'S' : 'C'));
+        cb_write(cs->cb_switches, i);
+    }
+}
+
+void task_reverse_notifier(int tid){
     Command c = {COMMAND_NOTIFY_SOLENOID_TIMER, 0, 0};
-    SendCommand(tid, c);
-    Destroy();
+    FOREVER {
+        SendCommand(tid, c);
+        Delay(17);
+    }
 }
 
 int calcReverseTime(int speed){
-    return 400 / (15 - speed);
+    return 350 / (15 - speed) + 75;
 }
 
 void task_reverse_train(int arg){
@@ -80,21 +85,41 @@ void task_switch_courier(int cmdtid){
     }
 }
 
+static inline void commandserver_exec_switch(CommandServer *cs, int arg1, int arg2, ReplyMessage *rm, int servertid){
+    Putc(servertid, 1, arg1 == 'C' ? 34 : 33);
+    Putc(servertid, 1, arg2);
+    cs->solenoid_off = 0;
+    if (cs->courier_waiting != 0){
+        rm->ret = (arg1 << 16) | arg2;
+        Reply(cs->courier_waiting, rm, sizeof(*rm));
+        cs->courier_waiting = 0;
+    } else if (cs->courier_arg == -1) {
+        cs->courier_arg = (arg1 << 16) | arg2;
+    }
+}
+
 void task_commandserver(){
-    CommandServer cs = {0, 0, 0, -1, {0}, {0}};
+    CommandServer cs = {0, 0, 0, -1, {0}, {0}, 0};
     RegisterAs(NAME_COMMANDSERVER);
     int servertid = WhoIs(NAME_UART1_SEND), tid;
     CommandMessage cm;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
+    char switchQ_buf[SWITCHQ_BUF_SIZE];
+    circlebuffer_t cb_switches;
+    cb_init(&cb_switches, switchQ_buf, SWITCHQ_BUF_SIZE);
+    cs.cb_switches = &cb_switches;
 
-    FOREVER{
+    CreateWithArgument(PRIORITY_NOTIFIER, task_reverse_notifier, MyTid());
+    init_switches(&cs);
+
+    FOREVER {
         Receive(&tid, &cm, sizeof(cm));
         if (cm.command.type >= INVALID_COMMAND){
             rm.ret = ERR_INVALID_COMMAND;
         } else {
             rm.ret = 0;
         }
-        if (cm.command.type != COMMAND_NOTIFY_COURIER) {
+        if (cm.command.type != COMMAND_NOTIFY_COURIER && cm.command.type != COMMAND_NOTIFY_SOLENOID_TIMER) {
             Reply(tid, &rm.ret, sizeof(rm));
         }
 
@@ -120,19 +145,13 @@ void task_commandserver(){
         }
         case COMMAND_SW:
         {
-            if (cs.notifier_waiting)
-                cs.additional_delay=1; // TODO time server courier?
-            else 
-                cs.notifier_waiting = CreateWithArgument(PRIORITY_NOTIFIER, &task_solenoid_off, 150);
-
-            Putc(servertid, 1, cm.command.arg1 == 'C' ? 34 : 33);
-            Putc(servertid, 1, cm.command.arg2);
-            if (cs.courier_waiting != 0){
-                rm.ret = (cm.command.arg1 << 16) | cm.command.arg2;
-                Reply(cs.courier_waiting, &rm, sizeof(rm));
-                cs.courier_waiting = 0;
-            } else if (cs.courier_arg == -1) {
-                cs.courier_arg = (cm.command.arg1 << 16) | cm.command.arg2;
+            if (cs.notifier_waiting) {
+                Reply(cs.notifier_waiting, &rm, sizeof(rm));
+                cs.notifier_waiting = 0;
+                commandserver_exec_switch(&cs, cm.command.arg1, cm.command.arg2, &rm, servertid);
+            } else {
+                cb_write(cs.cb_switches, cm.command.arg1);
+                cb_write(cs.cb_switches, cm.command.arg2);
             }
             break;
         }
@@ -158,13 +177,21 @@ void task_commandserver(){
         }
         case COMMAND_NOTIFY_SOLENOID_TIMER:
         {
-            if (cs.additional_delay){
-                cs.notifier_waiting = CreateWithArgument(PRIORITY_NOTIFIER, &task_solenoid_off, 100);
-                cs.additional_delay = 0;
-            }
-            else {
+            if (cb_empty(cs.cb_switches) && !cs.solenoid_off){
                 Putc(servertid, 1, 32);
-                cs.notifier_waiting = 0;
+                cs.solenoid_off = 1;
+                Reply(tid, &rm, sizeof(rm));
+            } else if (cb_empty(cs.cb_switches)) {
+                cs.notifier_waiting = tid;
+            } else {
+                char arg1, arg2;
+                int err;
+                err = cb_read(cs.cb_switches, &arg1);
+                ASSERT(err == 0, "CB SHOULD NOT BE EMPTY");
+                err = cb_read(cs.cb_switches, &arg2);
+                ASSERT(err == 0, "CB SHOULD NOT BE EMPTY");
+                commandserver_exec_switch(&cs, arg1, arg2, &rm, servertid);
+                Reply(tid, &rm, sizeof(rm));
             }
             break;
         }

@@ -295,13 +295,6 @@ void task_terminal() {
             cb_write_string(&t.output, "%\0338");
             break;
         }
-    /*
-    TERMINAL_MAX,
-    TERMINAL_AVG,
-    TERMINAL_LST,
-    TERMINAL_SNSR,
-    TERMINAL_FNSR,
-    //*/
         case(TERMINAL_NOTIFY_COURIER):
         {
             t.notifier = tid;

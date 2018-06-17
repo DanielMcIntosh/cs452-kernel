@@ -277,7 +277,7 @@ void init_uart_servers() {
     Create(PRIORITY_WAREHOUSE, &task_uart2rcv);
 }
 
-int Getc(int servertid, int channel) {
+int Getc(int servertid, int __attribute__((unused)) channel) {
     #if DEBUG_COM2
     if (channel == 1){
         return bwgetc(COM1);
@@ -289,7 +289,7 @@ int Getc(int servertid, int channel) {
     return (r >= 0 ? rm.ret : r);
 }
 
-int Putc(int servertid, int channel, char ch) {
+int Putc(int servertid, int __attribute__((unused)) channel, char ch) {
     #if DEBUG_COM2
     if (channel == 1){
         bwputc(COM1, ch);
