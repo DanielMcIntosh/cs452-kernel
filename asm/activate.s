@@ -36,20 +36,20 @@ KERNEL_ENTRY_POINT:
 
     str r4, [r5, #20] @sp
 
-    MRS r4, SPSR
-    str r4, [r5, #24] @CPSR_usr
-    
     
 @ Retrieve syscall ID
     MSR CPSR_c, #0xD2 @ IRQ mode
         mov r0, sp
         mov sp, #0
         mov r1, lr
+        MRS r2, SPSR
     MSR CPSR_c, #0xD3 @ SVC mode
 
     teq r0, #1
     beq irq
     @ If this isn't IRQ, we get the value from here
+    MRS r4, SPSR
+    str r4, [r5, #24] @CPSR_usr
     ldr r0, [lr, #-4]
     and r0, r0, #0xFFFFFF @ Mask SWI bits from Return Value
     str lr, [r5, #16] @ Link Register from SWI
@@ -57,6 +57,7 @@ KERNEL_ENTRY_POINT:
 irq:
     @ If this is an IRQ, we use the IRQ return value
     mov r0, #100
+    str r2, [r5, #24] @CPSR_usr
     str r1, [r5, #16] @ Link Register from IRQ
 after:
 
