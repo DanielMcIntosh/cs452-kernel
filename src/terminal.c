@@ -41,14 +41,14 @@ static inline void cursor_to_position(struct circlebuffer *cb, int line, int col
 
 static void output_base_terminal(Terminal *t) {
     circlebuffer_t *cb = &t->output;
-    cb_write_string(cb, "\033[2J\033[3g\033[0;0H");
+    cb_write_string(cb, "\033[2J\033[3g\033[H\n");
+    cb_write_string(cb, "IDLE: %\r\n");
     int i;
     cursor_to_position(cb, t->input_line, t->input_col);
     cb_write_string(cb, "\033H> ");
     t->input_col+= 2;
 
     cursor_to_position(cb, 27, 1);
-    cb_write_string(cb, "IDLE: \r\n");
     cb_write_string(cb, "STK_LIM: ");
     cb_write_number(cb, STACK_SPACE_SIZE/TASK_POOL_SIZE - 4, 16);
     cb_write_string(cb, "\r\nSTK_AVG: \r\n");
@@ -277,7 +277,7 @@ void task_terminal() {
         {
             int time_hundred_millis = tm.arg1, idle = tm.arg2; 
             
-            cb_write_string(&t.output, "\0337\033[2;2H");
+            cb_write_string(&t.output, "\0337\033[H");
             int m = time_hundred_millis % 10;
             time_hundred_millis /= 10;
             int ss = time_hundred_millis % 60;
@@ -293,10 +293,10 @@ void task_terminal() {
             cb_write(&t.output, ':');
             cb_write_number(&t.output, m, 10);
 
-            cb_write_string(&t.output, "\033[27;7H");
+            cb_write_string(&t.output, "\n");
             cb_write_number(&t.output, idle, 10);
 
-            cb_write_string(&t.output, "%\0338");
+            cb_write_string(&t.output, "\0338");
             break;
         }
         case (TERMINAL_STACK_METRICS):
@@ -304,11 +304,11 @@ void task_terminal() {
             int avg_stack = tm.arg1, max_stack = tm.arg2;
             cb_write_string(&t.output, "\0337");
 
-            cursor_to_position(&t.output, 29, 10);
+            cursor_to_position(&t.output, 28, 10);
             cb_write_number(&t.output, avg_stack, 16);
             cb_write_string(&t.output, "   ");
 
-            cursor_to_position(&t.output, 30, 10);
+            cursor_to_position(&t.output, 29, 10);
             cb_write_number(&t.output, max_stack, 16);
             cb_write_string(&t.output, "   ");
 
