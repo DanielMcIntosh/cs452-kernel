@@ -10,6 +10,7 @@
 #include <tasks.h>
 #include <message.h>
 #include <clock.h>
+#include <sensor.h>
 
 typedef struct terminalparser {
     circlebuffer_t input;
@@ -192,14 +193,15 @@ void task_terminal_courier(int servertid) {
 
 void task_terminal() {
     // concept: server is one of the reciever loop ones
-    // Has a cb of characters to put (i guess there's 2 buffers now, which is ??
-    // alternate solution: have the 1 buffer, just fix Puts i guess?
+    // Has a cb of characters to put (now there's 2 buffers)
+    // alternate solution: have the 1 buffer, use puts in various places.
     // However, I think this makes sense. The responsibility of what to print for a certain event should be somewhere specific, in this case: here
     RegisterAs(NAME_TERMINAL);
     int mytid = MyTid();
     CreateWithArgument(PRIORITY_HIGH, &task_terminal_command_parser, mytid);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_terminal_courier, mytid);
     CreateWithArgument(PRIORITY_LOW, &task_clockprinter, mytid);
+    Create(PRIORITY_HIGH, &task_sensor_server);
 
     char cb_terminal_buf[CB_TERMINAL_BUF_SIZE];
     circlebuffer_t cb_terminal;

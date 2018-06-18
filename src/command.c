@@ -47,7 +47,7 @@ static void init_switches(CommandServer *cs){
     }
 }
 
-void task_reverse_notifier(int tid){
+void task_solenoid_notifier(int tid){
     Command c = {COMMAND_NOTIFY_SOLENOID_TIMER, 0, 0};
     FOREVER {
         SendCommand(tid, c);
@@ -109,7 +109,8 @@ void task_commandserver(){
     cb_init(&cb_switches, switchQ_buf, SWITCHQ_BUF_SIZE);
     cs.cb_switches = &cb_switches;
 
-    CreateWithArgument(PRIORITY_NOTIFIER, task_reverse_notifier, MyTid());
+    CreateWithArgument(PRIORITY_NOTIFIER, task_solenoid_notifier, MyTid());
+    Putc(servertid, 1, 0x60);
     init_switches(&cs);
 
     FOREVER {

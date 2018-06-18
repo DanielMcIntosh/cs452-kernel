@@ -15,7 +15,6 @@
 #include <uart.h>
 #include <terminal.h> 
 #include <command.h>
-#include <sensor.h>
 
 extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
@@ -64,7 +63,7 @@ void task_idle() {
         int time_end = clk4->value_low;
         int time_total = time_end - time_start;
         int percent_idle = 39320 * 100 / time_total;
-        movingavg = (CLAMP(percent_idle, 99, 0) * alpha) / 100 + (movingavg * (100-alpha) / 100);
+        movingavg = (percent_idle * alpha) / 100 + (movingavg * (100-alpha) / 100);
         StoreValue(VALUE_IDLE, movingavg);
     }
 }
@@ -98,8 +97,7 @@ void fut(){
     Create(PRIORITY_IDLE, &task_idle);
     int cmdtid = Create(PRIORITY_HIGH, &task_commandserver);
     Create(PRIORITY_HIGH, &task_terminal);
-    Create(PRIORITY_HIGH, &task_sensor_server);
-    CreateWithArgument(PRIORITY_NOTIFIER, &task_switch_courier, cmdtid);
+    CreateWithArgument(PRIORITY_NOTIFIER, &task_switch_courier, cmdtid); // This is here because it must be created after both the command server and the terminal server, but with a higher priority compared to both.
 }
 
 
