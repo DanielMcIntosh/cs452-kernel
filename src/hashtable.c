@@ -92,3 +92,12 @@ int ht_lookup(Hashtable *ht, char key[static HT_KEY_SIZE]){
     LOGF("Hash: %d |-> Value: %d\r\n", hsh, (*ht)[hsh].value);
     return (*ht)[hsh].value;
 }
+
+void ht_rev_lookup(Hashtable *ht, int value, char *result_buf) {
+    for (int i = 0; i < HT_SIZE; ++i) {
+        int cur_value = (*ht)[i].value;
+        if (cur_value == value) {
+            memcpy(result_buf, (*ht)[i].key, HT_KEY_SIZE);
+        }
+    }
+}

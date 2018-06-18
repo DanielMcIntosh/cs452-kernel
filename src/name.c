@@ -54,6 +54,8 @@ void task_nameserver(){
                 msg.tid = ht_insert(&ns.ht, msg.name, tid);
                 LOGF("NameServer registered %s as %d\r\n ", msg.name, tid);
                 break;
+            case MESSAGE_NAME_LOOKUP:
+                ht_rev_lookup(&ns.ht, msg.tid, msg.name);
             default:
                 LOGF("NameServer received invalid argument %d\r\n ", msg.id);
                 msg.tid = ERR_INVALID_ARGUMENT;
@@ -78,4 +80,13 @@ int WhoIs(char * name){
     memcpy(msg.name, name, MAXNAMESIZE);
     Send(TID_NS, &msg, sizeof(msg), &msg, sizeof(msg));
     return msg.tid;
+}
+
+char *NameLookup(int tid, char *result_buf) {
+    NameMessage msg;
+    msg.id = MESSAGE_NAME_LOOKUP;
+    msg.tid = tid;
+    Send(TID_NS, &msg, sizeof(msg), &msg, sizeof(msg));
+    memcpy(result_buf, msg.name, MAXNAMESIZE);
+    return result_buf;
 }

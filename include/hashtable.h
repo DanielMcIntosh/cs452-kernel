@@ -17,5 +17,6 @@ typedef HT_Node Hashtable[HT_SIZE];
 void ht_init(Hashtable *ht);
 int ht_insert(Hashtable *ht, char key[static HT_KEY_SIZE], int value);
 int ht_lookup(Hashtable *ht, char key[static HT_KEY_SIZE]);
+void ht_rev_lookup(Hashtable *ht, int value, char *result_buf);
 
 #endif

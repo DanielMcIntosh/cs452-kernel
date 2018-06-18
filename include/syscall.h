@@ -24,6 +24,8 @@ typedef enum {
 
 typedef enum {
     VALUE_IDLE,
+    VALUE_STACK_AVG,
+    VALUE_STACK_MAX,
     NUM_VALUES
 } StorableValue;
 

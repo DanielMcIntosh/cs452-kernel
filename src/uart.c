@@ -52,7 +52,9 @@ static inline void generic_uart_rcv_notifier(int servertid, int uart) {
     ReplyMessage rm = {0, 0};
 
     FOREVER {
-        msg.argument = AwaitEvent(event);
+        int data = AwaitEvent(event);
+        ASSERT(data >= 0, "Error waiting on event");
+        msg.argument = data;
         int err = Send(servertid, &msg, sizeof(msg), &rm, sizeof(rm));
         ASSERT(err >= 0, "Error sending to server");
         ASSERT(rm.ret == 0, "Error return from server");
@@ -145,7 +147,10 @@ static inline void generic_uart_rcv_server(int uart) {
             break;
         } 
         default:
-            PANIC("RCV SERVER %d UNHANDLED REQUEST TYPE: %d", uart, um.request)
+        {
+            char name[MAXNAMESIZE] = {0};
+            PANIC("RCV SERVER %d UNHANDLED REQUEST TYPE: %d FROM: %d (%s)", uart, um.request, tid, NameLookup(tid, name));
+        }
         }
     }
 }
@@ -172,7 +177,7 @@ static inline void generic_uart_send_server(int uart) {
         case NOTIFY_SEND:
         {
             rm.ret = 0;
-            if (!cb_empty(ss.txQ) && (ss.cts == CTS_ASSERTED || uart == 2)) {
+            if (!cb_empty(ss.txQ) && (uart == 2 || ss.cts == CTS_ASSERTED)) {
                 err = cb_read(ss.txQ, (char *) &rm.ret);
                 ASSERT(err == 0, "CB Read failure");
                 ss.cts = SEND_COMPLETE;
@@ -209,7 +214,7 @@ static inline void generic_uart_send_server(int uart) {
         }
         case PUTCH:
         {
-            if (ss.notifier != 0 && (ss.cts == CTS_ASSERTED || uart == 2)) {
+            if (ss.notifier != 0 && (uart == 2 || ss.cts == CTS_ASSERTED)) {
                 rm.ret = um.argument;
                 ss.cts = SEND_COMPLETE;
                 Reply(ss.notifier, &rm, sizeof(rm));
@@ -222,12 +227,17 @@ static inline void generic_uart_send_server(int uart) {
             break;
         } 
         default:
-            PANIC("SEND SERVER %d UNHANDLED REQUEST TYPE: %d from %d (NS: %d, NR: %d, NM: %d, GC: %d, PC: %d, PS: %d)", uart, tid, um.request, NOTIFY_SEND,
-    NOTIFY_RCV,
-    NOTIFY_MODEM,
-    GETCH,
-    PUTCH,
-    PUTSTR)
+        {
+            char name[MAXNAMESIZE];
+            NameLookup(tid, name);
+            PANIC("SEND SERVER %d UNHANDLED REQUEST TYPE: %d FROM: %d (%s) (NS: %d, NR: %d, NM: %d, GC: %d, PC: %d, PS: %d)", uart, um.request, tid, name,
+                NOTIFY_SEND,
+                NOTIFY_RCV,
+                NOTIFY_MODEM,
+                GETCH,
+                PUTCH,
+                PUTSTR);
+        }
         }
     }
 }

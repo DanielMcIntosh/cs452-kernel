@@ -62,6 +62,7 @@ typedef struct taskdesc {
 #define TD_arg(t, n) (n == 4 ? t->sp[14] : t->sp[n])
 
 typedef struct {
+    TD *task_pool;
     TD *heads[NUM_PRIORITIES];
     TD *tails[NUM_PRIORITIES];
     TD *free_queue;
@@ -69,17 +70,18 @@ typedef struct {
     unsigned int ready_bitfield : NUM_PRIORITIES;
 } TaskQueue;
 
-int task_init(TD *task_pool, TaskQueue *queue, char *stack_space, unsigned int stack_space_size);
+int task_init(TaskQueue *queue, char *stack_space, unsigned int stack_space_size);
 
 int task_getTid(TD *task);
 int task_getParentTid(TD *task);
+int task_get_stack_size(TD *task);
 
 TD *task_nextActive(TaskQueue *queue);
 void task_react_to_state(TD *task, TaskQueue *queue);
 int task_create(TaskQueue *queue, int parent_tid, Priority priority, int lr, int arg);
 
-static inline __attribute__((always_inline)) TD *task_lookup(TD *task_pool, int tid) {
-    return &(task_pool[tid & TASK_BASE_TID_MASK]);
+static inline __attribute__((always_inline)) TD *task_lookup(TaskQueue *queue, int tid) {
+    return &(queue->task_pool[tid & TASK_BASE_TID_MASK]);
 }
 
 #endif //TASKS_H

@@ -4,6 +4,6 @@
 #include "syscall.h"
 #include "tasks.h"
 
-Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue);
+Syscall handle(Syscall a, TD *task, TaskQueue *task_ready_queue, ValueStore *values);
 
 #endif //SYS_HANDLER_H

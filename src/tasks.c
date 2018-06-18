@@ -66,30 +66,30 @@ TD *fetch_task(TaskQueue * restrict queue) {
 //////////////////////////////////////////////////////
 //  EXPOSED
 //////////////////////////////////////////////////////
-int task_init(TD *task_pool, TaskQueue * restrict queue, char * restrict stack_space, unsigned int stack_space_size) {
+int task_init(TaskQueue * restrict queue, char * restrict stack_space, unsigned int stack_space_size) {
     int STACK_SPACE_PER_TASK = stack_space_size/TASK_POOL_SIZE - 4;
 
     for (int i = 0; i < TASK_POOL_SIZE; ++i) {
         //we write to the stack from the bottom up,
         //so start with sp_base at the end of the allocated range for this task
         stack_space += STACK_SPACE_PER_TASK;
-        task_lookup(task_pool, i)->sp_base = (int) stack_space;
-        task_lookup(task_pool, i)->state = STATE_DESTROYED;
-        task_lookup(task_pool, i)->tid = i;
-        task_lookup(task_pool, i)->use_counter = 0;
-        task_lookup(task_pool, i)->last_syscall = SYSCALL_EXIT;
+        task_lookup(queue, i)->sp_base = (int) stack_space;
+        task_lookup(queue, i)->state = STATE_DESTROYED;
+        task_lookup(queue, i)->tid = i;
+        task_lookup(queue, i)->use_counter = 0;
+        task_lookup(queue, i)->last_syscall = SYSCALL_EXIT;
     }
 
     for (int i = 0; i < TASK_POOL_SIZE - 1; ++i) {
-        task_lookup(task_pool, i)->rdynext = task_lookup(task_pool, i+1);
+        task_lookup(queue, i)->rdynext = task_lookup(queue, i+1);
     }
-    task_lookup(task_pool, TASK_POOL_SIZE-1)->rdynext = 0;
+    task_lookup(queue, TASK_POOL_SIZE-1)->rdynext = 0;
 
     for (int i = 0; i < NUM_PRIORITIES; ++i) {
         queue->heads[i] = 0;
         queue->tails[i] = 0;
     }
-    queue->free_queue = task_pool;
+    queue->free_queue = queue->task_pool;
     for (int i = 0; i < NUM_EVENTS; ++i) {
         queue->event_wait[i] = 0;
     }
@@ -102,6 +102,10 @@ int task_getTid(TD *task) {
 
 int task_getParentTid(TD *task) {
     return task->p_tid;
+}
+
+int task_get_stack_size(TD *task) {
+    return task->sp_base - (int)task->sp;
 }
 
 TD *task_nextActive(TaskQueue * restrict queue) {

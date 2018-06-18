@@ -12,4 +12,6 @@
 
 #define NAME_FUT "FUT"
 
+void task_stack_metric_printer(int terminaltid);
+
 #endif
