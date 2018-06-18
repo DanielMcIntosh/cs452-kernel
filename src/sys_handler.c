@@ -40,10 +40,10 @@ static inline void handle_exit(TD *task) {
 //                                  MESSAGE PASSING
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-static inline void handle_send(TD *task, TD *task_pool, TaskQueue *task_ready_queue){
+static inline void handle_send(TD *task, TaskQueue *task_ready_queue){
     LOG("SEND called\r\n");
 
-    TD *receiver = task_lookup(task_pool, TD_arg(task, 0));
+    TD *receiver = task_lookup(task_ready_queue, TD_arg(task, 0));
     if (receiver == NULL) {
         task->r0 = ERR_TASK_DOES_NOT_EXIST;
         return;
@@ -111,10 +111,10 @@ static inline void handle_receive(TD *task) {
     }
 }
 
-static inline void handle_reply(TD *task, TD *task_pool, TaskQueue *task_ready_queue) {
+static inline void handle_reply(TD *task, TaskQueue *task_ready_queue) {
     LOG("REPLY called\r\n");
     
-    TD *sender = task_lookup(task_pool, TD_arg(task, 0));
+    TD *sender = task_lookup(task_ready_queue, TD_arg(task, 0));
     if (sender == NULL) {
         task->r0 = ERR_TASK_DOES_NOT_EXIST;
         return;
@@ -229,8 +229,7 @@ static inline void handle_get_value(TD *task, ValueStore *v){
 //////////////////////////////////////////////////////////////////////////////////////////////
 //                                     MAIN
 //////////////////////////////////////////////////////////////////////////////////////////////
-Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) {
-    static ValueStore values = {{0}};
+Syscall handle(Syscall a, TD *task, TaskQueue *task_ready_queue, ValueStore *values) {
     LOGF("HANDLE: %d, %d\t", a, task);
     LOGF("ARGS: %d, %d, %d, %d, %d\t", TD_arg(task, 0), TD_arg(task, 1), TD_arg(task, 2), TD_arg(task, 3), TD_arg(task, 4));
     switch(a) {
@@ -261,7 +260,7 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) 
         }
         case SYSCALL_SEND:
         {
-            handle_send(task, task_pool, task_ready_queue);
+            handle_send(task, task_ready_queue);
             break;
         }
         case SYSCALL_RECEIVE:
@@ -271,7 +270,7 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) 
         }
         case SYSCALL_REPLY:
         {
-            handle_reply(task, task_pool, task_ready_queue);
+            handle_reply(task, task_ready_queue);
             break;
         }
         case SYSCALL_AWAIT:
@@ -311,12 +310,12 @@ Syscall handle(Syscall a, TD *task, TD *task_pool, TaskQueue *task_ready_queue) 
         }
         case SYSCALL_STORE_VALUE:
         {
-            handle_store_value(task, &values);
+            handle_store_value(task, values);
             break;
         }
         case SYSCALL_GET_VALUE:
         {
-            handle_get_value(task, &values);
+            handle_get_value(task, values);
             break;
         }
         default:

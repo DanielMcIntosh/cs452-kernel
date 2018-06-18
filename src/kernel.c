@@ -44,7 +44,7 @@ TD* schedule(TaskQueue *task_ready_queue){
     return task_nextActive(task_ready_queue);
 }
 
-#define IDLE_ITERATIONS 500000
+#define IDLE_ITERATIONS 2000000
 void task_idle() {
     int i, j = 0;
     int movingavg = 99;
@@ -63,35 +63,44 @@ void task_idle() {
             : [i] "+r" (i), [j] "+r" (j));
         int time_end = clk4->value_low;
         int time_total = time_end - time_start;
-        int percent_idle = 39320 * 100 / time_total;
-        movingavg = (CLAMP(percent_idle, 99, 0) * alpha) / 100 + (movingavg * (100-alpha) / 100);
+        int percent_idle = 157280 * 100 / time_total;
+        movingavg = (percent_idle * alpha) / 100 + (movingavg * (100-alpha) / 100);
         StoreValue(VALUE_IDLE, movingavg);
     }
 }
 #undef IDLE_ITERATIONS
 
-typedef struct ttmsg {
-    int MessageType;
-    int t;
-    int n;
-} TTMsg;
-
-void task_timetest(){
-    int tid = MyTid();
-    int fut_tid = WhoIs(NAME_FUT);
-    TTMsg tm;
-    tm.MessageType = MESSAGE_TT;
-    Send(fut_tid, &tm, sizeof(tm), &tm, sizeof(tm));
-    for (int i = 0; i < tm.n; i++){
-        int err = Delay(tm.t);
-        ASSERT(err == 0, "Error Delaying");
-        bwprintf(COM2, "%d: %d, %d/%d\r\n", tid, tm.t, i+1, tm.n);
+void task_stack_metric_printer(int terminaltid){
+    LOG("STACK METRIC PRINTER INIT");
+    FOREVER{
+        SendTerminalRequest(terminaltid, TERMINAL_STACK_METRICS, GetValue(VALUE_STACK_AVG), GetValue(VALUE_STACK_MAX));
+        Delay(10*TICKS_PER_HUNDRED_MILLIS + 1); //add 1 just so we don't trigger exactly the same time as the clock printing
     }
+}
+
+void update_stack_size_metric(TD *task, ValueStore *value_store) {
+    int stack_limit = STACK_SPACE_SIZE/TASK_POOL_SIZE - 4;
+    int size = task_get_stack_size(task);
+    if (size >= stack_limit) {
+        PANIC("TASK %d RAN PAST IT'S STACK LIMIT", task_getTid(task));
+    }
+
+    int old_avg = value_store->values[VALUE_STACK_AVG];
+    int old_max = value_store->values[VALUE_STACK_MAX];
+
+    if (size > old_max) {
+        value_store->values[VALUE_STACK_MAX] = size;
+    }
+
+    int alpha = 50;
+    value_store->values[VALUE_STACK_AVG] = (size * alpha) / 100 + (old_avg * (100-alpha) / 100);
 }
 
 void fut(){
     LOG("First User Task: Start\r\n");
     StoreValue(VALUE_IDLE, 0); // init idle value
+    StoreValue(VALUE_STACK_AVG, 0); // init avg task stack size
+    StoreValue(VALUE_STACK_MAX, 0); // init max task stack size
     Create(PRIORITY_WAREHOUSE, &task_nameserver);
     Create(PRIORITY_WAREHOUSE, &task_clockserver);
     init_uart_servers();
@@ -100,13 +109,6 @@ void fut(){
     Create(PRIORITY_HIGH, &task_terminal);
     Create(PRIORITY_HIGH, &task_sensor_server);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_switch_courier, cmdtid);
-}
-
-void check_stack_size(TD *task) {
-    int stack_limit = STACK_SPACE_SIZE/TASK_POOL_SIZE - 4;
-    if (task_get_stack_size(task) >= stack_limit) {
-        PANIC("TASK %d RAN PAST IT'S STACK LIMIT", task_getTid(task));
-    }
 }
 
 int main(){
@@ -131,11 +133,14 @@ int main(){
 //    bwprintf(COM2, "%d -> %d, %d -> %d\r\n", stack_space, stack_space + STACK_SPACE_SIZE, task_pool, task_pool + TASK_POOL_SIZE);
 
     TaskQueue task_ready_queue;
+    task_ready_queue.task_pool = task_pool;
+    ValueStore value_store = {{0}};
 
-    task_init(task_pool, &task_ready_queue, stack_space, STACK_SPACE_SIZE);
+    task_init(&task_ready_queue, stack_space, STACK_SPACE_SIZE);
 
     int err = task_create(&task_ready_queue, 1, 4, (int) &fut, 0);
     ASSERT(err == 0, "FATAL ERROR: Could not create First User Task");
+
     LOG("Task Created!\r\n");
     LOGF("&fut: %x\r\n", (int) &fut);
 
@@ -154,9 +159,9 @@ int main(){
         f = activate((int) task);
         task->last_syscall = f;
 
-        check_stack_size(task);
+        update_stack_size_metric(task, &value_store);
 
-        handle(f, task, task_pool, &task_ready_queue);
+        handle(f, task, &task_ready_queue, &value_store);
         LOG("\r\n");
         task = schedule(&task_ready_queue);
     }

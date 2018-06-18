@@ -41,14 +41,18 @@ static inline void cursor_to_position(struct circlebuffer *cb, int line, int col
 
 static void output_base_terminal(Terminal *t) {
     circlebuffer_t *cb = &t->output;
-    cb_write_string(cb, "\033[2J\033[0;0H");
+    cb_write_string(cb, "\033[2J\033[3g\033[0;0H");
     int i;
     cursor_to_position(cb, t->input_line, t->input_col);
-    cb_write_string(cb, "> ");
+    cb_write_string(cb, "\033H> ");
     t->input_col+= 2;
+
     cursor_to_position(cb, 27, 1);
-    cb_write_string(cb, "\r\n\n\n\n\n");
     cb_write_string(cb, "IDLE: \r\n");
+    cb_write_string(cb, "STK_LIM: ");
+    cb_write_number(cb, STACK_SPACE_SIZE/TASK_POOL_SIZE - 4, 16);
+    cb_write_string(cb, "\r\nSTK_AVG: \r\n");
+    cb_write_string(cb, "STK_MAX: \r\n");
 
     cursor_to_position(cb, 5, 1);
     for (i = 1; i <= 18; i++) {
@@ -199,6 +203,7 @@ void task_terminal() {
     CreateWithArgument(PRIORITY_HIGH, &task_terminal_command_parser, mytid);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_terminal_courier, mytid);
     CreateWithArgument(PRIORITY_LOW, &task_clockprinter, mytid);
+    CreateWithArgument(PRIORITY_LOW, &task_stack_metric_printer, mytid);
 
     char cb_terminal_buf[CB_TERMINAL_BUF_SIZE];
     circlebuffer_t cb_terminal;
@@ -230,18 +235,19 @@ void task_terminal() {
         }
         case(TERMINAL_NEWLINE):
         {
-            cursor_to_position(&t.output, t.input_line, TERMINAL_INPUT_BASE_COL);
-            cb_write_string(&t.output, "  ");
+            //wipe the prompt, and move down one line (NOT changing our column!)
+            cb_write_string(&t.output, "\r\t  \n");
             t.input_line++;
             if (t.input_line >= TERMINAL_INPUT_MAX_LINE) {
                 t.input_line = TERMINAL_INPUT_BASE_LINE;
+                cursor_to_position(&t.output, t.input_line, TERMINAL_INPUT_BASE_COL+2);
             }
-            cursor_to_position(&t.output, t.input_line, TERMINAL_INPUT_BASE_COL);
-            cb_write_string(&t.output, "> \0337");
+            //wipe the previous command
             for (int i = TERMINAL_INPUT_BASE_COL+2; i < TERMINAL_INPUT_MAX_COL; i++) {
                 cb_write(&t.output, ' ');
             }
-            cb_write_string(&t.output, "\0338");
+            //write the prompt
+            cb_write_string(&t.output, "\r\t> ");
             break;
         }
         case(TERMINAL_SENSOR):
@@ -269,7 +275,8 @@ void task_terminal() {
         }
         case (TERMINAL_TIME):
         {
-            int time_hundred_millis = tm.arg1; int idle = tm.arg2; 
+            int time_hundred_millis = tm.arg1, idle = tm.arg2; 
+            
             cb_write_string(&t.output, "\0337\033[2;2H");
             int m = time_hundred_millis % 10;
             time_hundred_millis /= 10;
@@ -285,9 +292,27 @@ void task_terminal() {
             cb_write_number(&t.output, ss, 10);
             cb_write(&t.output, ':');
             cb_write_number(&t.output, m, 10);
-            cb_write_string(&t.output, "\033[32;7H");
+
+            cb_write_string(&t.output, "\033[27;7H");
             cb_write_number(&t.output, idle, 10);
+
             cb_write_string(&t.output, "%\0338");
+            break;
+        }
+        case (TERMINAL_STACK_METRICS):
+        {
+            int avg_stack = tm.arg1, max_stack = tm.arg2;
+            cb_write_string(&t.output, "\0337");
+
+            cursor_to_position(&t.output, 29, 10);
+            cb_write_number(&t.output, avg_stack, 16);
+            cb_write_string(&t.output, "   ");
+
+            cursor_to_position(&t.output, 30, 10);
+            cb_write_number(&t.output, max_stack, 16);
+            cb_write_string(&t.output, "   ");
+
+            cb_write_string(&t.output, "\0338");
             break;
         }
         case(TERMINAL_NOTIFY_COURIER):
