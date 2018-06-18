@@ -46,7 +46,7 @@ The activation code is in \verb|asm/activate.s|. To activate a task, the followi
 \begin{enumerate}
 \item Kernel registers $4-12, lr$ are saved onto the stack. Then, the CPSR is saved onto the kernel stack, as well as $r0$ (the argument containing the task struct).
 \item CSPR\_usr is loaded from the task struct, and SPSR\_svc is set to it (so that movs will return it to user mode).
-\item Tthe LR from the task struct is loaded into lr\_svc, and the return value from the task struct is loaded into $r0$.
+\item The LR from the task struct is loaded into lr\_svc, and the return value from the task struct is loaded into $r0$.
 \item The kernel switches to System mode, reloads the user stack pointer, and then reloads user registers $r4-r12, lr$.
 \item \verb|movs pc, lr| is called, to complete the context switch into user code.
 \end{enumerate}
@@ -189,7 +189,7 @@ The commands work in the following way:
 \item[rv] The bytes to reduce the speed to 0 is sent to the server. Then, a short-lived task is spawned which waits the calculated stopping time ($75 + 350(15 - s)$, where $s$ is the current speed).
 This stopping time is a simple linear approximation.
 After the delay, a notifier to sent the reverse command is sent to the server. Then, after another $100$ms delay, a notifiaction to re-accelerate the train is sent.
-\item[sw] A Solenoid Notifier task exist, which loops forever, delaying for $170$ ($150$ plus a small buffer) milliseconds before notifying the server. 
+\item[sw] A Solenoid Notifier task exists, which loops forever, delaying for $170$ ($150$ plus a small buffer) milliseconds before notifying the server. 
 When a sw command is sent, it is added to the switch buffer. 
 Every time the server recieves a solenoid notification, it checks if there is a switch in the buffer. 
 If so, it sends the switch command, and replies to the notifier. 
