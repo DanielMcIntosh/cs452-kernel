@@ -63,7 +63,7 @@ void task_idle() {
         int time_end = clk4->value_low;
         int time_total = time_end - time_start;
         int percent_idle = 157280 * 100 / time_total;
-        movingavg = (percent_idle * alpha) / 100 + (movingavg * (100-alpha) / 100);
+        movingavg = MOVING_AVERAGE(percent_idle, movingavg, alpha);
         StoreValue(VALUE_IDLE, movingavg);
     }
 }
@@ -92,7 +92,7 @@ void update_stack_size_metric(TD *task, ValueStore *value_store) {
     }
 
     int alpha = 50;
-    value_store->values[VALUE_STACK_AVG] = (size * alpha) / 100 + (old_avg * (100-alpha) / 100);
+    value_store->values[VALUE_STACK_AVG] = MOVING_AVERAGE(size, old_avg, alpha);
 }
 
 void fut(){

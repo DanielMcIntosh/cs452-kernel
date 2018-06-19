@@ -6,7 +6,10 @@
 
 #define FOREVER for(;;)
 #define STACK_SPACE_SIZE 0x800000
+
 #define NUM_TRAINS 80
+#define NUM_SWITCHES 22
+#define NUM_SENSORS (16 * 5)
 
 #define DUMPR(x) "mov r0, #1\n\tmov r1, "x"\n\t bl bwputr\n\t"
 

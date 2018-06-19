@@ -18,8 +18,6 @@
 #define SENSOR_LINE_BASE 2
 #define SENSOR_LINE_MAX 24
 
-#define NUM_SWITCHES 30
-
 #define NAME_TERMINAL "term"
 
 typedef enum terminalrequest {

@@ -10,6 +10,7 @@
 #include <clock.h>
 #include <terminal.h>
 #include <circlebuffer.h>
+#include <train.h>
 
 typedef struct commandmessage{
     MessageType type;
@@ -24,6 +25,8 @@ typedef struct commandserver{
     int courier_arg;
     int train_states[NUM_TRAINS];
     int train_speeds[NUM_TRAINS];
+
+    // ALSO TODO: We'll never have more than like 5, so making this with all 80 might be unneccesary?
     circlebuffer_t *cb_switches;
 } CommandServer;
 

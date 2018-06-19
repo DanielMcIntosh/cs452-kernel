@@ -1,0 +1,99 @@
+#include <track_state.h>
+#include <train.h>
+#include <switch.h>
+#include <sensor.h>
+#include <err.h>
+#include <kernel.h>
+#include <message.h>
+#include <syscall.h>
+#include <debug.h>
+
+typedef struct track{
+    int track;
+    Train trains[NUM_TRAINS];
+    Switch switches[NUM_SWITCHES];
+    Sensor sensors[NUM_SENSORS];
+} TrackState;
+
+typedef struct tsmessage{
+    MessageType type;
+    TrackStateRequest request;
+    long long data;
+} TrackStateMessage;
+
+void init_track_state(TrackState *ts, int track){
+    ts->track = track;
+    Train init_train = {0, FORWARD, 0, 0, 0, 0};
+    Sensor init_sensor = {{0}, SENSOR_OFF, 0};
+    Switch init_switch = {SWITCH_STRAIGHT};
+    for (int i = 0; i < NUM_TRAINS; i++){
+        ts->trains[i] = init_train;
+    }
+    for (int i = 0; i < NUM_SENSORS; i++){
+        ts->sensors[i] = init_sensor;
+        ts->sensors[i].name[0] = 'A' + i/16;
+        ts->sensors[i].name[1] = '0' + ((i%16) / 10);
+        ts->sensors[i].name[2] = '0' + ((i%16) % 10);
+        ts->sensors[i].name[3] = 0;
+    }
+    for (int i = 0; i < NUM_SWITCHES; i++){
+        ts->switches[i] = init_switch;
+    }
+}
+
+void task_track_state(int track){
+
+    TrackState ts;
+    init_track_state(&ts, track);
+
+    TrackStateMessage tm;
+    ReplyMessage rm = {MESSAGE_REPLY, 0};
+    int tid;
+
+    FOREVER{
+        Receive(&tid, &tm, sizeof(tm));
+        Reply(tid, &rm, sizeof(rm));
+        switch (tm.request){
+        case (TRAIN_SPEED):
+        {
+            rm.ret = ts.trains[(int) tm.data].speed;
+            break;
+        }
+        case (SWITCH):
+        {
+            rm.ret = ts.switches[(int) tm.data].state;
+            break;
+        }
+        case (SENSOR):
+        {
+            rm.ret = ts.sensors[(int) tm.data].state;
+            break;
+        }
+
+        case (NOTIFY_SENSOR_DATA):
+        {
+            
+            break;
+        }
+        case (NOTIFY_TRAIN_SPEED):
+        {
+            ts.trains[(int) (tm.data >> 32)].speed = (int) (tm.data & 0xFFFF); // unpack train speed; TODO struct?
+            break;
+        }
+        case (NOTIFY_TRAIN_DIRECTION):
+        {
+            ts.trains[(int) (tm.data >> 32)].direction = (int) (tm.data & 0xFFFF); // unpack train direction; TODO struct?
+            break;
+        }
+        case (NOTIFY_SWITCH):
+        {
+            ts.switches[(int) (tm.data >> 32)].state = (int) (tm.data & 0xFFFF); // unpack train direction; TODO struct?
+            break;
+        }
+        default:
+        {
+            PANIC("Track State Server: Unhandled request type: %d", tm.request);
+        }
+        }
+    }
+}

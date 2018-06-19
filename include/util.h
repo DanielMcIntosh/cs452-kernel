@@ -28,5 +28,9 @@ void * memcpy(void * dest, const void* src, unsigned int sz);
 #define CLAMP(X, Y, Z) (((X) > (Y)) ? (Y) : (((X) < (Z)) ? (Z) : (X)))
 #endif
 
+#ifndef MOVING_AVERAGE
+#define MOVING_AVERAGE(N, O, A) ((A)*(N)/100 + (100-(A))*(O)/100)
+#endif
+
 
 #endif
