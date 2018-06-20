@@ -15,6 +15,7 @@
 #include <uart.h>
 #include <terminal.h> 
 #include <command.h>
+#include <track_state.h>
 
 extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
@@ -107,6 +108,7 @@ void fut(){
     int cmdtid = Create(PRIORITY_HIGH, &task_commandserver);
     Create(PRIORITY_HIGH, &task_terminal);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_switch_courier, cmdtid); // This is here because it must be created after both the command server and the terminal server, but with a higher priority compared to both.
+    CreateWithArgument(PRIORITY_HIGH, &task_track_state, TRACK_A);
 }
 
 int main(){

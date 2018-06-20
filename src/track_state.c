@@ -7,6 +7,8 @@
 #include <message.h>
 #include <syscall.h>
 #include <debug.h>
+#include <terminal.h>
+#include <name.h>
 
 typedef struct track{
     int track;
@@ -20,6 +22,11 @@ typedef struct tsmessage{
     TrackStateRequest request;
     long long data;
 } TrackStateMessage;
+
+typedef union snsrunion{
+    SensorData fields;
+    long bits;
+} SensorUnion;
 
 void init_track_state(TrackState *ts, int track){
     ts->track = track;
@@ -41,7 +48,18 @@ void init_track_state(TrackState *ts, int track){
     }
 }
 
+int NotifySensorData(int trackstatetid, SensorData data){
+    SensorUnion u = { .fields = data };
+    TrackStateMessage msg = {MESSAGE_TRACK_STATE, NOTIFY_SENSOR_DATA, u.bits};
+    ReplyMessage rm;
+
+    int r = Send(trackstatetid, &msg, sizeof(msg), &rm, sizeof(rm));
+    return (r >= 0 ? rm.ret : r);
+}
+
 void task_track_state(int track){
+    RegisterAs(NAME_TRACK_STATE);
+    int puttid = WhoIs(NAME_TERMINAL);
 
     TrackState ts;
     init_track_state(&ts, track);
@@ -72,7 +90,20 @@ void task_track_state(int track){
 
         case (NOTIFY_SENSOR_DATA):
         {
-            
+            SensorUnion u = { .bits = tm.data};
+            SensorData f = u.fields;
+            int k = 1 << 15;
+            for (int i = 1; i <= 16; i++, k >>= 1){
+                if (f.data & k) {
+                    if (!(ts.sensors[16 * f.radix + i].state == SENSOR_ON)){
+                        ts.sensors[16 * f.radix + i].state = SENSOR_ON;
+                        SendTerminalRequest(puttid, TERMINAL_SENSOR, 'A'+f.radix, i); // TODO courier
+                    }
+                } else {
+                    ts.sensors[16 * f.radix + i].state = SENSOR_OFF;
+                }
+                ts.sensors[16 * f.radix + i].lastTriggeredTime = f.time;
+            }
             break;
         }
         case (NOTIFY_TRAIN_SPEED):

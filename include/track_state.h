@@ -6,7 +6,7 @@
 #define TRACK_B 0
 
 typedef struct sensordata {
-    int radix: 4;
+    unsigned int radix: 4;
     unsigned int data: 16;
     int time: 32;
 } __attribute__((packed)) SensorData;
@@ -28,6 +28,6 @@ void task_track_state();
 
 void requestTrackState(); // TODO
 
-void notifySensorData(int trackstatetid, SensorData data); // TODO
+int NotifySensorData(int trackstatetid, SensorData data);
 
 #endif

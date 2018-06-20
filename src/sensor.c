@@ -9,11 +9,12 @@
 #include <command.h>
 #include <debug.h>
 #include <terminal.h>
+#include <track_state.h>
 
 typedef struct sensorserver{
-    char sensor_status[81];
-    char sensor_data[10];
+    char sensor_data[2];
     int current_sensor_query;
+    int current_sensor_radix;
     int query_complete;
     int notifier_tid;
     int send_cm;
@@ -60,7 +61,8 @@ void task_sensor_courier(int servertid){
     CourierMessage cm = {0, {0, 0, 0}};
     int commandtid = WhoIs(NAME_COMMANDSERVER);
     FOREVER{
-        Send(servertid, &sm, sizeof(sm), &cm, sizeof(cm));
+        int err = Send(servertid, &sm, sizeof(sm), &cm, sizeof(cm));
+        ASSERT(err >= 0, "SEND ERROR");
         SendCommand(commandtid, cm.c);
     }
 }
@@ -68,13 +70,12 @@ void task_sensor_courier(int servertid){
 void task_sensor_server(){
     // concept: 2 notifiers - a timeout notifier, and a read notifier
     // server waits for bytes to be sent from com1; if it times out, we send it again
-    // not really happy with this design, but it works for now. Eventually, I'd like to use individual queries
-    SensorServer ss = {{0}, {0}, 0, 0, 0, 1};
+    SensorServer ss = {{0}, 0, 0, 0, 0, 1};
     SensorMessage sm;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
     CourierMessage cm = {MESSAGE_SENSOR_COURIER, {COMMAND_SENSOR_REQUEST, 0, 0}};
 
-    int mytid = MyTid(), puttid = WhoIs(NAME_TERMINAL),tid;
+    int mytid = MyTid(), puttid = WhoIs(NAME_TERMINAL),trackstatetid = WhoIs(NAME_TRACK_STATE), tid;
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_read_notifier, mytid);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_timeout_notifier, mytid);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_courier, mytid);
@@ -84,6 +85,7 @@ void task_sensor_server(){
         case SENSOR_COURIER:
         {
             if (ss.send_cm){
+                cm.c.arg1 = ss.current_sensor_radix;
                 Reply(tid, &cm, sizeof(cm));
                 ss.send_cm = 0;
             } else
@@ -92,11 +94,12 @@ void task_sensor_server(){
         }
         case SENSOR_TIMEOUT:
         {
-            rm.ret = 180;
+            rm.ret = 50;
             Reply(tid, &rm, sizeof(rm));
 
             if (!ss.query_complete){
                 if (ss.notifier_tid != 0){
+                    cm.c.arg1 = ss.current_sensor_radix;
                     Reply(ss.notifier_tid, &cm, sizeof(cm));
                     ss.notifier_tid = 0;
                 } else 
@@ -104,7 +107,6 @@ void task_sensor_server(){
 
                 ss.current_sensor_query = 0;
                 // TODO remember the off by 1 error from before? It never showed up, but i'm not sure what to do if it does.
-                // TODO switch to individual queries
             }
             ss.query_complete = 0;
             break;
@@ -114,41 +116,19 @@ void task_sensor_server(){
             rm.ret = 0;
             Reply(tid, &rm, sizeof(rm));
             ss.sensor_data[ss.current_sensor_query++] = sm.data; 
-            if (ss.current_sensor_query == 10) {
-                int i, j, k;
-                for (j = 0; j < 5; j++) {
-                    k = 128;
-                    for (i = 1; i <= 8; i++, k >>= 1 ) {
-                        if (ss.sensor_data[2*j] & k) { // ith sensor is active
-                            if (!ss.sensor_status[(2 * j) * 8 + i]) {
-                                SendTerminalRequest(puttid, TERMINAL_SENSOR, 'A'+j, i);
-                                ss.sensor_status[(2 * j) * 8 + i] = 1;
-                            }
-                        } else {
-                            ss.sensor_status[(2 * j) * 8 + i] = 0;
-                        }
-                    }
-                    k = 128;
-                    for (i = 1; i <= 8; i++, k >>= 1 ) {
-                        if (ss.sensor_data[2*j+1] & k) { // ith sensor is active
-                            if (!ss.sensor_status[(2*j)*8 + i + 8]) {
-                                SendTerminalRequest(puttid, TERMINAL_SENSOR, 'A'+j, 8+i);
-                                ss.sensor_status[(2*j)*8 + i + 8] = 1;
-                            }
-                        } else {
-                            ss.sensor_status[(2*j)*8 + i + 8] = 0;
-                        }
-                    }
-                }
+            if (ss.current_sensor_query == 2) {
+                SensorData s = {ss.current_sensor_radix, (ss.sensor_data[0] << 8) | ss.sensor_data[1], Time()};
+                NotifySensorData(trackstatetid, s);
 
+                ss.current_sensor_query = 0;
+                ss.current_sensor_radix = (ss.current_sensor_radix + 1) % 5;
+                ss.query_complete = 1;
                 if (ss.notifier_tid != 0){
+                    cm.c.arg1 = ss.current_sensor_radix;
                     Reply(ss.notifier_tid, &cm, sizeof(cm));
                     ss.notifier_tid = 0;
                 } else 
                     ss.send_cm = 1;
-
-                ss.current_sensor_query = 0;
-                ss.query_complete = 1;
             }
             break;
         }
