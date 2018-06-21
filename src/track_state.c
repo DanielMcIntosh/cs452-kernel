@@ -9,12 +9,16 @@
 #include <debug.h>
 #include <terminal.h>
 #include <name.h>
+#include <track_data.h>
+#include <util.h>
+
 
 typedef struct track{
-    int track;
+    int track_number;
     Train trains[NUM_TRAINS];
     Switch switches[NUM_SWITCHES];
     Sensor sensors[NUM_SENSORS];
+    track_node track[TRACK_MAX];
 } TrackState;
 
 typedef struct tsmessage{
@@ -28,8 +32,13 @@ typedef union snsrunion{
     long long bits;
 } SensorUnion;
 
+typedef union swunion{
+    SwitchData fields;
+    long long bits;
+} SwitchUnion;
+
 void init_track_state(TrackState *ts, int track){
-    ts->track = track;
+    ts->track_number = track;
     Train init_train = {0, FORWARD, 0, 0, 0, 0};
     Sensor init_sensor = {{0}, SENSOR_OFF, 0};
     Switch init_switch = {SWITCH_STRAIGHT};
@@ -46,14 +55,61 @@ void init_track_state(TrackState *ts, int track){
     for (int i = 0; i < NUM_SWITCHES; i++){
         ts->switches[i] = init_switch;
     }
+    if (track == TRACK_A)
+        init_tracka(ts->track);
+    else
+        init_trackb(ts->track);
+}
+
+static track_node* predict_next_sensor(TrackState *ts, track_node *last_sensor, int *distance){
+    // basic plan for this: linked list search: follow state given by TrackState
+    // Stop when another sensor is found
+
+    track_node *n = last_sensor->edge[DIR_AHEAD].dest;
+    *distance = last_sensor->edge[DIR_AHEAD].dist;
+    while (n != NULL && n->type != NODE_SENSOR){
+        switch (n->type) {
+        case (NODE_BRANCH):
+        {
+            n = n->edge[STATE_TO_DIR(ts->switches[SWCLAMP(n->num)].state)].dest;
+            *distance += n->edge[STATE_TO_DIR(ts->switches[SWCLAMP(n->num)].state)].dist;
+            break;
+        }
+        case (NODE_ENTER):
+        case (NODE_EXIT):
+        case (NODE_MERGE):
+        {
+            n = n->edge[DIR_AHEAD].dest;
+            *distance += n->edge[DIR_AHEAD].dist;
+            break;
+        }
+        default:
+        {
+            PANIC("INVALID TRACK NODE TYPE: %d", n->type);
+        }
+        }
+    }
+    ASSERT(n == NULL || n->type == NODE_SENSOR, "While Loop broken early");
+
+    return n;
+}
+
+static inline int notifyTrackState(int trackstatetid, TrackStateRequest rq, long long data){
+    TrackStateMessage msg = {MESSAGE_TRACK_STATE, rq, data};
+    ReplyMessage rm;
+    int r = Send(trackstatetid, &msg, sizeof(msg), &rm, sizeof(rm));
+    return (r >= 0 ? rm.ret : r);
 }
 
 int NotifySensorData(int trackstatetid, SensorData data){
     SensorUnion u = { .fields = data };
-    TrackStateMessage msg = {MESSAGE_TRACK_STATE, NOTIFY_SENSOR_DATA, u.bits};
-    ReplyMessage rm;
-    int r = Send(trackstatetid, &msg, sizeof(msg), &rm, sizeof(rm));
-    return (r >= 0 ? rm.ret : r);
+    return notifyTrackState(trackstatetid, NOTIFY_SENSOR_DATA, u.bits);
+
+}
+
+int NotifySwitchStatus(int trackstatetid, SwitchData data){
+    SwitchUnion u = {.fields = data};
+    return notifyTrackState(trackstatetid, NOTIFY_SWITCH, u.bits);
 }
 
 void task_track_state(int track){
@@ -97,6 +153,17 @@ void task_track_state(int track){
                     if (!(ts.sensors[16 * f.radix + i].state == SENSOR_ON)){
                         ts.sensors[16 * f.radix + i].state = SENSOR_ON;
                         SendTerminalRequest(puttid, TERMINAL_SENSOR, f.radix << 16 | i, f.time); // TODO courier
+                        track_node *c = &(ts.track[SENSOR_TO_NODE(f.radix, i)]); // last known train position
+                        int distance;
+                        track_node *n = predict_next_sensor(&ts, c, &distance); // next predicted train position
+                        if (n != NULL) {
+                            for (int i = 0; n->name[i] != NULL; i++){
+                                SendTerminalRequest(puttid, TERMINAL_ECHO, n->name[i], 0);
+                            }
+                            SendTerminalRequest(puttid, TERMINAL_NEWLINE, 0, 0);
+                        }
+                        // TODO: this process might eventually take too long to happen here - delegate it to another process at some point?
+
                     }
                 } else {
                     ts.sensors[16 * f.radix + i].state = SENSOR_OFF;
@@ -107,7 +174,7 @@ void task_track_state(int track){
         }
         case (NOTIFY_TRAIN_SPEED):
         {
-            ts.trains[(int) (tm.data >> 32)].speed = (int) (tm.data & 0xFFFF); // unpack train speed; TODO struct?
+            ts.trains[(int) (tm.data >> 32)].speed = (int) (tm.data & 0xFFFF); // unpack train speed; TODO struct? (realistically, clean up all of the bit packing adventures - this is bad code)
             break;
         }
         case (NOTIFY_TRAIN_DIRECTION):
@@ -117,7 +184,8 @@ void task_track_state(int track){
         }
         case (NOTIFY_SWITCH):
         {
-            ts.switches[(int) (tm.data >> 32)].state = (int) (tm.data & 0xFFFF); // unpack train direction; TODO struct?
+            SwitchUnion u = { .bits = tm.data};
+            ts.switches[SWCLAMP(u.fields.sw)].state = u.fields.state;
             break;
         }
         default:

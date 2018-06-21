@@ -2,14 +2,23 @@
 #define TRACK_STATE_H
 
 #define NAME_TRACK_STATE "state"
-#define TRACK_A 0
+#define TRACK_A 1
 #define TRACK_B 0
+
+#define SENSOR_TO_NODE(r, s) (16 * (r) + (s) - 1)
+#define STATE_TO_DIR(s) ((s) == SWITCH_STRAIGHT ? DIR_STRAIGHT : DIR_CURVED)
+#define SWCLAMP(c) ((c) > 18 ? (c) - 134 : (c))
 
 typedef struct sensordata {
     unsigned int radix: 4;
     unsigned int data: 16;
     unsigned int time: 32;
 } __attribute__((packed)) SensorData;
+
+typedef struct switchdata{
+    unsigned int state: 4;
+    unsigned int sw: 32;
+} __attribute__((packed)) SwitchData;
 
 typedef enum tsrequest{
     TRAIN_SPEED, // TODO other requests
@@ -29,5 +38,6 @@ void task_track_state();
 void requestTrackState(); // TODO
 
 int NotifySensorData(int trackstatetid, SensorData data);
+int NotifySwitchStatus(int trackstatetid, SwitchData data);
 
 #endif

@@ -11,6 +11,8 @@
 #include <terminal.h>
 #include <circlebuffer.h>
 #include <train.h>
+#include <track_state.h>
+#include <switch.h>
 
 typedef struct commandmessage{
     MessageType type;
@@ -24,9 +26,7 @@ typedef struct commandserver{
     int courier_waiting;
     int courier_arg;
     int train_states[NUM_TRAINS];
-    int train_speeds[NUM_TRAINS];
-
-    // ALSO TODO: We'll never have more than like 5, so making this with all 80 might be unneccesary?
+    int train_speeds[NUM_TRAINS]; // TODO move this data to track_state.h?
     circlebuffer_t *cb_switches;
 } CommandServer;
 
@@ -91,6 +91,8 @@ void task_switch_courier(int cmdtid){
 static inline void commandserver_exec_switch(CommandServer *cs, int arg1, int arg2, ReplyMessage *rm, int servertid){
     Putc(servertid, 1, arg1 == 'C' ? 34 : 33);
     Putc(servertid, 1, arg2);
+    SwitchData sd = {arg1 == 'C' ? SWITCH_CURVED : SWITCH_STRAIGHT, arg2};
+    NotifySwitchStatus(WhoIs(NAME_TRACK_STATE), sd); // TODO store tid value
     cs->solenoid_off = 0;
     if (cs->courier_waiting != 0){
         rm->ret = (arg1 << 16) | arg2;
