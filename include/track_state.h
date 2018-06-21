@@ -39,5 +39,6 @@ void requestTrackState(); // TODO
 
 int NotifySensorData(int trackstatetid, SensorData data);
 int NotifySwitchStatus(int trackstatetid, SwitchData data);
+int GetSwitchState(int trackstatetid, int sw);
 
 #endif

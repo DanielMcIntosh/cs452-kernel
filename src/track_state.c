@@ -94,23 +94,27 @@ static track_node* predict_next_sensor(TrackState *ts, track_node *last_sensor, 
     return n;
 }
 
-static inline int notifyTrackState(int trackstatetid, TrackStateRequest rq, long long data){
+static inline int sendTrackState(int trackstatetid, TrackStateRequest rq, long long data){
     TrackStateMessage msg = {MESSAGE_TRACK_STATE, rq, data};
     ReplyMessage rm;
     int r = Send(trackstatetid, &msg, sizeof(msg), &rm, sizeof(rm));
     return (r >= 0 ? rm.ret : r);
 }
-
 int NotifySensorData(int trackstatetid, SensorData data){
     SensorUnion u = { .fields = data };
-    return notifyTrackState(trackstatetid, NOTIFY_SENSOR_DATA, u.bits);
+    return sendTrackState(trackstatetid, NOTIFY_SENSOR_DATA, u.bits);
 
 }
 
 int NotifySwitchStatus(int trackstatetid, SwitchData data){
     SwitchUnion u = {.fields = data};
-    return notifyTrackState(trackstatetid, NOTIFY_SWITCH, u.bits);
+    return sendTrackState(trackstatetid, NOTIFY_SWITCH, u.bits);
 }
+
+int GetSwitchState(int trackstatetid, int sw){
+    return sendTrackState(trackstatetid, SWITCH, sw);
+}
+    
 
 void task_track_state(int track){
     RegisterAs(NAME_TRACK_STATE);

@@ -68,6 +68,7 @@ static void output_base_terminal(Terminal *t) {
     }
     cursor_to_position(cb, t->input_line, t->input_col);
 }
+
 static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
     char c;
     if (cb_empty(cb_input)) {
@@ -141,6 +142,19 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
         if (c != 'o')
             break;
         cmd->type = COMMAND_GO;
+        return 0;
+    case 'i': // inv
+        if (cb_empty(cb_input))
+            break;
+        cb_read(cb_input, &c);
+        if (c != 'n')
+            break;
+        if (cb_empty(cb_input))
+            break;
+        cb_read(cb_input, &c);
+        if (c != 'v')
+            break;
+        cmd->type = COMMAND_INV;
         return 0;
     default:
         break;

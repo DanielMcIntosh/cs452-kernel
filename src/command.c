@@ -191,6 +191,27 @@ void task_commandserver(){
             }
             break;
         }
+        case COMMAND_INV:
+        {
+            int i = 1;
+            int tid = WhoIs(NAME_TRACK_STATE);
+            if (cs.notifier_waiting) {
+                Reply(cs.notifier_waiting, &rm, sizeof(rm));
+                cs.notifier_waiting = 0;
+                commandserver_exec_switch(&cs, INV_STATE_TO_CHAR(GetSwitchState(tid, i)), i, &rm, servertid);
+                i++;
+            } 
+
+            for (; i <= 18; i++) {
+                cb_write(cs.cb_switches, INV_STATE_TO_CHAR(GetSwitchState(tid, i)));
+                cb_write(cs.cb_switches, i);
+            }
+            for (int y = 153; y <= 155; y++) {
+                cb_write(cs.cb_switches, INV_STATE_TO_CHAR(GetSwitchState(tid, y)));
+                cb_write(cs.cb_switches, y);
+            }
+            break;
+        }
         case COMMAND_QUIT:
         {
             Quit();
