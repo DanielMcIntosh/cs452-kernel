@@ -75,7 +75,7 @@ void task_sensor_server(){
     ReplyMessage rm = {MESSAGE_REPLY, 0};
     CourierMessage cm = {MESSAGE_SENSOR_COURIER, {COMMAND_SENSOR_REQUEST, 0, 0}};
 
-    int mytid = MyTid(), puttid = WhoIs(NAME_TERMINAL),trackstatetid = WhoIs(NAME_TRACK_STATE), tid;
+    int mytid = MyTid(), trackstatetid = WhoIs(NAME_TRACK_STATE), tid;
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_read_notifier, mytid);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_timeout_notifier, mytid);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_courier, mytid);

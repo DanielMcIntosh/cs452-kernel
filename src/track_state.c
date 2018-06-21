@@ -25,7 +25,7 @@ typedef struct tsmessage{
 
 typedef union snsrunion{
     SensorData fields;
-    long bits;
+    long long bits;
 } SensorUnion;
 
 void init_track_state(TrackState *ts, int track){
@@ -52,7 +52,6 @@ int NotifySensorData(int trackstatetid, SensorData data){
     SensorUnion u = { .fields = data };
     TrackStateMessage msg = {MESSAGE_TRACK_STATE, NOTIFY_SENSOR_DATA, u.bits};
     ReplyMessage rm;
-
     int r = Send(trackstatetid, &msg, sizeof(msg), &rm, sizeof(rm));
     return (r >= 0 ? rm.ret : r);
 }
@@ -97,7 +96,7 @@ void task_track_state(int track){
                 if (f.data & k) {
                     if (!(ts.sensors[16 * f.radix + i].state == SENSOR_ON)){
                         ts.sensors[16 * f.radix + i].state = SENSOR_ON;
-                        SendTerminalRequest(puttid, TERMINAL_SENSOR, 'A'+f.radix, i); // TODO courier
+                        SendTerminalRequest(puttid, TERMINAL_SENSOR, f.radix << 16 | i, f.time); // TODO courier
                     }
                 } else {
                     ts.sensors[16 * f.radix + i].state = SENSOR_OFF;

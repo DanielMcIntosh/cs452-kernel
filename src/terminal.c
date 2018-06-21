@@ -254,12 +254,19 @@ void task_terminal() {
         }
         case(TERMINAL_SENSOR):
         {
+            char radix = tm.arg1 >> 16;
+            int snsr = tm.arg1 & 0xFF; // unpack arg1;
             cb_write_string(&t.output, "\0337");
             cursor_to_position(&t.output, t.sensor_line, SENSOR_COL_BASE);
             cb_write_string(&t.output, "    ");
             cursor_to_position(&t.output, t.sensor_line, SENSOR_COL_BASE);
-            cb_write(&t.output, tm.arg1);
+            cb_write(&t.output, 'A' + radix);
+            if (snsr < 10)
+                cb_write(&t.output, '0');
+            cb_write_number(&t.output, snsr, 10);
+            cb_write_string(&t.output, " (");
             cb_write_number(&t.output, tm.arg2, 10);
+            cb_write(&t.output, ')');
             t.sensor_line++;
             if (t.sensor_line > SENSOR_LINE_MAX) {
                 t.sensor_line = SENSOR_LINE_BASE;

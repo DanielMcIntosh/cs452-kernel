@@ -106,7 +106,7 @@ int cb_write_number(struct circlebuffer *cb, unsigned int num, unsigned int base
         num %= d;
         d /= base;
         if (n || dgt > 0 || d == 0) {
-            int err = cb_write(cb, dgt + ( dgt < 10 ? '0' : 'A' - 10));
+            int err = cb_write(cb, dgt + ( dgt < 10 ? '0' : ('A' - 10)));
             if (err) {
                 return err;
             }
