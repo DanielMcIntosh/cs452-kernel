@@ -40,13 +40,43 @@ int SendCommand(int servertid, Command c){
 
 static void init_switches(CommandServer *cs){
     ASSERT(cb_empty(cs->cb_switches), "Cannot init non-empty cb");
+
+    char SWITCH_INIT_STATES[] = {
+        [1] = 'C', 
+        [2] = 'C',
+        [3] = 'C',
+        [4] = 'C',
+        [5] = 'C',
+        [6] = 'C',
+        [7] = 'C',
+        [8] = 'S',
+        [9] = 'C',
+        [10] = 'C',
+        [11] = 'C',
+        [12] = 'C',
+        [13] = 'C',
+        [14] = 'S',
+        [15] = 'C',
+        [16] = 'C',
+        [17] = 'C',
+        [18] = 'C',
+        [153] = 'C',
+        [154] = 'S',
+        [155] = 'C',
+        [156] = 'S',
+        [157] = 'C',
+        [158] = 'S',
+        [159] = 'C',
+        [160] = 'S'
+    };
+
     for (int i = 1; i <= 18; i++){
-        cb_write(cs->cb_switches, 'C');
+        cb_write(cs->cb_switches, SWITCH_INIT_STATES[i]);
         cb_write(cs->cb_switches, i);
     }
-    for (int i = 153; i <= 156; i++){
-        cb_write(cs->cb_switches, (i % 2 == 0 ? 'S' : 'C'));
-        cb_write(cs->cb_switches, i);
+    for (int y = 153; y <= 156; y++){
+        cb_write(cs->cb_switches, SWITCH_INIT_STATES[y]);
+        cb_write(cs->cb_switches, y);
     }
 }
 

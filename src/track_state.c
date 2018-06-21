@@ -123,6 +123,20 @@ void task_track_state(int track){
     ReplyMessage rm = {MESSAGE_REPLY, 0};
     int tid;
 
+    int predicted_velocity = 10; // TODO tie to train
+
+    int last_sensor = 0;
+    unsigned int last_sensor_time = 0;
+    int last_sensor_distance = 0;
+
+    int next_sensor = 0;
+    int next_sensor_predict_time = 0;
+
+    int last_error = 0;
+
+    int alpha = 5;
+    int VELOCITY_PRECISION = 10000;
+
     FOREVER{
         Receive(&tid, &tm, sizeof(tm));
         Reply(tid, &rm, sizeof(rm));
@@ -152,23 +166,34 @@ void task_track_state(int track){
                 if (f.data & k) {
                     if (!(ts.sensors[16 * f.radix + i].state == SENSOR_ON)){
                         ts.sensors[16 * f.radix + i].state = SENSOR_ON;
+                        ts.sensors[16 * f.radix + i].lastTriggeredTime = f.time;
                         SendTerminalRequest(puttid, TERMINAL_SENSOR, f.radix << 16 | i, f.time); // TODO courier
-                        track_node *c = &(ts.track[SENSOR_TO_NODE(f.radix, i)]); // last known train position
-                        int distance;
-                        track_node *n = predict_next_sensor(&ts, c, &distance); // next predicted train position
-                        if (n != NULL) {
-                            for (int i = 0; n->name[i] != NULL; i++){
-                                SendTerminalRequest(puttid, TERMINAL_ECHO, n->name[i], 0);
-                            }
-                            SendTerminalRequest(puttid, TERMINAL_NEWLINE, 0, 0);
-                        }
                         // TODO: this process might eventually take too long to happen here - delegate it to another process at some point?
 
+                        track_node *c = &(ts.track[SENSOR_TO_NODE(f.radix, i)]); // last known train position
+                        if (c->num == next_sensor) {
+                            last_error = predicted_velocity * (next_sensor_predict_time - last_sensor_time) / VELOCITY_PRECISION;
+                            if (last_error < 0) last_error *= -1;
+                            unsigned int dt = f.time - last_sensor_time;
+                            int new_velocity = last_sensor_distance * VELOCITY_PRECISION / dt;
+                            predicted_velocity = MOVING_AVERAGE(new_velocity, predicted_velocity, alpha);
+                        }
+                        
+                        int distance;
+                        track_node *n = predict_next_sensor(&ts, c, &distance); // next predicted train position
+
+                        next_sensor_predict_time = f.time + distance * VELOCITY_PRECISION / predicted_velocity;
+                        SendTerminalRequest(puttid, TERMINAL_SENSOR_PREDICT, next_sensor_predict_time, last_error);
+
+                        last_sensor = c->num;
+                        last_sensor_time = f.time;
+                        last_sensor_distance = distance;
+                        next_sensor = n->num;
                     }
                 } else {
                     ts.sensors[16 * f.radix + i].state = SENSOR_OFF;
                 }
-                ts.sensors[16 * f.radix + i].lastTriggeredTime = f.time;
+
             }
             break;
         }
