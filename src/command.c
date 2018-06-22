@@ -13,6 +13,7 @@
 #include <train.h>
 #include <track_state.h>
 #include <switch.h>
+#include <util.h>
 
 typedef struct commandmessage{
     MessageType type;
@@ -139,6 +140,7 @@ void task_commandserver(){
     int servertid = WhoIs(NAME_UART1_SEND), tid;
     CommandMessage cm;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
+    RouteMessage rom = {0, {{0}}};
     char switchQ_buf[SWITCHQ_BUF_SIZE];
     circlebuffer_t cb_switches;
     cb_init(&cb_switches, switchQ_buf, SWITCHQ_BUF_SIZE);
@@ -206,11 +208,31 @@ void task_commandserver(){
                 cb_write(cs.cb_switches, INV_STATE_TO_CHAR(GetSwitchState(tid, i)));
                 cb_write(cs.cb_switches, i);
             }
-            for (int y = 153; y <= 155; y++) {
+            for (int y = 153; y <= 156; y++) {
                 cb_write(cs.cb_switches, INV_STATE_TO_CHAR(GetSwitchState(tid, y)));
                 cb_write(cs.cb_switches, y);
             }
             break;
+        }
+        case COMMAND_ROUTE:
+        {
+
+            int err = GetRoute(WhoIs(NAME_TRACK_STATE), cm.command.arg1, cm.command.arg2, &rom);
+            ASSERT(err==0, "FAILED TO GET ROUTE");
+            for (int i = 1; i <= NUM_SWITCHES; i++) {
+                if (rom.switches[i].state != SWITCH_UNKNOWN){
+                    if (cs.notifier_waiting) {
+                        Reply(cs.notifier_waiting, &rm, sizeof(rm));
+                        cs.notifier_waiting = 0;
+                        commandserver_exec_switch(&cs, STATE_TO_CHAR(rom.switches[i].state),(i >= 18 ? i + 135 : i), &rm, servertid);
+                    }  else {
+                        cb_write(cs.cb_switches, STATE_TO_CHAR(rom.switches[i].state));
+                        cb_write(cs.cb_switches, (i >= 18 ? i + 135 : i)); 
+                    }
+                }
+            }
+            break;
+
         }
         case COMMAND_QUIT:
         {

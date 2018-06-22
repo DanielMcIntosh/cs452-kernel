@@ -4,7 +4,6 @@
 #define NAME_COMMANDSERVER "CMDS"
 // 2 arguments for each of the 22 switches + 2 extra as buffer space
 #define SWITCHQ_BUF_SIZE (2 *(22 + 2))
-#define INV_STATE_TO_CHAR(s) ((s) == SWITCH_STRAIGHT ? 'C' : 'S')
 
 /*
 typedef enum direction{
@@ -21,6 +20,7 @@ typedef enum cmdtype{
     COMMAND_SW,
     COMMAND_QUIT,
     COMMAND_INV,
+    COMMAND_ROUTE,
     NO_COMMAND,
     // PARTIAL COMMANDS
     COMMAND_NOTIFY_RV_ACCEL,

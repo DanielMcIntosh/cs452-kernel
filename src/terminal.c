@@ -156,6 +156,31 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
             break;
         cmd->type = COMMAND_INV;
         return 0;
+    case 'f': // find (TODO we need a better command parsing strategy)
+        if (cb_empty(cb_input))
+            break;
+        cb_read(cb_input, &c);
+        if (c != 'i')
+            break;
+        if (cb_empty(cb_input))
+            break;
+        cb_read(cb_input, &c);
+        if (c != 'n')
+            break;
+        if (cb_empty(cb_input))
+            break;
+        cb_read(cb_input, &c);
+        if (c != 'd')
+            break;
+        cb_read(cb_input, &c); // the space
+        cb_read(cb_input, &swarg); // RADIX
+        err = cb_read_number(cb_input, &number); // SW #
+        if (err)
+            break;
+        cmd->type = COMMAND_ROUTE;
+        cmd->arg1 = swarg;
+        cmd->arg2 = number;
+        return 0;
     default:
         break;
     }

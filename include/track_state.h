@@ -1,3 +1,6 @@
+#include <kernel.h>
+#include <switch.h>
+
 #ifndef TRACK_STATE_H
 #define TRACK_STATE_H
 
@@ -20,10 +23,16 @@ typedef struct switchdata{
     unsigned int sw: 32;
 } __attribute__((packed)) SwitchData;
 
+typedef struct routemessage{
+    int end_sensor;
+    Switch switches[NUM_SWITCHES+1];
+} RouteMessage;
+
 typedef enum tsrequest{
     TRAIN_SPEED, // TODO other requests
     SWITCH,
     SENSOR,
+    ROUTE,
 
     NOTIFY_SENSOR_DATA,
     NOTIFY_TRAIN_SPEED,
@@ -40,5 +49,6 @@ void requestTrackState(); // TODO
 int NotifySensorData(int trackstatetid, SensorData data);
 int NotifySwitchStatus(int trackstatetid, SwitchData data);
 int GetSwitchState(int trackstatetid, int sw);
+int GetRoute(int trackstatetid, char radix, int snsr, RouteMessage *rom);
 
 #endif

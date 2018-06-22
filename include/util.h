@@ -32,5 +32,7 @@ void * memcpy(void * dest, const void* src, unsigned int sz);
 #define MOVING_AVERAGE(N, O, A) ((A)*(N)/100 + (100-(A))*(O)/100)
 #endif
 
+#define STATE_TO_CHAR(s) ((s) == SWITCH_STRAIGHT ? 'S' : ((s) == SWITCH_UNKNOWN ? '?' : 'C'))
+#define INV_STATE_TO_CHAR(s) ((s) == SWITCH_STRAIGHT ? 'C' : ((s) == SWITCH_UNKNOWN ? '?' : 'S'))
 
 #endif

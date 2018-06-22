@@ -2,6 +2,7 @@
 #define SWITCH_H
 
 typedef enum switchstate{
+    SWITCH_UNKNOWN,
     SWITCH_STRAIGHT,
     SWITCH_CURVED
 } SwitchState;
