@@ -98,6 +98,13 @@ void update_stack_size_metric(TD *task, ValueStore *value_store) {
 
 void fut(){
     LOG("First User Task: Start\r\n");
+    // get any important values here
+    uart2->ctrl |= UARTEN_MASK;
+    bwputstr(COM2, "TRACK? [A/B] >> ");
+    char track = bwgetc(COM2);
+    for (volatile int i = 0; i < 55; i++);
+    uart2->ctrl &= ~UARTEN_MASK;
+
     StoreValue(VALUE_IDLE, 0); // init idle value
     StoreValue(VALUE_STACK_AVG, 0); // init avg task stack size
     StoreValue(VALUE_STACK_MAX, 0); // init max task stack size
@@ -108,7 +115,7 @@ void fut(){
     int cmdtid = Create(PRIORITY_HIGH, &task_commandserver);
     Create(PRIORITY_HIGH, &task_terminal);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_switch_courier, cmdtid); // This is here because it must be created after both the command server and the terminal server, but with a higher priority compared to both.
-    CreateWithArgument(PRIORITY_HIGH, &task_track_state, TRACK_A);
+    CreateWithArgument(PRIORITY_HIGH, &task_track_state, CHAR_TO_TRACK(track));
 }
 
 int main(){
