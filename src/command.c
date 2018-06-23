@@ -227,7 +227,7 @@ void task_commandserver(){
                         commandserver_exec_switch(&cs, STATE_TO_CHAR(rom.switches[i].state),(i >= 18 ? i + 135 : i), &rm, servertid);
                     }  else {
                         cb_write(cs.cb_switches, STATE_TO_CHAR(rom.switches[i].state));
-                        cb_write(cs.cb_switches, (i >= 18 ? i + 135 : i)); 
+                        cb_write(cs.cb_switches, (i > 18 ? i + 134 : i)); 
                     }
                 }
             }

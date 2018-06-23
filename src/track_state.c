@@ -21,24 +21,17 @@ typedef struct track{
 } TrackState;
 
 typedef struct visited { // represents sensors
-    long long low;
-    long long high:16;
+    long long switches: NUM_SWITCHES;
 } Visited;
 
 #define IsVisited(v, n) \
-    ((n) >= 64) ? \
-        ((v).high & (1 << ((n) - (64)))) \
-        : \
-        ((v).low & (1 << (n)))
+        ((v).switches & (1 << (SWCLAMP(n) - 1)))
 #define Visit(v, n) \
-    if ((n) >= 64) \
-        (v).high |= (1 << ((n) - (64))); \
-    else \
-        (v).low |= (1 << (n));
+        (v).switches |= (1 << (SWCLAMP(n) - 1));
 
 typedef struct trackpath{
     Visited visited;
-    Switch switches[NUM_SWITCHES];
+    Switch switches[NUM_SWITCHES+1];
 } TrackPath;
 
 typedef struct tsmessage{
@@ -121,22 +114,24 @@ static int find_path_between_nodes(int puttid, track_node *origin, track_node *d
     switch (origin->type){
     case (NODE_BRANCH):
     {
+        if (IsVisited(l->visited, origin->num)){
+            return 0;
+        }
+        Visit(l->visited, origin->num);
+
         if (find_path_between_nodes(puttid, origin->edge[DIR_STRAIGHT].dest, dest, l, level+1)){
-            l->switches[origin->num].state = SWITCH_STRAIGHT;
+            l->switches[SWCLAMP(origin->num)].state = SWITCH_STRAIGHT;
             return 1;
         } else if (find_path_between_nodes(puttid, origin->edge[DIR_CURVED].dest, dest, l, level+1)){
-            l->switches[origin->num].state = SWITCH_CURVED;
+            l->switches[SWCLAMP(origin->num)].state = SWITCH_CURVED;
+            if (origin->num >= 153){
+               l->switches[SWCLAMP(SW3_COMPLEMENT(origin->num))].state = SWITCH_STRAIGHT; 
+            }
             return 1;
         }
         return 0;
     }
     case (NODE_SENSOR):
-    {
-        if (IsVisited(l->visited, origin->num)){
-            return 0;
-        }
-        Visit(l->visited, origin->num);
-    }
     case (NODE_ENTER):
     case (NODE_EXIT):
     case (NODE_MERGE):
@@ -231,13 +226,11 @@ void task_track_state(int track){
             track_node *d = &ts.track[(int) tm.data];
             track_node *n = &ts.track[next_sensor];
 
-            TrackPath tp = {{0, 0}, {{SWITCH_UNKNOWN}}}; 
+            TrackPath tp = {{0}, {{SWITCH_UNKNOWN}}}; 
             int possible = find_path_between_nodes(puttid, n, d, &tp, 0);
             if (possible) {
                 rom.end_sensor = (int) tm.data; // TODO: second last sensor + distance
                 for (int i = 1; i <= NUM_SWITCHES; i++){
-                    //SendTerminalRequest(puttid, TERMINAL_ECHO, (i >=  10 ? 'A' + i - 10 : '0' + i), 0);
-                    //SendTerminalRequest(puttid, TERMINAL_ECHO, STATE_TO_CHAR(tp.switches[i].state), 0);
                     if (tp.switches[i].state != ts.switches[i].state) {
                         rom.switches[i] = tp.switches[i]; // pick up differences and unnknowns
                     } else {

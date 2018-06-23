@@ -8,10 +8,6 @@
 #define TRACK_A 1
 #define TRACK_B 0
 
-#define SENSOR_TO_NODE(r, s) (16 * (r) + (s) - 1)
-#define STATE_TO_DIR(s) ((s) == SWITCH_STRAIGHT ? DIR_STRAIGHT : DIR_CURVED)
-#define SWCLAMP(c) ((c) > 18 ? (c) - 134 : (c))
-
 typedef struct sensordata {
     unsigned int radix: 4;
     unsigned int data: 16;
