@@ -152,7 +152,7 @@ void task_react_to_state(TD * restrict task, TaskQueue * restrict queue) {
     }
 }
 
-int task_create(TaskQueue * restrict queue, int parent_tid, Priority priority, int lr, int arg) {
+int task_create(TaskQueue * restrict queue, int parent_tid, Priority priority, int lr, int arg0, int arg1) {
     TD * restrict task;
 
     if (priority >= NUM_PRIORITIES) {
@@ -168,12 +168,14 @@ int task_create(TaskQueue * restrict queue, int parent_tid, Priority priority, i
     // Store registers on stack
     task->sp -= 15; // 14 registers, 1 arg5
     int *sp = task->sp; 
-    *sp++ = arg;
-    for (int cur_reg = 1; cur_reg <= 12; ++cur_reg){
+    *sp++ = arg0;
+    *sp++ = arg1;
+    for (int cur_reg = 2; cur_reg <= 12; ++cur_reg){
         *sp++ = cur_reg;
     }
     *sp++ = (int)(&Exit);
-    task->r0 = arg;
+    task->r0 = arg0;
+    
     LOGF("New task = %x\t", task);
     LOGF("lr = %x\t", task->lr);
     LOGF("sp = %x\r\n", task->sp);

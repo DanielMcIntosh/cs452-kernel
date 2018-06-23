@@ -16,11 +16,27 @@ typedef enum {
     SYSCALL_INTERRUPTS_ON,
     SYSCALL_DESTROY,
     SYSCALL_CREATE_ARGUMENT,
+    SYSCALL_CREATE_2_ARGS,
     SYSCALL_STORE_VALUE,
     SYSCALL_GET_VALUE,
 
     SYSCALL_INTERRUPT = 100
 } Syscall;
+
+typedef enum {
+    PRIORITY_INIT,
+    PRIORITY_NOTIFIER,
+    PRIORITY_WAREHOUSE,
+    PRIORITY_HIGHEST,
+    PRIORITY_HIGHER = PRIORITY_HIGHEST+2,
+    PRIORITY_HIGH = PRIORITY_HIGHER+2,
+    PRIORITY_MID = PRIORITY_HIGH+2,
+    PRIORITY_LOW = PRIORITY_MID+2,
+    PRIORITY_LOWER = PRIORITY_LOW+2,
+    PRIORITY_LOWEST = 14,
+    PRIORITY_IDLE,
+    NUM_PRIORITIES
+} Priority;
 
 typedef enum {
     VALUE_IDLE,
@@ -32,7 +48,7 @@ typedef enum {
 typedef struct valuestore { int values[NUM_VALUES]; } ValueStore;
 
 // ==== K1 ====
-int Create(int priority, void (*code)());
+int Create(Priority priority, void (*code)());
 int MyTid();
 int MyParentTID();
 void Pass();
@@ -51,7 +67,10 @@ int Quit();
 int EnterCriticalSection();
 int ExitCriticalSection();
 int Destroy();
-int CreateWithArgument(int priority, void (*code)(int), int argument);
+
+int CreateWithArgument(Priority priority, void (*code)(int), int argument);
+int CreateWith2Args(Priority priority, void (*code)(int, int), int arg0, int arg1);
+
 int StoreValue(StorableValue tag, int value);
 int GetValue(StorableValue tag);
 

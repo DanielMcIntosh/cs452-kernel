@@ -40,6 +40,9 @@ inline static __attribute__((always_inline)) int syscall_2(const int n, const in
 inline static __attribute__((always_inline)) int syscall_3(const int n, const int arg1, const int arg2, const int arg3){
     return syscall_5(n, arg1, arg2, arg3, 0, 0);
 }
+inline static __attribute__((always_inline)) int syscall_4(const int n, const int arg1, const int arg2, const int arg3, const int arg4){
+    return syscall_5(n, arg1, arg2, arg3, arg4, 0);
+}
 
 void Pass(){
     syscall_0(SYSCALL_PASS);
@@ -57,7 +60,7 @@ int MyParentTID(){
     return syscall_0(SYSCALL_PTID);
 }
 
-int Create(int priority, void (*code)()){
+int Create(Priority priority, void (*code)()){
     return syscall_2(SYSCALL_CREATE, priority, (int)code);
 }
 
@@ -93,8 +96,12 @@ int Destroy(){
     return syscall_0(SYSCALL_DESTROY);
 }
 
-int CreateWithArgument(int priority, void (*code)(int), int argument){
+int CreateWithArgument(Priority priority, void (*code)(int), int argument){
     return syscall_3(SYSCALL_CREATE_ARGUMENT, priority, (int) code, argument);
+}
+
+int CreateWith2Args(Priority priority, void (*code)(int, int), int arg0, int arg1){
+    return syscall_4(SYSCALL_CREATE_ARGUMENT, priority, (int) code, arg0, arg1);
 }
 
 int StoreValue(StorableValue tag, int value){

@@ -11,7 +11,7 @@
 
 static inline void handle_create(TD *task, TaskQueue *task_ready_queue) {
     LOGF("TASK CREATE: %d, %d, %d\r\n", task_getTid(task), TD_arg(task, 0), TD_arg(task, 1));
-    task->r0 = task_create(task_ready_queue, task_getTid(task), TD_arg(task, 0), TD_arg(task, 1), 0);
+    task->r0 = task_create(task_ready_queue, task_getTid(task), TD_arg(task, 0), TD_arg(task, 1), 0, 0);
 }
 
 static inline void handle_tid(TD *task) {
@@ -212,17 +212,22 @@ static inline void handle_destroy(TD *task){
 
 static inline void handle_create_argument(TD *task, TaskQueue *task_ready_queue){
     LOGF("TASK CREATE ARG: %d, %d, %d, %d\r\n", task_getTid(task), TD_arg(task, 0), TD_arg(task, 1), TD_arg(task, 2));
-    task->r0 = task_create(task_ready_queue, task_getTid(task), TD_arg(task, 0), TD_arg(task, 1), TD_arg(task, 2));
+    task->r0 = task_create(task_ready_queue, task_getTid(task), TD_arg(task, 0), TD_arg(task, 1), TD_arg(task, 2), 0);
+}
+
+static inline void handle_create_2_args(TD *task, TaskQueue *task_ready_queue){
+    LOGF("TASK CREATE ARG: %d, %d, %d, %d, %d\r\n", task_getTid(task), TD_arg(task, 0), TD_arg(task, 1), TD_arg(task, 2), TD_arg(task, 3));
+    task->r0 = task_create(task_ready_queue, task_getTid(task), TD_arg(task, 0), TD_arg(task, 1), TD_arg(task, 2), TD_arg(task, 3));
 }
 
 static inline void handle_store_value(TD *task, ValueStore *v){
-    LOGF("TASK CREATE ARG: %d %d -> %d\r\n", task_getTid(task), TD_arg(task, 0), TD_arg(task, 1));
+    LOG("HANDLE STORE VALUE\r\n");
     v->values[TD_arg(task, 0)] = TD_arg(task, 1);
     task->r0 = TD_arg(task, 1);
 }
 
 static inline void handle_get_value(TD *task, ValueStore *v){
-    LOGF("TASK CREATE ARG: %d %d -> %d\r\n", task_getTid(task), TD_arg(task, 0), TD_arg(task, 1));
+    LOG("HANDLE GET VALUE\r\n");
     task->r0 = v->values[TD_arg(task, 0)];
 }
 
@@ -306,6 +311,11 @@ Syscall handle(Syscall a, TD *task, TaskQueue *task_ready_queue, ValueStore *val
         case SYSCALL_CREATE_ARGUMENT:
         {
             handle_create_argument(task, task_ready_queue);
+            break;
+        }
+        case SYSCALL_CREATE_2_ARGS:
+        {
+            handle_create_2_args(task, task_ready_queue);
             break;
         }
         case SYSCALL_STORE_VALUE:

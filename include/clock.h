@@ -34,4 +34,7 @@ int Time();
 int Delay(int ticks);
 int DelayUntil(int ticks); //FIXME: pass in tid_clk
 
+//sends to the calling task MESSAGE_TIMEOUT after a specified number of ticks
+void Timeout(int ticks);
+
 #endif

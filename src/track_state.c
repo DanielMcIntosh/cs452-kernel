@@ -10,6 +10,7 @@
 #include <terminal.h>
 #include <name.h>
 #include <track_data.h>
+#include <train_event.h>
 #include <util.h>
 
 typedef struct track{
@@ -63,7 +64,7 @@ void init_track_state(TrackState *ts, int track){
         ts->sensors[i].name[0] = 'A' + i/16;
         ts->sensors[i].name[1] = '0' + ((i%16) / 10);
         ts->sensors[i].name[2] = '0' + ((i%16) % 10);
-        ts->sensors[i].name[3] = 0;
+        ts->sensors[i].name[3] = '\0';
     }
     for (int i = 0; i < NUM_SWITCHES; i++){
         ts->switches[i] = init_switch;
@@ -176,6 +177,7 @@ int GetRoute(int trackstatetid, char radix, int snsr, RouteMessage *rom){
 void task_track_state(int track){
     RegisterAs(NAME_TRACK_STATE);
     int puttid = WhoIs(NAME_TERMINAL);
+    int train_evt_courrier_tid = Create(PRIORITY_MID, &task_train_event_courier);
 
     TrackState ts;
     init_track_state(&ts, track);
@@ -254,9 +256,15 @@ void task_track_state(int track){
             int k = 1 << 15;
             for (int i = 1; i <= 16; i++, k >>= 1){
                 if (f.data & k) {
-                    if (!(ts.sensors[16 * f.radix + i].state == SENSOR_ON)){
+                    if (ts.sensors[16 * f.radix + i].state != SENSOR_ON){
                         ts.sensors[16 * f.radix + i].state = SENSOR_ON;
                         ts.sensors[16 * f.radix + i].lastTriggeredTime = f.time;
+
+                        TrainEvent_Notify(train_evt_courrier_tid, i);
+
+                        //TODO change all of this to use RunWhen instead of running here
+                        //first need to be able to have multiple tasks waiting per sensor
+                        
                         SendTerminalRequest(puttid, TERMINAL_SENSOR, f.radix << 16 | i, f.time); // TODO courier
                         // TODO: this process might eventually take too long to happen here - delegate it to another process at some point?
 

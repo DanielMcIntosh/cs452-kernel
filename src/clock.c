@@ -5,12 +5,12 @@
 #include <message.h>
 #include <name.h>
 #include <syscall.h>
-#include <tasks.h>
 #include <err.h>
 #include <event.h>
 #include <minheap.h>
 #include <debug.h>
 #include <terminal.h>
+#include <util.h>
 
 struct debugclock *clk4 = (struct debugclock*)TIMER4_BASE; 
 struct clock *clk1 = (struct clock*)TIMER1_BASE, *clk2=(struct clock*)TIMER2_BASE, *clk3 = (struct clock*)TIMER3_BASE;
@@ -126,6 +126,18 @@ int Delay(int ticks){
 
 int DelayUntil(int ticks){
     return clockSend(DELAYUNTIL, ticks);
+}
+
+void task_timeout(int caller_tid, int timeout) {
+    Delay(timeout);
+    MessageType msg = MESSAGE_TIMEOUT;
+    Send(caller_tid, &msg, sizeof(msg), NULL, 0);
+    Destroy();
+}
+
+void Timeout(int ticks) {
+    int mytid = MyTid();
+    CreateWith2Args(PRIORITY_LOW, &task_timeout, mytid, ticks);
 }
 
 void task_clockprinter(int terminaltid){

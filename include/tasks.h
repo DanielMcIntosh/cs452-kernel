@@ -1,23 +1,11 @@
 #ifndef TASKS_H
 #define TASKS_H
 #include "event.h"
+#include "syscall.h"
 
 #define TASK_COUNTER_OFFSET 8
 #define TASK_POOL_SIZE (0x1 << (TASK_COUNTER_OFFSET - 1))
 #define TASK_BASE_TID_MASK (TASK_POOL_SIZE - 1)
-
-typedef enum {
-    PRIORITY_INIT,
-    PRIORITY_NOTIFIER,
-    PRIORITY_WAREHOUSE,
-    PRIORITY_HIGHER,
-    PRIORITY_HIGH,
-    PRIORITY_MID,
-    PRIORITY_LOW,
-    PRIORITY_LOWEST,
-    PRIORITY_IDLE = 15,
-    NUM_PRIORITIES
-} Priority;
 
 typedef enum {
     STATE_READY,
@@ -78,7 +66,7 @@ int task_get_stack_size(TD *task);
 
 TD *task_nextActive(TaskQueue *queue);
 void task_react_to_state(TD *task, TaskQueue *queue);
-int task_create(TaskQueue *queue, int parent_tid, Priority priority, int lr, int arg);
+int task_create(TaskQueue *queue, int parent_tid, Priority priority, int lr, int arg0, int arg1);
 
 static inline __attribute__((always_inline)) TD *task_lookup(TaskQueue *queue, int tid) {
     return &(queue->task_pool[tid & TASK_BASE_TID_MASK]);
