@@ -8,6 +8,8 @@
 #define TRACK_A 1
 #define TRACK_B 0
 
+#define CHAR_TO_TRACK(c) ((c) == 'A' ? TRACK_A : TRACK_B)
+
 typedef struct sensordata {
     unsigned int radix: 4;
     unsigned int data: 16;
