@@ -13,7 +13,7 @@
 typedef struct sensordata {
     unsigned int radix: 4;
     unsigned int data: 16;
-    unsigned int time: 32;
+    int time: 32;
 } __attribute__((packed)) SensorData;
 
 typedef struct switchdata{

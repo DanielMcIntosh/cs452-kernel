@@ -19,7 +19,10 @@ int cb_read_number(struct circlebuffer *cb, int *i); // NOTE: reads 1 past the n
 int cb_write(struct circlebuffer *cb, char c);
 int cb_backspace(struct circlebuffer *cb);
 int cb_write_string(struct circlebuffer *cb, char *s);
-int cb_write_number(struct circlebuffer *cb, unsigned int num, unsigned int base);
+
+//d = base^(num_digits_to_print). This function will pad with 0's if necessary.
+int cb_write_fixed_size_number(struct circlebuffer *cb, unsigned int num, unsigned int base, unsigned int d);
+int cb_write_number(struct circlebuffer *cb, int num, unsigned int base);
 
 
 #endif

@@ -184,10 +184,10 @@ void task_track_state(int track){
     int alpha = 15;
     int VELOCITY_PRECISION = 10000;
 
-    int predicted_velocity = 5 * VELOCITY_PRECISION; // TODO tie to train
+    int predicted_velocity = 4 * VELOCITY_PRECISION; // TODO tie to train
 
     int last_sensor = 0;
-    unsigned int last_sensor_time = 0;
+    int last_sensor_time = 0;
     int last_sensor_distance = 0;
 
     int next_sensor = 0;
@@ -263,11 +263,10 @@ void task_track_state(int track){
                         // TODO: this process might eventually take too long to happen here - delegate it to another process at some point?
 
                         track_node *c = &(ts.track[SENSOR_TO_NODE(sensor)]); // last known train position
-                        if (c->num == next_sensor) {
-                            // Time is in ms, velocity is in cm/s -> error is in mm (?)
-                            last_error = (next_sensor_predict_time - last_sensor_time) * predicted_velocity / VELOCITY_PRECISION;
-                            if (last_error < 0) last_error *= -1;
-                            unsigned int dt = f.time - last_sensor_time;
+                        if (sensor == next_sensor) {
+                            // Time is in ms, velocity is in cm/s -> error is in units of 10 micro meters
+                            last_error = (next_sensor_predict_time - f.time) * predicted_velocity / VELOCITY_PRECISION;
+                            int dt = f.time - last_sensor_time;
                             int new_velocity = last_sensor_distance * VELOCITY_PRECISION / dt;
                             predicted_velocity = MOVING_AVERAGE(new_velocity, predicted_velocity, alpha);
                         }
@@ -295,13 +294,15 @@ void task_track_state(int track){
         case (NOTIFY_TRAIN_SPEED):
         {
             Reply(tid, &rm, sizeof(rm));
-            ts.trains[(int) (tm.data >> 32)].speed = (int) (tm.data & 0xFFFF); // unpack train speed; TODO struct? (realistically, clean up all of the bit packing adventures - this is bad code)
+
+            //ts.trains[(int) (tm.data >> 32)].speed = (int) (tm.data & 0xFFFF); // unpack train speed; TODO struct? (realistically, clean up all of the bit packing adventures - this is bad code)
             break;
         }
         case (NOTIFY_TRAIN_DIRECTION):
         {
             Reply(tid, &rm, sizeof(rm));
-            ts.trains[(int) (tm.data >> 32)].direction = (int) (tm.data & 0xFFFF); // unpack train direction; TODO struct?
+
+            //ts.trains[(int) (tm.data >> 32)].direction = (int) (tm.data & 0xFFFF); // unpack train direction; TODO struct?
             break;
         }
         case (NOTIFY_SWITCH):

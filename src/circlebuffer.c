@@ -95,23 +95,31 @@ int cb_write_string(struct circlebuffer *cb, char * s) {
     return 0;
 }
 
-int cb_write_number(struct circlebuffer *cb, unsigned int num, unsigned int base) {
-    int n = 0;
+//d = base^(num_digits_to_print). This function will pad with 0's if necessary.
+int cb_write_fixed_size_number(struct circlebuffer *cb, unsigned int num, unsigned int base, unsigned int d) {
     int dgt;
-    unsigned int d = 1;
-
-    while( (num / d) >= base) d  *= base; // find max digit
     while (d != 0) {
         dgt = num / d; // get digit
         num %= d;
         d /= base;
-        if (n || dgt > 0 || d == 0) {
-            int err = cb_write(cb, dgt + ( dgt < 10 ? '0' : ('A' - 10)));
-            if (err) {
-                return err;
-            }
-            ++n;
+        int err = cb_write(cb, dgt + ( dgt < 10 ? '0' : ('A' - 10)));
+        if (err) {
+            return err;
         }
     }
     return 1;
+}
+
+int cb_write_number(struct circlebuffer *cb, int num, unsigned int base) {
+    if (num < 0) {
+        cb_write(cb, '-');
+        num *= -1;
+    }
+    unsigned int d = 1;
+
+    while( (num / d) >= base) {
+        d  *= base; // find max digit
+    }
+
+    return cb_write_fixed_size_number(cb, num, base, d);
 }

@@ -357,18 +357,15 @@ void task_terminal() {
             int ss = time_hundred_millis % 60;
             time_hundred_millis /= 60;
             int mm = time_hundred_millis;
-            if (mm < 10)
-                cb_write(&t.output, '0');
-            cb_write_number(&t.output, mm, 10);
+
+            cb_write_fixed_size_number(&t.output, mm, 10, 10);
             cb_write(&t.output, ':');
-            if (ss < 10)
-                cb_write(&t.output, '0');
-            cb_write_number(&t.output, ss, 10);
+            cb_write_fixed_size_number(&t.output, ss, 10, 10);
             cb_write(&t.output, ':');
-            cb_write_number(&t.output, m, 10);
+            cb_write_fixed_size_number(&t.output, m, 10, 1);
 
             cb_write_string(&t.output, "\n");
-            cb_write_number(&t.output, idle, 10);
+            cb_write_fixed_size_number(&t.output, idle, 10, 10);
 
             cb_write_string(&t.output, "\0338");
             break;
@@ -418,8 +415,8 @@ void task_terminal() {
             cb_write_string(&t.output, "   ");
 
             cursor_to_position(&t.output, 31, 10);
-            cb_write(&t.output, 'A' + next_sensor/16);
-            cb_write_number(&t.output, next_sensor % 16+1, 10);
+            cb_write(&t.output, 'A' + SENSOR_GET_RADIX(next_sensor));
+            cb_write_number(&t.output, SENSOR_GET_NUM(next_sensor) + 1, 10);
             cb_write_string(&t.output, "   ");
 
             cb_write_string(&t.output, "\0338");
