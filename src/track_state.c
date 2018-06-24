@@ -85,16 +85,16 @@ static track_node* predict_next_sensor(TrackState *ts, track_node *last_sensor, 
         switch (n->type) {
         case (NODE_BRANCH):
         {
-            n = n->edge[STATE_TO_DIR(ts->switches[SWCLAMP(n->num)].state)].dest;
             *distance += n->edge[STATE_TO_DIR(ts->switches[SWCLAMP(n->num)].state)].dist;
+            n = n->edge[STATE_TO_DIR(ts->switches[SWCLAMP(n->num)].state)].dest;
             break;
         }
         case (NODE_ENTER):
         case (NODE_EXIT):
         case (NODE_MERGE):
         {
-            n = n->edge[DIR_AHEAD].dest;
             *distance += n->edge[DIR_AHEAD].dist;
+            n = n->edge[DIR_AHEAD].dest;
             break;
         }
         default:
@@ -187,7 +187,10 @@ void task_track_state(int track){
     RouteMessage rom = {0, {{SWITCH_UNKNOWN}}};
     int tid;
 
-    int predicted_velocity = 10; // TODO tie to train
+    int alpha = 15;
+    int VELOCITY_PRECISION = 10000;
+
+    int predicted_velocity = 5 * VELOCITY_PRECISION; // TODO tie to train
 
     int last_sensor = 0;
     unsigned int last_sensor_time = 0;
@@ -197,9 +200,6 @@ void task_track_state(int track){
     int next_sensor_predict_time = 0;
 
     int last_error = 0;
-
-    int alpha = 5;
-    int VELOCITY_PRECISION = 10000;
 
     FOREVER{
         Receive(&tid, &tm, sizeof(tm));
@@ -267,10 +267,10 @@ void task_track_state(int track){
                         
                         SendTerminalRequest(puttid, TERMINAL_SENSOR, f.radix << 16 | i, f.time); // TODO courier
                         // TODO: this process might eventually take too long to happen here - delegate it to another process at some point?
-
                         track_node *c = &(ts.track[SENSOR_TO_NODE(f.radix, i)]); // last known train position
                         if (c->num == next_sensor) {
-                            last_error = predicted_velocity * (next_sensor_predict_time - last_sensor_time) / VELOCITY_PRECISION;
+                            // Time is in ms, velocity is in cm/s -> error is in mm (?)
+                            last_error = (next_sensor_predict_time - last_sensor_time) * predicted_velocity / VELOCITY_PRECISION;
                             if (last_error < 0) last_error *= -1;
                             unsigned int dt = f.time - last_sensor_time;
                             int new_velocity = last_sensor_distance * VELOCITY_PRECISION / dt;
@@ -282,6 +282,8 @@ void task_track_state(int track){
 
                         next_sensor_predict_time = f.time + distance * VELOCITY_PRECISION / predicted_velocity;
                         SendTerminalRequest(puttid, TERMINAL_SENSOR_PREDICT, next_sensor_predict_time, last_error);
+                        SendTerminalRequest(puttid, TERMINAL_VELOCITY_DEBUG, predicted_velocity, n->num);
+                        SendTerminalRequest(puttid, TERMINAL_DISTANCE_DEBUG, distance, 0);
 
                         last_sensor = c->num;
                         last_sensor_time = f.time;

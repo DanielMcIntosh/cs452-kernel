@@ -32,4 +32,8 @@ void * memcpy(void * dest, const void* src, unsigned int sz);
 #define MOVING_AVERAGE(N, O, A) ((A)*(N)/100 + (100-(A))*(O)/100)
 #endif
 
+#ifndef MS_TO_S
+#define MS_TO_S(ms) ((ms)/1000)
+#endif
+
 #endif

@@ -56,6 +56,9 @@ static void output_base_terminal(Terminal *t) {
     cb_write_number(cb, STACK_SPACE_SIZE/TASK_POOL_SIZE - 4, 16);
     cb_write_string(cb, "\r\nSTK_AVG: \r\n");
     cb_write_string(cb, "STK_MAX: \r\n");
+    cb_write_string(cb, "VELO_PR: \r\n");
+    cb_write_string(cb, "SNSR_NX: \r\n");
+    cb_write_string(cb, "DIST_NX: \r\n");
 
     cursor_to_position(cb, 5, 1);
     for (i = 1; i <= 18; i++) {
@@ -381,6 +384,35 @@ void task_terminal() {
 
             cb_write_string(&t.output, "\0338");
 
+            break;
+        }
+        case (TERMINAL_VELOCITY_DEBUG):
+        {
+            int current_predicted_velocity = tm.arg1;
+            int next_sensor = tm.arg2;
+            cb_write_string(&t.output, "\0337");
+
+            cursor_to_position(&t.output, 30, 10);
+            cb_write_number(&t.output, current_predicted_velocity, 10);
+            cb_write_string(&t.output, "   ");
+
+            cursor_to_position(&t.output, 31, 10);
+            cb_write(&t.output, 'A' + next_sensor/16);
+            cb_write_number(&t.output, next_sensor % 16+1, 10);
+            cb_write_string(&t.output, "   ");
+
+            cb_write_string(&t.output, "\0338");
+
+            break;
+        }
+        case (TERMINAL_DISTANCE_DEBUG):
+        {
+            int next_sensor_distance = tm.arg1;
+            cb_write_string(&t.output, "\0337");
+            cursor_to_position(&t.output, 32, 10);
+            cb_write_number(&t.output, next_sensor_distance, 10);
+            cb_write_string(&t.output, "  ");
+            cb_write_string(&t.output, "\0338");
             break;
         }
         case(TERMINAL_NOTIFY_COURIER):
