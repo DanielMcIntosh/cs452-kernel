@@ -6,6 +6,7 @@
 #include <message.h>
 #include <util.h>
 #include <debug.h>
+#include <terminal.h>
 
 typedef enum te_request{
     QUEUE,
@@ -34,6 +35,7 @@ void task_train_event_courier() {
                 //set waiting task for sensor
                 ASSERT(waiting_tid[tm.sensor] == 0, "task already queued");
                 waiting_tid[tm.sensor] = tid;
+                break;
             }
             case NOTIFY:
             {
@@ -43,6 +45,7 @@ void task_train_event_courier() {
                     Send(waiting_tid[tm.sensor], &wakeup, sizeof(wakeup), NULL, 0);
                     waiting_tid[tm.sensor] = 0;
                 }
+                break;
             }
         }
     }

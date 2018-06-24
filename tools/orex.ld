@@ -12,6 +12,7 @@ data : /* Initialized data. */
 {
 _DataStart = . ;
 *(.data)
+*(.data.rel.ro)
 _DataEnd = . ;
 } >ram
 

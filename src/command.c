@@ -241,7 +241,7 @@ void task_commandserver(){
             }
             //TODO get train number somehow
             Runnable runnable = {&stop_train, 24, 0U, '\0'};
-            RunWhen(16 * radix + sensor, &runnable, PRIORITY_MID);
+            RunWhen(16 * (radix - 'A') + sensor, &runnable, PRIORITY_MID);
             break;
 
         }

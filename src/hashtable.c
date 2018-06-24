@@ -65,10 +65,7 @@ int ht_insert(Hashtable *ht, char key[static HT_KEY_SIZE], int value){
         if (hsh >= HT_SIZE){
             hsh = 0;
         }
-        if (n > HT_SIZE) {
-            bwprintf(COM2, "HT FULL: %d/%d\r\n", n, HT_SIZE);
-            return ERR_HT_FULL;
-        }
+        ASSERT (n <= HT_SIZE, "HT INSERT FAILED: FULL");
     }
     memcpy((*ht)[hsh].key, key, HT_KEY_SIZE);
     (*ht)[hsh].value = value;
@@ -84,10 +81,7 @@ int ht_lookup(Hashtable *ht, char key[static HT_KEY_SIZE]){
         if (hsh >= HT_SIZE){
             hsh = 0;
         }
-        if (n > HT_SIZE) {
-            PANIC("HT NOT FOUND: %d/%d\r\n", n, HT_SIZE);
-            return ERR_HT_NOT_FOUND;
-        }
+        ASSERT (n <= HT_SIZE, "HT LOOKUP FAILED: NOT FOUND");
     }
     LOGF("Hash: %d |-> Value: %d\r\n", hsh, (*ht)[hsh].value);
     return (*ht)[hsh].value;
