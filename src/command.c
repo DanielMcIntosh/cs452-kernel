@@ -95,9 +95,7 @@ int calcReverseTime(int speed){
     return 350 / (15 - speed) + 75;
 }
 
-void task_reverse_train(int arg){
-    int train = arg >> 16;
-    int speed = arg & 0xffff;
+void task_reverse_train(int train, int speed){
     int tid = WhoIs(NAME_COMMANDSERVER);
 
     Delay(calcReverseTime(speed));
@@ -178,27 +176,32 @@ void task_commandserver(){
         }
         case COMMAND_TR:
         {
-            Putc(servertid, 1, cm.command.arg1);
-            Putc(servertid, 1, cm.command.arg2);
-            cs.train_speeds[cm.command.arg2] = cm.command.arg1; // update speed in server
+            int speed = cm.command.arg1;
+            int train = cm.command.arg2;
+            Putc(servertid, 1, speed);
+            Putc(servertid, 1, train);
+            cs.train_speeds[train] = speed; // update speed in server
             break;
         }
         case COMMAND_RV:
         {
+            int train = cm.command.arg1;
             Putc(servertid, 1, 0);
-            Putc(servertid, 1, cm.command.arg1);
-            CreateWithArgument(PRIORITY_NOTIFIER, &task_reverse_train, (cm.command.arg1 << 16) | (cs.train_speeds[cm.command.arg1])); // TODO proper bit packed struct here
+            Putc(servertid, 1, train);
+            CreateWith2Args(PRIORITY_NOTIFIER, &task_reverse_train, train, cs.train_speeds[train]);
             break;
         }
         case COMMAND_SW:
         {
+            char dir = cm.command.arg1;
+            int sw = cm.command.arg2;
             if (cs.notifier_waiting) {
                 Reply(cs.notifier_waiting, &rm, sizeof(rm));
                 cs.notifier_waiting = 0;
-                commandserver_exec_switch(&cs, cm.command.arg1, cm.command.arg2, &rm, servertid);
+                commandserver_exec_switch(&cs, dir, sw, &rm, servertid);
             } else {
-                cb_write(cs.cb_switches, cm.command.arg1);
-                cb_write(cs.cb_switches, cm.command.arg2);
+                cb_write(cs.cb_switches, dir);
+                cb_write(cs.cb_switches, sw);
             }
             break;
         }
@@ -225,8 +228,8 @@ void task_commandserver(){
         }
         case COMMAND_ROUTE:
         {
-            int radix = cm.command.arg1, sensor = cm.command.arg2;
-            int err = GetRoute(WhoIs(NAME_TRACK_STATE), radix, sensor, &rom);
+            int sensor = cm.command.arg1;
+            int err = GetRoute(WhoIs(NAME_TRACK_STATE), sensor, &rom);
             ASSERT(err==0, "FAILED TO GET ROUTE");
             for (int i = 1; i <= NUM_SWITCHES; i++) {
                 if (rom.switches[i].state != SWITCH_UNKNOWN){
@@ -242,7 +245,7 @@ void task_commandserver(){
             }
             //TODO get train number somehow
             Runnable runnable = {&stop_train, 24, 0U, '\0'};
-            RunWhen(16 * (radix - 'A') + sensor, &runnable, PRIORITY_MID);
+            RunWhen(sensor, &runnable, PRIORITY_MID);
             break;
 
         }
@@ -255,15 +258,18 @@ void task_commandserver(){
         // partial commands
         case COMMAND_NOTIFY_RV_ACCEL:
         {
+            int speed = cm.command.arg1;
+            int train = cm.command.arg2;
             //reaccelerate
-            Putc(servertid, 1, cm.command.arg1);
-            Putc(servertid, 1, cm.command.arg2);
+            Putc(servertid, 1, speed);
+            Putc(servertid, 1, train);
             break;
         }
         case COMMAND_NOTIFY_RV_REVERSE:
         {
+            int train = cm.command.arg1;
             Putc(servertid, 1, 15);
-            Putc(servertid, 1, cm.command.arg1); 
+            Putc(servertid, 1, train); 
             break;    
         }
         case COMMAND_NOTIFY_SOLENOID_TIMER:

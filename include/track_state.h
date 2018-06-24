@@ -47,6 +47,6 @@ void requestTrackState(); // TODO
 int NotifySensorData(int trackstatetid, SensorData data);
 int NotifySwitchStatus(int trackstatetid, SwitchData data);
 int GetSwitchState(int trackstatetid, int sw);
-int GetRoute(int trackstatetid, char radix, int snsr, RouteMessage *rom);
+int GetRoute(int trackstatetid, int sensor, RouteMessage *rom);
 
 #endif

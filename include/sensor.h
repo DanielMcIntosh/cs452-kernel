@@ -1,7 +1,9 @@
 #ifndef SENSOR_H
 #define SENSOR_H
 
-#define SENSOR_TO_NODE(r, s) (16 * (r) + (s) - 1)
+#define SENSOR_PAIR_TO_SENSOR(r, s) (16 * (r) + (s))
+#define SENSOR_GET_RADIX(s) ((s) / 16)
+#define SENSOR_GET_NUM(s) ((s) % 16)
 
 typedef enum sensorstate{
     SENSOR_OFF,

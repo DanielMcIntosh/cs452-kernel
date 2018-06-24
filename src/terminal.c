@@ -78,67 +78,79 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
         cmd->type = INVALID_COMMAND;
         return 0;
     }
-    int number, arg, err;
-    char swarg;
+    int err;
     cb_read(cb_input, &c);
     switch(c) {
     case 'q':
+    {
         if (cb_empty(cb_input)) {
             cmd->type = COMMAND_QUIT;
             return 0;
         }
         break;
+    }
     case 't': // tr
+    {
+        int train, speed;
         if (cb_empty(cb_input))
             break;
         cb_read(cb_input, &c);
         if (c != 'r')
             break;
         cb_read(cb_input, &c); // the space
-        err = cb_read_number(cb_input, &number);
+        err = cb_read_number(cb_input, &train);
         if (err)
             break;
-        err = cb_read_number(cb_input, &arg);
+        err = cb_read_number(cb_input, &speed);
         if (err)
             break;
-        // tr <number> <speed>
+        // tr <train> <speed>
         cmd->type = COMMAND_TR;
-        cmd->arg1 = arg;
-        cmd->arg2 = number;
+        cmd->arg1 = speed;
+        cmd->arg2 = train;
         return 0;
+    }
     case 'r': // rv
+    {
+        int train;
         if (cb_empty(cb_input))
             break;
         cb_read(cb_input, &c);
         if (c != 'v')
             break;
         cb_read(cb_input, &c); // the space
-        err = cb_read_number(cb_input, &number);
+        err = cb_read_number(cb_input, &train);
         if (err)
             break;
-        // rv <number>
+        // rv <train>
         cmd->type = COMMAND_RV;
-        cmd->arg1 = number;
+        cmd->arg1 = train;
         return 0;
+    }
     case 's': // sw
+    {
+        int sw;
+        char dir;
         if (cb_empty(cb_input))
             break;
         cb_read(cb_input, &c);
         if (c != 'w')
             break;
         cb_read(cb_input, &c); // the space
-        err = cb_read_number(cb_input, &number);
+        err = cb_read_number(cb_input, &sw);
         if (err)
             break;
-        err = cb_read(cb_input, &swarg);
+        err = cb_read(cb_input, &dir);
         if (err)
             break;
-        // sw <number> <direction>
+        // sw <sw> <dir>
         cmd->type = COMMAND_SW;
-        cmd->arg1 = swarg;
-        cmd->arg2 = number;
+        cmd->arg1 = dir;
+        cmd->arg2 = sw;
         return 0;
+    }
     case 'g': // go
+    {
         if (cb_empty(cb_input))
             break;
         cb_read(cb_input, &c);
@@ -146,7 +158,9 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
             break;
         cmd->type = COMMAND_GO;
         return 0;
+    }
     case 'i': // inv
+    {
         if (cb_empty(cb_input))
             break;
         cb_read(cb_input, &c);
@@ -159,7 +173,11 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
             break;
         cmd->type = COMMAND_INV;
         return 0;
+    }
     case 'f': // find (TODO we need a better command parsing strategy)
+    {
+        char sensor_char;
+        int sensor_num;
         if (cb_empty(cb_input))
             break;
         cb_read(cb_input, &c);
@@ -176,16 +194,18 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
         if (c != 'd')
             break;
         cb_read(cb_input, &c); // the space
-        cb_read(cb_input, &swarg); // RADIX
-        err = cb_read_number(cb_input, &number); // SW #
+        cb_read(cb_input, &sensor_char); // RADIX
+        err = cb_read_number(cb_input, &sensor_num); // SW #
         if (err)
             break;
         cmd->type = COMMAND_ROUTE;
-        cmd->arg1 = swarg;
-        cmd->arg2 = number;
+        cmd->arg1 = SENSOR_PAIR_TO_SENSOR(sensor_char - 'A', sensor_num - 1);
         return 0;
+    }
     default:
+    {
         break;
+    }
     }
     while (cb_read(cb_input, &c) == 0);// clear input buffer
     cmd->type = INVALID_COMMAND;
@@ -298,16 +318,17 @@ void task_terminal() {
         }
         case(TERMINAL_SENSOR):
         {
-            char radix = tm.arg1 >> 16;
-            int snsr = tm.arg1 & 0xFF; // unpack arg1;
+            int sensor = tm.arg1;
+            int sensor_radix = SENSOR_GET_RADIX(sensor);
+            int sensor_num = SENSOR_GET_NUM(sensor) + 1; //change from 0 based to 1 based sensor values
             cb_write_string(&t.output, "\0337");
             cursor_to_position(&t.output, t.sensor_line, SENSOR_COL_BASE);
             cb_write_string(&t.output, "    ");
             cursor_to_position(&t.output, t.sensor_line, SENSOR_COL_BASE);
-            cb_write(&t.output, 'A' + radix);
-            if (snsr < 10)
+            cb_write(&t.output, 'A' + sensor_radix);
+            if (sensor_num < 10)
                 cb_write(&t.output, '0');
-            cb_write_number(&t.output, snsr, 10);
+            cb_write_number(&t.output, sensor_num, 10);
             cb_write_string(&t.output, " (");
             cb_write_number(&t.output, tm.arg2, 10);
             cb_write(&t.output, ')');

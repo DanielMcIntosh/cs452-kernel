@@ -38,18 +38,12 @@ typedef struct trackpath{
 typedef struct tsmessage{
     MessageType type;
     TrackStateRequest request;
-    long long data;
+    union {
+        long long data;
+        SensorData sensor_data;
+        SwitchData switch_data;
+    };
 } TrackStateMessage;
-
-typedef union snsrunion{
-    SensorData fields;
-    long long bits;
-} SensorUnion;
-
-typedef union swunion{
-    SwitchData fields;
-    long long bits;
-} SwitchUnion;
 
 void init_track_state(TrackState *ts, int track){
     ts->track_number = track;
@@ -147,28 +141,28 @@ static int find_path_between_nodes(int puttid, track_node *origin, track_node *d
     return 0;
 }
 
-static inline int sendTrackState(int trackstatetid, TrackStateRequest rq, long long data){
-    TrackStateMessage msg = {MESSAGE_TRACK_STATE, rq, data};
+static inline int sendTrackState(int trackstatetid, TrackStateMessage *msg){
     ReplyMessage rm;
-    int r = Send(trackstatetid, &msg, sizeof(msg), &rm, sizeof(rm));
+    int r = Send(trackstatetid, msg, sizeof(*msg), &rm, sizeof(rm));
     return (r >= 0 ? rm.ret : r);
 }
 int NotifySensorData(int trackstatetid, SensorData data){
-    SensorUnion u = { .fields = data };
-    return sendTrackState(trackstatetid, NOTIFY_SENSOR_DATA, u.bits);
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = NOTIFY_SENSOR_DATA, {.sensor_data = data}};
+    return sendTrackState(trackstatetid, &msg);
 }
 
 int NotifySwitchStatus(int trackstatetid, SwitchData data){
-    SwitchUnion u = {.fields = data};
-    return sendTrackState(trackstatetid, NOTIFY_SWITCH, u.bits);
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = NOTIFY_SWITCH, {.switch_data = data}};
+    return sendTrackState(trackstatetid, &msg);
 }
 
 int GetSwitchState(int trackstatetid, int sw){
-    return sendTrackState(trackstatetid, SWITCH, sw);
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = SWITCH, {.data = sw}};
+    return sendTrackState(trackstatetid, &msg);
 }
 
-int GetRoute(int trackstatetid, char radix, int snsr, RouteMessage *rom){
-    TrackStateMessage msg = {MESSAGE_TRACK_STATE, ROUTE, SENSOR_TO_NODE(radix - 'A', snsr)};
+int GetRoute(int trackstatetid, int sensor, RouteMessage *rom){
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = ROUTE, {.data = SENSOR_TO_NODE(sensor)}};
     int r = Send(trackstatetid, &msg, sizeof(msg), rom, sizeof(*rom));
     return (r >= 0 ? 0 : -1);
 }
@@ -251,23 +245,24 @@ void task_track_state(int track){
         case (NOTIFY_SENSOR_DATA):
         {
             Reply(tid, &rm, sizeof(rm));
-            SensorUnion u = { .bits = tm.data};
-            SensorData f = u.fields;
+            SensorData f = tm.sensor_data;
             int k = 1 << 15;
-            for (int i = 1; i <= 16; i++, k >>= 1){
+            for (int i = 0; i <= 15; i++, k >>= 1){
+                int sensor = SENSOR_PAIR_TO_SENSOR(f.radix, i);
                 if (f.data & k) {
-                    if (ts.sensors[16 * f.radix + i].state != SENSOR_ON){
-                        ts.sensors[16 * f.radix + i].state = SENSOR_ON;
-                        ts.sensors[16 * f.radix + i].lastTriggeredTime = f.time;
+                    if (ts.sensors[sensor].state != SENSOR_ON){
+                        ts.sensors[sensor].state = SENSOR_ON;
+                        ts.sensors[sensor].lastTriggeredTime = f.time;
 
-                        TrainEvent_Notify(train_evt_courrier_tid, 16 * f.radix + i);
+                        TrainEvent_Notify(train_evt_courrier_tid, sensor);
 
                         //TODO change all of this to use RunWhen instead of running here
                         //first need to be able to have multiple tasks waiting per sensor
-                        
-                        SendTerminalRequest(puttid, TERMINAL_SENSOR, f.radix << 16 | i, f.time); // TODO courier
+
+                        SendTerminalRequest(puttid, TERMINAL_SENSOR, sensor, f.time); // TODO courier
                         // TODO: this process might eventually take too long to happen here - delegate it to another process at some point?
-                        track_node *c = &(ts.track[SENSOR_TO_NODE(f.radix, i)]); // last known train position
+
+                        track_node *c = &(ts.track[SENSOR_TO_NODE(sensor)]); // last known train position
                         if (c->num == next_sensor) {
                             // Time is in ms, velocity is in cm/s -> error is in mm (?)
                             last_error = (next_sensor_predict_time - last_sensor_time) * predicted_velocity / VELOCITY_PRECISION;
@@ -291,7 +286,7 @@ void task_track_state(int track){
                         next_sensor = n->num;
                     }
                 } else {
-                    ts.sensors[16 * f.radix + i].state = SENSOR_OFF;
+                    ts.sensors[sensor].state = SENSOR_OFF;
                 }
 
             }
@@ -312,8 +307,7 @@ void task_track_state(int track){
         case (NOTIFY_SWITCH):
         {
             Reply(tid, &rm, sizeof(rm));
-            SwitchUnion u = { .bits = tm.data};
-            ts.switches[SWCLAMP(u.fields.sw)].state = u.fields.state;
+            ts.switches[SWCLAMP(tm.switch_data.sw)].state = tm.switch_data.state;
             break;
         }
         default:
