@@ -260,7 +260,7 @@ void task_track_state(int track){
                         ts.sensors[16 * f.radix + i].state = SENSOR_ON;
                         ts.sensors[16 * f.radix + i].lastTriggeredTime = f.time;
 
-                        TrainEvent_Notify(train_evt_courrier_tid, i);
+                        TrainEvent_Notify(train_evt_courrier_tid, 16 * f.radix + i);
 
                         //TODO change all of this to use RunWhen instead of running here
                         //first need to be able to have multiple tasks waiting per sensor

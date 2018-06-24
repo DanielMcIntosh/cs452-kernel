@@ -85,7 +85,7 @@ int ht_lookup(Hashtable *ht, char key[static HT_KEY_SIZE]){
             hsh = 0;
         }
         if (n > HT_SIZE) {
-            bwprintf(COM2, "HT NOT FOUND: %d/%d\r\n", n, HT_SIZE);
+            PANIC("HT NOT FOUND: %d/%d\r\n", n, HT_SIZE);
             return ERR_HT_NOT_FOUND;
         }
     }

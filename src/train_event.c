@@ -23,7 +23,7 @@ void task_train_event_courier() {
     TrainEventMessage tm;
     int tid;
 
-    static int waiting_tid[NUM_SENSORS] = {0};
+    int waiting_tid[NUM_SENSORS] = {0};
 
     FOREVER{
         Receive(&tid, &tm, sizeof(tm));
@@ -37,7 +37,7 @@ void task_train_event_courier() {
             }
             case NOTIFY:
             {
-                if (tm.sensor != 0) {
+                if (waiting_tid[tm.sensor] != 0) {
                     //send to the task waiting on sensor
                     MessageType wakeup = MESSAGE_WAKEUP;
                     Send(waiting_tid[tm.sensor], &wakeup, sizeof(wakeup), NULL, 0);
