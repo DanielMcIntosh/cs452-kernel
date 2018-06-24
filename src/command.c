@@ -12,6 +12,7 @@
 #include <circlebuffer.h>
 #include <train.h>
 #include <track_state.h>
+#include <train_event.h>
 #include <switch.h>
 #include <util.h>
 
@@ -134,6 +135,13 @@ static inline void commandserver_exec_switch(CommandServer *cs, int arg1, int ar
     }
 }
 
+void stop_train(int train) {
+    int command_tid = WhoIs(NAME_COMMANDSERVER);
+
+    Command stop_cmd = {COMMAND_TR, 0, train};
+    SendCommand(command_tid, stop_cmd);
+}
+
 void task_commandserver(){
     CommandServer cs = {0, 0, 0, -1, {0}, {0}, 0};
     RegisterAs(NAME_COMMANDSERVER);
@@ -216,8 +224,8 @@ void task_commandserver(){
         }
         case COMMAND_ROUTE:
         {
-
-            int err = GetRoute(WhoIs(NAME_TRACK_STATE), cm.command.arg1, cm.command.arg2, &rom);
+            int radix = cm.command.arg1, sensor = cm.command.arg2;
+            int err = GetRoute(WhoIs(NAME_TRACK_STATE), radix, sensor, &rom);
             ASSERT(err==0, "FAILED TO GET ROUTE");
             for (int i = 1; i <= NUM_SWITCHES; i++) {
                 if (rom.switches[i].state != SWITCH_UNKNOWN){
@@ -231,6 +239,9 @@ void task_commandserver(){
                     }
                 }
             }
+            //TODO get train number somehow
+            Runnable runnable = {&stop_train, 24, 0U, '\0'};
+            RunWhen(16 * radix + sensor, &runnable, PRIORITY_MID);
             break;
 
         }
