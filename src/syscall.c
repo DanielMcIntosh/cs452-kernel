@@ -101,7 +101,7 @@ int CreateWithArgument(Priority priority, void (*code)(int), int argument){
 }
 
 int CreateWith2Args(Priority priority, void (*code)(int, int), int arg0, int arg1){
-    return syscall_4(SYSCALL_CREATE_ARGUMENT, priority, (int) code, arg0, arg1);
+    return syscall_4(SYSCALL_CREATE_2_ARGS, priority, (int) code, arg0, arg1);
 }
 
 int StoreValue(StorableValue tag, int value){
