@@ -97,7 +97,8 @@ int calcReverseTime(int speed){
 
 void task_reverse_train(int train, int speed){
     int tid = WhoIs(NAME_COMMANDSERVER);
-
+    speed = train >> 8;
+    train &= 0xFF;
     Delay(calcReverseTime(speed));
     Command crv = {COMMAND_NOTIFY_RV_REVERSE, train, 15};
     SendCommand(tid, crv);
@@ -208,14 +209,19 @@ void task_commandserver(){
             Putc(servertid, 1, speed);
             Putc(servertid, 1, train);
             cs.train_speeds[train] = speed; // update speed in server
+            TrainData td = {speed, train};
+            NotifyTrainSpeed(WhoIs(NAME_TRACK_STATE), td);
             break;
         }
         case COMMAND_RV:
         {
             int train = cm.command.arg1;
+            int speed = GetTrainSpeed(WhoIs(NAME_TRACK_STATE), train);
             Putc(servertid, 1, 0);
             Putc(servertid, 1, train);
-            CreateWith2Args(PRIORITY_NOTIFIER, &task_reverse_train, train, cs.train_speeds[train]);
+            CreateWith2Args(PRIORITY_NOTIFIER, &task_reverse_train, train | (speed << 8), 0);
+            TrainData td = {0, train};
+            NotifyTrainSpeed(WhoIs(NAME_TRACK_STATE), td); // TODO track state courier
             break;
         }
         case COMMAND_SW:
@@ -274,7 +280,7 @@ void task_commandserver(){
                 }
             }
             //TODO get train number somehow
-            Runnable runnable = {&stop_train, 24 | time_after_sensor << 8, 0U, FALSE};
+            Runnable runnable = {&stop_train, train | time_after_sensor << 8, 0U, FALSE};
             RunWhen(sensor_to_wake, &runnable, PRIORITY_MID);
             break;
 
@@ -300,6 +306,8 @@ void task_commandserver(){
             //reaccelerate
             Putc(servertid, 1, speed);
             Putc(servertid, 1, train);
+            TrainData td = {speed, train};
+            NotifyTrainSpeed(WhoIs(NAME_TRACK_STATE), td);
             break;
         }
         case COMMAND_NOTIFY_RV_REVERSE:

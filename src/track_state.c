@@ -42,6 +42,7 @@ typedef struct tsmessage{
         long long data;
         SensorData sensor_data;
         SwitchData switch_data;
+        TrainData train_data;
     };
 } TrackStateMessage;
 
@@ -168,6 +169,7 @@ static inline int sendTrackState(int trackstatetid, TrackStateMessage *msg){
     int r = Send(trackstatetid, msg, sizeof(*msg), &rm, sizeof(rm));
     return (r >= 0 ? rm.ret : r);
 }
+
 int NotifySensorData(int trackstatetid, SensorData data){
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = NOTIFY_SENSOR_DATA, {.sensor_data = data}};
     return sendTrackState(trackstatetid, &msg);
@@ -178,8 +180,18 @@ int NotifySwitchStatus(int trackstatetid, SwitchData data){
     return sendTrackState(trackstatetid, &msg);
 }
 
+int NotifyTrainSpeed(int trackstatetid, TrainData data){
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = NOTIFY_TRAIN_SPEED, {.train_data = data}};
+    return sendTrackState(trackstatetid, &msg);
+}
+
 int GetSwitchState(int trackstatetid, int sw){
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = SWITCH, {.data = sw}};
+    return sendTrackState(trackstatetid, &msg);
+}
+
+int GetTrainSpeed(int trackstatetid, int train){
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = TRAIN_SPEED, {.data = train}};
     return sendTrackState(trackstatetid, &msg);
 }
 
@@ -205,7 +217,16 @@ void task_track_state(int track){
 
     int alpha = 15;
 
-    int predicted_velocity = 4 * VELOCITY_PRECISION; // TODO tie to train
+    int predicted_velocity[NUM_SPEEDS] = 
+    { 0, 0, 0, // 0->2
+        VELOCITY_PRECISION, VELOCITY_PRECISION, //3, 4
+        2 * VELOCITY_PRECISION, 2 * VELOCITY_PRECISION, // 5, 6
+        3 * VELOCITY_PRECISION, 3 * VELOCITY_PRECISION, // 7, 8
+        4 * VELOCITY_PRECISION, 5 * VELOCITY_PRECISION, // 9, 10
+        5 * VELOCITY_PRECISION, 6 * VELOCITY_PRECISION, // 11, 12
+        7 * VELOCITY_PRECISION, 8 * VELOCITY_PRECISION // 13, 14
+    };
+    int current_speed = 0;
 
     int last_sensor = 0;
     int last_sensor_time = 0;
@@ -215,6 +236,7 @@ void task_track_state(int track){
     int next_sensor_predict_time = 0;
 
     int last_error = 0;
+
 
     FOREVER{
         Receive(&tid, &tm, sizeof(tm));
@@ -245,7 +267,7 @@ void task_track_state(int track){
             TrackPath tp = {{0}, {{SWITCH_UNKNOWN}}}; 
             int possible = find_path_between_nodes(n, d, &tp, 0);
             if (possible) {
-                ASSERT(reverse_distance_from_node(&ts, d, STOPPING_DISTANCE, predicted_velocity, &tp, &f, &rom.time_after_end_sensor) == 0, "Reverse Distance Failed");
+                ASSERT(reverse_distance_from_node(&ts, d, STOPPING_DISTANCE, predicted_velocity[current_speed], &tp, &f, &rom.time_after_end_sensor) == 0, "Reverse Distance Failed");
                 rom.end_sensor = (int) f->num; 
                 for (int i = 1; i <= NUM_SWITCHES; i++){
                     if (tp.switches[i].state != ts.switches[i].state) {
@@ -286,18 +308,18 @@ void task_track_state(int track){
                         track_node *c = &(ts.track[SENSOR_TO_NODE(sensor)]); // last known train position
                         if (sensor == next_sensor) {
                             // Time is in ms, velocity is in cm/s -> error is in units of 10 micro meters
-                            last_error = (next_sensor_predict_time - f.time) * predicted_velocity / VELOCITY_PRECISION;
+                            last_error = (next_sensor_predict_time - f.time) * predicted_velocity[current_speed] / VELOCITY_PRECISION;
                             int dt = f.time - last_sensor_time;
                             int new_velocity = last_sensor_distance * VELOCITY_PRECISION / dt;
-                            predicted_velocity = MOVING_AVERAGE(new_velocity, predicted_velocity, alpha);
+                            predicted_velocity[current_speed] = MOVING_AVERAGE(new_velocity, predicted_velocity[current_speed], alpha);
                         }
                         
                         int distance;
                         track_node *n = predict_next_sensor(&ts, c, NULL, &distance); // next predicted train position
 
-                        next_sensor_predict_time = f.time + distance * VELOCITY_PRECISION / predicted_velocity;
+                        next_sensor_predict_time = f.time + distance * VELOCITY_PRECISION / predicted_velocity[current_speed];
                         SendTerminalRequest(puttid, TERMINAL_SENSOR_PREDICT, next_sensor_predict_time, last_error);
-                        SendTerminalRequest(puttid, TERMINAL_VELOCITY_DEBUG, predicted_velocity, n->num);
+                        SendTerminalRequest(puttid, TERMINAL_VELOCITY_DEBUG, predicted_velocity[current_speed], n->num);
                         SendTerminalRequest(puttid, TERMINAL_DISTANCE_DEBUG, distance, 0);
 
                         last_sensor = c->num;
@@ -315,8 +337,9 @@ void task_track_state(int track){
         case (NOTIFY_TRAIN_SPEED):
         {
             Reply(tid, &rm, sizeof(rm));
-
-            //ts.trains[(int) (tm.data >> 32)].speed = (int) (tm.data & 0xFFFF); // unpack train speed; TODO struct? (realistically, clean up all of the bit packing adventures - this is bad code)
+            ts.trains[(int) tm.train_data.train].speed = tm.train_data.speed;
+            current_speed = tm.train_data.speed;
+            next_sensor = -1; // reset prediction;
             break;
         }
         case (NOTIFY_TRAIN_DIRECTION):

@@ -4,6 +4,8 @@
 #ifndef TRACK_STATE_H
 #define TRACK_STATE_H
 
+#define NUM_SPEEDS 15
+
 #define NAME_TRACK_STATE "state"
 #define TRACK_A 1
 #define TRACK_B 0
@@ -22,6 +24,11 @@ typedef struct switchdata{
     unsigned int state: 4;
     unsigned int sw: 32;
 } __attribute__((packed)) SwitchData;
+
+typedef struct traindata {
+    unsigned int speed: 4;
+    unsigned int train: 8;
+} __attribute__((packed)) TrainData;
 
 typedef struct routemessage{
     int end_sensor;
@@ -49,7 +56,9 @@ void requestTrackState(); // TODO
 
 int NotifySensorData(int trackstatetid, SensorData data);
 int NotifySwitchStatus(int trackstatetid, SwitchData data);
+int NotifyTrainSpeed(int trackstatetid, TrainData data);
 int GetSwitchState(int trackstatetid, int sw);
 int GetRoute(int trackstatetid, int sensor, RouteMessage *rom);
+int GetTrainSpeed(int trackstatetid, int train);
 
 #endif

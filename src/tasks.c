@@ -175,6 +175,7 @@ int task_create(TaskQueue * restrict queue, int parent_tid, Priority priority, i
     }
     *sp++ = (int)(&Exit);
     task->r0 = arg0;
+    task->sp[1] = arg1;
     
     LOGF("New task = %x\t", task);
     LOGF("lr = %x\t", task->lr);
