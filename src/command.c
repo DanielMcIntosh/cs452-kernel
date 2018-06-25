@@ -158,9 +158,12 @@ static inline void commandserver_exec_switch(CommandServer *cs, int arg1, int ar
     }
 }
 
-void stop_train(int train) {
+void stop_train(int arg) {
     int command_tid = WhoIs(NAME_COMMANDSERVER);
+    int train = arg & 0xFF;
+    int wait = arg >> 8;
 
+    Delay(wait);
     Command stop_cmd = {COMMAND_TR, 0, train};
     SendCommand(command_tid, stop_cmd);
 }
@@ -171,7 +174,7 @@ void task_commandserver(){
     int servertid = WhoIs(NAME_UART1_SEND), tid;
     CommandMessage cm;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
-    RouteMessage rom = {0, {{0}}};
+    RouteMessage rom = {0, 0, {{0}}};
     char switchQ_buf[SWITCHQ_BUF_SIZE];
     circlebuffer_t cb_switches;
     cb_init(&cb_switches, switchQ_buf, SWITCHQ_BUF_SIZE);
@@ -255,6 +258,8 @@ void task_commandserver(){
             int sensor = cm.command.arg1;
             int train = cm.command.arg2;
             int err = GetRoute(WhoIs(NAME_TRACK_STATE), sensor, &rom);
+            int time_after_sensor = rom.time_after_end_sensor;
+            int sensor_to_wake = rom.end_sensor;
             ASSERT(err==0, "FAILED TO GET ROUTE");
             for (int i = 1; i <= NUM_SWITCHES; i++) {
                 if (rom.switches[i].state != SWITCH_UNKNOWN){
@@ -268,8 +273,9 @@ void task_commandserver(){
                     }
                 }
             }
-            Runnable runnable = {&stop_train, train, 0U, FALSE};
-            RunWhen(sensor, &runnable, PRIORITY_MID);
+            //TODO get train number somehow
+            Runnable runnable = {&stop_train, 24 | time_after_sensor << 8, 0U, FALSE};
+            RunWhen(sensor_to_wake, &runnable, PRIORITY_MID);
             break;
 
         }

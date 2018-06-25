@@ -9,6 +9,8 @@
 #define TRACK_B 0
 
 #define CHAR_TO_TRACK(c) ((c) == 'A' ? TRACK_A : TRACK_B)
+#define VELOCITY_PRECISION 10000
+#define STOPPING_DISTANCE 100
 
 typedef struct sensordata {
     unsigned int radix: 4;
@@ -23,6 +25,7 @@ typedef struct switchdata{
 
 typedef struct routemessage{
     int end_sensor;
+    int time_after_end_sensor;
     Switch switches[NUM_SWITCHES+1];
 } RouteMessage;
 
