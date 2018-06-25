@@ -97,8 +97,6 @@ int calcReverseTime(int speed){
 
 void task_reverse_train(int train, int speed){
     int tid = WhoIs(NAME_COMMANDSERVER);
-    speed = train >> 8;
-    train &= 0xFF;
     Delay(calcReverseTime(speed));
     Command crv = {COMMAND_NOTIFY_RV_REVERSE, train, 15};
     SendCommand(tid, crv);
@@ -219,7 +217,7 @@ void task_commandserver(){
             int speed = GetTrainSpeed(WhoIs(NAME_TRACK_STATE), train);
             Putc(servertid, 1, 0);
             Putc(servertid, 1, train);
-            CreateWith2Args(PRIORITY_NOTIFIER, &task_reverse_train, train | (speed << 8), 0);
+            CreateWith2Args(PRIORITY_NOTIFIER, &task_reverse_train, train, speed);
             TrainData td = {0, train};
             NotifyTrainSpeed(WhoIs(NAME_TRACK_STATE), td); // TODO track state courier
             break;

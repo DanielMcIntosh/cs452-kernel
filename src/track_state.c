@@ -226,6 +226,15 @@ void task_track_state(int track){
         5 * VELOCITY_PRECISION, 6 * VELOCITY_PRECISION, // 11, 12
         7 * VELOCITY_PRECISION, 8 * VELOCITY_PRECISION // 13, 14
     };
+    int stopping_distance[NUM_SPEEDS] = 
+    { 0, 10, 20,
+        30, 40,
+        50, 60,
+        70, 80,
+        90, 150,
+        200, 400,
+        900, 1100
+    };
     int current_speed = 0;
 
     int last_sensor = 0;
@@ -267,7 +276,7 @@ void task_track_state(int track){
             TrackPath tp = {{0}, {{SWITCH_UNKNOWN}}}; 
             int possible = find_path_between_nodes(n, d, &tp, 0);
             if (possible) {
-                ASSERT(reverse_distance_from_node(&ts, d, STOPPING_DISTANCE, predicted_velocity[current_speed], &tp, &f, &rom.time_after_end_sensor) == 0, "Reverse Distance Failed");
+                ASSERT(reverse_distance_from_node(&ts, d, stopping_distance[current_speed], predicted_velocity[current_speed], &tp, &f, &rom.time_after_end_sensor) == 0, "Reverse Distance Failed");
                 rom.end_sensor = (int) f->num; 
                 for (int i = 1; i <= NUM_SWITCHES; i++){
                     if (tp.switches[i].state != ts.switches[i].state) {
