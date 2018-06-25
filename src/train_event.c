@@ -78,13 +78,14 @@ void task_runner(int sensor) {
     Reply(tid, NULL, 0);
 
     if (to_run.run_on_timeout || type == MESSAGE_WAKEUP) {
-        to_run.func(to_run.arg);
+        to_run.func(to_run.arg0, to_run.arg1, type == MESSAGE_WAKEUP);
     }
 
     if (to_run.timeout != 0) {
         Receive(&tid, &type, sizeof(type));
         Reply(tid, NULL, 0);
     }
+    Destroy();
 }
 
 

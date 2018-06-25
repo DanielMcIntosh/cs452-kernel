@@ -9,12 +9,14 @@
 #define FALSE 0
 #endif
 
-void memswap(void * a, void * b, unsigned int sz);
-void * memcpy(void * dest, const void* src, unsigned int sz);
-
 #ifndef NULL
 #define NULL 0
 #endif
+
+#define bool int
+
+void memswap(void * a, void * b, unsigned int sz);
+void * memcpy(void * dest, const void* src, unsigned int sz);
 
 #ifndef MAX
 #define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))

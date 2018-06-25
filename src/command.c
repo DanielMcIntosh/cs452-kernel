@@ -27,8 +27,6 @@ typedef struct commandserver{
     int solenoid_off;
     int courier_waiting;
     int courier_arg;
-    int train_states[NUM_TRAINS];
-    int train_speeds[NUM_TRAINS]; // TODO move this data to track_state.h?
     circlebuffer_t *cb_switches;
 } CommandServer;
 
@@ -118,30 +116,6 @@ void task_switch_courier(int cmdtid){
     }
 }
 
-void task_send_wakeup(int tid) {
-    MessageType msg = MESSAGE_WAKEUP;
-    Send(tid, &msg, sizeof(msg), NULL, 0);
-}
-
-void task_calibrate(int train, int sensor) {
-    /*
-    int cmdtid = WhoIs(NAME_COMMANDSERVER);
-    int my_tid = MyTid();
-
-    int timeout = ;
-    int intvl = ;
-    int num_over = 0, num_under = 0;
-    for (int i = 0; i < 8; ++i) {
-        //for now, assume we're always successful at reaching our start sensor
-        Runnable runnable = {&task_send_wakeup, my_tid, 0U, FALSE};
-        RunWhen(sensor, &runnable, PRIORITY_HIGHEST);
-        Receive(&tid, )
-        intvl = intvl * 4 / 5;
-    }
-    */
-    Destroy();
-}
-
 static inline void commandserver_exec_switch(CommandServer *cs, int arg1, int arg2, ReplyMessage *rm, int servertid){
     Putc(servertid, 1, arg1 == 'C' ? 34 : 33);
     Putc(servertid, 1, arg2);
@@ -157,18 +131,98 @@ static inline void commandserver_exec_switch(CommandServer *cs, int arg1, int ar
     }
 }
 
-void stop_train(int arg) {
-    int command_tid = WhoIs(NAME_COMMANDSERVER);
-    int train = arg & 0xFF;
-    int wait = arg >> 8;
+//cannot be used from within the commandserver task
+static inline void setup_track_state(int cmdtid, RouteMessage *rom) {
+    for (int i = 1; i <= NUM_SWITCHES; i++) {
+        if (rom->switches[i].state != SWITCH_UNKNOWN){
+            char sw_state = STATE_TO_CHAR(rom->switches[i].state);
+            int sw_num = SWUNCLAMP(i);
+            Command cmd = {COMMAND_SW, sw_state, {.arg2 = sw_num}};
+            SendCommand(cmdtid, cmd);
+        }
+    }
+}
+
+static inline void stop_train(int train, int wait) {
+    int cmdtid = WhoIs(NAME_COMMANDSERVER);
 
     Delay(wait);
     Command stop_cmd = {COMMAND_TR, 0, {.arg2 = train}};
-    SendCommand(command_tid, stop_cmd);
+    SendCommand(cmdtid, stop_cmd);
+}
+
+void calibration_wrapper(int iteration, int caller_tid, bool success) {
+    int track_state_tid = WhoIs(NAME_TRACK_STATE);
+
+    CalData cal_data = {iteration, success};
+    NotifyCalibrationResult(track_state_tid, cal_data);
+
+    Send(caller_tid, &success, sizeof(success), NULL, 0);
+}
+
+void send_wakeup(int tid, int __attribute__((unused)) arg1, bool success) {
+    MessageType msg = success ? MESSAGE_WAKEUP : MESSAGE_TIMEOUT;
+    Send(tid, &msg, sizeof(msg), NULL, 0);
+}
+
+void task_calibrate(int train, int sensor_dest) {
+    int cmdtid = WhoIs(NAME_COMMANDSERVER);
+    int my_tid = MyTid();
+
+    RouteMessage rom = {0, 0, {{0}}};
+    int alarm_tid;
+    MessageType alarm_message;
+    int track_state_tid = WhoIs(NAME_TRACK_STATE);
+    int speed = GetTrainSpeed(track_state_tid, train);
+
+    int num_over = 0;
+    while (num_over == 0 || num_over == CAL_ITERATIONS) {
+        num_over = 0;
+        for (int i = 0; i < CAL_ITERATIONS; ++i) {
+            //set the train on course to hit sensor_dest, and get timing info
+            RouteRequest rq = {.object = sensor_dest, .distance_past = 0};
+            int err = GetRoute(WhoIs(NAME_TRACK_STATE), rq, &rom);
+            ASSERT(err==0, "FAILED TO GET ROUTE");
+            setup_track_state(cmdtid, &rom);
+            int sensor_to_wake = rom.end_sensor;
+
+            //wait until we hit <sensor_to_wake>
+            //for now, assume we're always successful in triggering <sensor_to_wake>
+            Runnable runnable_alarm = {&send_wakeup, my_tid, 0, 0U, FALSE};
+            RunWhen(sensor_to_wake, &runnable_alarm, PRIORITY_MID);
+            Receive(&alarm_tid, &alarm_message, sizeof(alarm_message));
+            Reply(alarm_tid, NULL, 0);
+
+            int delay = rom.time_after_end_sensor;
+            //wait <delay> ticks, then send a stop command
+            stop_train(train, delay);
+
+            //Timeout 1.5 s after we send stop command
+            Runnable runnable_calibrate = {&calibration_wrapper, i, my_tid, 250, TRUE};
+            RunWhen(sensor_dest, &runnable_calibrate, PRIORITY_MID);
+
+            int cal_tid;
+            bool overshot;
+            Receive(&cal_tid, &overshot, sizeof(overshot));
+            Reply(cal_tid, NULL, 0);
+
+            Command accel_cmd = {COMMAND_TR, speed, {.arg2 = train}};
+            SendCommand(cmdtid, accel_cmd);
+
+            if (overshot) {
+                ++num_over;
+            }
+        }
+    }
+    Destroy();
+}
+
+void stop_wrapper(int train, int wait, bool __attribute__((unused)) success) {
+    stop_train(train, wait);
 }
 
 void task_commandserver(){
-    CommandServer cs = {0, 0, 0, -1, {0}, {0}, 0};
+    CommandServer cs = {0, 0, 0, -1, 0};
     RegisterAs(NAME_COMMANDSERVER);
     int servertid = WhoIs(NAME_UART1_SEND), tid;
     CommandMessage cm;
@@ -206,7 +260,6 @@ void task_commandserver(){
             int train = cm.command.arg2;
             Putc(servertid, 1, speed);
             Putc(servertid, 1, train);
-            cs.train_speeds[train] = speed; // update speed in server
             TrainData td = {speed, train};
             NotifyTrainSpeed(WhoIs(NAME_TRACK_STATE), td);
             break;
@@ -264,24 +317,25 @@ void task_commandserver(){
             int train = cm.command.smallarg2;
             RouteRequest rq = {.object = sensor, .distance_past = distance_past};
             int err = GetRoute(WhoIs(NAME_TRACK_STATE), rq, &rom);
+            ASSERT(err==0, "FAILED TO GET ROUTE");
 
             int time_after_sensor = rom.time_after_end_sensor;
             int sensor_to_wake = rom.end_sensor;
-            ASSERT(err==0, "FAILED TO GET ROUTE");
             for (int i = 1; i <= NUM_SWITCHES; i++) {
                 if (rom.switches[i].state != SWITCH_UNKNOWN){
+                    char sw_state = STATE_TO_CHAR(rom.switches[i].state);
+                    int sw_num = SWUNCLAMP(i);
                     if (cs.notifier_waiting) {
                         Reply(cs.notifier_waiting, &rm, sizeof(rm));
                         cs.notifier_waiting = 0;
-                        commandserver_exec_switch(&cs, STATE_TO_CHAR(rom.switches[i].state),(i >= 18 ? i + 135 : i), &rm, servertid);
+                        commandserver_exec_switch(&cs, sw_state, sw_num, &rm, servertid);
                     }  else {
-                        cb_write(cs.cb_switches, STATE_TO_CHAR(rom.switches[i].state));
-                        cb_write(cs.cb_switches, (i > 18 ? i + 134 : i)); 
+                        cb_write(cs.cb_switches, sw_state);
+                        cb_write(cs.cb_switches, sw_num); 
                     }
                 }
             }
-            //TODO get train number somehow
-            Runnable runnable = {&stop_train, train | time_after_sensor << 8, 0U, FALSE};
+            Runnable runnable = {&stop_wrapper, train, time_after_sensor, 0U, FALSE};
             RunWhen(sensor_to_wake, &runnable, PRIORITY_MID);
             break;
 

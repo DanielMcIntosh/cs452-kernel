@@ -1,5 +1,6 @@
 #include <kernel.h>
 #include <switch.h>
+#include <util.h>
 
 #ifndef TRACK_STATE_H
 #define TRACK_STATE_H
@@ -12,7 +13,7 @@
 
 #define CHAR_TO_TRACK(c) ((c) == 'A' ? TRACK_A : TRACK_B)
 #define VELOCITY_PRECISION 10000
-#define STOPPING_DISTANCE 100
+#define CAL_ITERATIONS 8
 
 typedef struct sensordata {
     unsigned int radix: 4;
@@ -26,14 +27,19 @@ typedef struct switchdata{
 } __attribute__((packed)) SwitchData;
 
 typedef struct traindata {
-    unsigned int speed: 4;
-    unsigned int train: 8;
+    unsigned int speed;
+    unsigned int train;
 } __attribute__((packed)) TrainData;
 
 typedef struct routerequest{
     unsigned int object: 16;
     unsigned int distance_past: 16;
 } __attribute__((packed)) RouteRequest; // TODO move these structs into the c file.
+
+typedef struct caldata{
+    int iteration;
+    bool triggered;
+} __attribute__((packed)) CalData;
 
 typedef struct routemessage{
     int end_sensor;
@@ -51,6 +57,7 @@ typedef enum tsrequest{
     NOTIFY_TRAIN_SPEED,
     NOTIFY_TRAIN_DIRECTION,
     NOTIFY_SWITCH,
+    NOTIFY_CAL,
 
     NUM_TRACK_STATE_REQUESTS
 } TrackStateRequest;
@@ -62,6 +69,8 @@ void requestTrackState(); // TODO
 int NotifySensorData(int trackstatetid, SensorData data);
 int NotifySwitchStatus(int trackstatetid, SwitchData data);
 int NotifyTrainSpeed(int trackstatetid, TrainData data);
+int NotifyCalibrationResult(int trackstatetid, CalData data);
+
 int GetSwitchState(int trackstatetid, int sw);
 int GetRoute(int trackstatetid, RouteRequest req, RouteMessage *rom);
 int GetTrainSpeed(int trackstatetid, int train);

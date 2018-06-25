@@ -1,12 +1,14 @@
 #ifndef _TRAIN_EVENT_H_
 #define _TRAIN_EVENT_H_
 #include <syscall.h>
+#include <util.h>
 
 #define NAME_TRAIN_EVENT_COURRIER "trn_evt"
 
 typedef struct {
-    void (*func)(int arg);
-    int arg;
+    void (*func)(int arg0, int arg1, bool success);
+    int arg0;
+    int arg1;
     unsigned int timeout;
     char run_on_timeout;
 } Runnable;

@@ -39,11 +39,12 @@ typedef struct tsmessage{
     MessageType type;
     TrackStateRequest request;
     union {
-        long long data;
+        int data;
         SensorData sensor_data;
         SwitchData switch_data;
         TrainData train_data;
         RouteRequest route_request;
+        CalData cal_data;
     };
 } TrackStateMessage;
 
@@ -101,7 +102,7 @@ static track_node* predict_next_sensor(TrackState *ts, track_node *last_sensor, 
         }
         default:
         {
-            PANIC("INVALID TRACK NODE TYPE: %d", n->type);
+            PANIC("in: predict_next_sensor - INVALID TRACK NODE TYPE: %d", n->type);
         }
         }
     }
@@ -128,7 +129,7 @@ static int reverse_distance_from_node(TrackState *ts, track_node *destination, i
 
 static int find_path_between_nodes(track_node *origin, track_node *dest, TrackPath * l, int level){
     if (origin == dest) return 1;
-    if (origin == NULL) return 0;
+    if (origin == NULL || origin->type == NODE_NONE) return 0;
 
     switch (origin->type){
     case (NODE_BRANCH):
@@ -159,7 +160,7 @@ static int find_path_between_nodes(track_node *origin, track_node *dest, TrackPa
     }
     default:
     {
-        PANIC("INVALID TRACK NODE TYPE: %d", origin->type);
+        PANIC("in: find_path_between_nodes - INVALID TRACK NODE TYPE: %d", origin->type);
     }
     }
     return 0;
@@ -186,13 +187,13 @@ int NotifyTrainSpeed(int trackstatetid, TrainData data){
     return sendTrackState(trackstatetid, &msg);
 }
 
-int GetSwitchState(int trackstatetid, int sw){
-    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = SWITCH, {.data = sw}};
+int NotifyCalibrationResult(int trackstatetid, CalData data) {
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = NOTIFY_CAL, {.cal_data = data}};
     return sendTrackState(trackstatetid, &msg);
 }
 
-int GetTrainSpeed(int trackstatetid, int train){
-    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = TRAIN_SPEED, {.data = train}};
+int GetSwitchState(int trackstatetid, int sw){
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = SWITCH, {.data = sw}};
     return sendTrackState(trackstatetid, &msg);
 }
 
@@ -202,6 +203,11 @@ int GetRoute(int trackstatetid, RouteRequest req, RouteMessage *rom){
     return (r >= 0 ? 0 : -1);
 }
     
+int GetTrainSpeed(int trackstatetid, int train){
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = TRAIN_SPEED, {.data = train}};
+    return sendTrackState(trackstatetid, &msg);
+}
+
 
 void task_track_state(int track){
     RegisterAs(NAME_TRACK_STATE);
@@ -359,13 +365,26 @@ void task_track_state(int track){
         {
             Reply(tid, &rm, sizeof(rm));
 
-            //ts.trains[(int) (tm.data >> 32)].direction = (int) (tm.data & 0xFFFF); // unpack train direction; TODO struct?
             break;
         }
         case (NOTIFY_SWITCH):
         {
             Reply(tid, &rm, sizeof(rm));
-            ts.switches[SWCLAMP(tm.switch_data.sw)].state = tm.switch_data.state;
+            SwitchData data = tm.switch_data;
+            ts.switches[SWCLAMP(data.sw)].state = data.state;
+            break;
+        }
+        case (NOTIFY_CAL):
+        {
+            Reply(tid, &rm, sizeof(rm));
+            CalData data = tm.cal_data;
+
+            //adjust stopping_distance
+            int interval = 20;
+            for (int i = 0; i < data.iteration; ++i) {
+                interval = interval * 4 / 5;
+            }
+            stopping_distance[current_speed] += (data.triggered ? -1 : 1) * interval;
             break;
         }
         default:
