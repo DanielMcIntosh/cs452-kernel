@@ -84,7 +84,7 @@ static void init_switches(CommandServer *cs){
 }
 
 void task_solenoid_notifier(int tid){
-    Command c = {COMMAND_NOTIFY_SOLENOID_TIMER, 0, 0};
+    Command c = {COMMAND_NOTIFY_SOLENOID_TIMER, 0, {.arg2 = 0}};
     FOREVER {
         SendCommand(tid, c);
         Delay(17);
@@ -98,17 +98,17 @@ int calcReverseTime(int speed){
 void task_reverse_train(int train, int speed){
     int tid = WhoIs(NAME_COMMANDSERVER);
     Delay(calcReverseTime(speed));
-    Command crv = {COMMAND_NOTIFY_RV_REVERSE, train, 15};
+    Command crv = {COMMAND_NOTIFY_RV_REVERSE, train, {.arg2 = 15}};
     SendCommand(tid, crv);
     Delay(10);
-    Command cra = {COMMAND_NOTIFY_RV_ACCEL, speed, train};
+    Command cra = {COMMAND_NOTIFY_RV_ACCEL, speed, {.arg2 = train}};
     SendCommand(tid, cra);
     Destroy();
 }
 
 void task_switch_courier(int cmdtid){
     int terminaltid = WhoIs(NAME_TERMINAL);
-    Command c = {COMMAND_NOTIFY_COURIER, 0, 0};
+    Command c = {COMMAND_NOTIFY_COURIER, 0, {.arg2 = 0}};
     FOREVER {
         int r = SendCommand(cmdtid, c);
         // unpack r
@@ -163,7 +163,7 @@ void stop_train(int arg) {
     int wait = arg >> 8;
 
     Delay(wait);
-    Command stop_cmd = {COMMAND_TR, 0, train};
+    Command stop_cmd = {COMMAND_TR, 0, {.arg2 = train}};
     SendCommand(command_tid, stop_cmd);
 }
 
@@ -260,8 +260,11 @@ void task_commandserver(){
         case COMMAND_ROUTE:
         {
             int sensor = cm.command.arg1;
-            int train = cm.command.arg2;
-            int err = GetRoute(WhoIs(NAME_TRACK_STATE), sensor, &rom);
+            int distance_past = cm.command.smallarg1;
+            int train = cm.command.smallarg2;
+            RouteRequest rq = {.object = sensor, .distance_past = distance_past};
+            int err = GetRoute(WhoIs(NAME_TRACK_STATE), rq, &rom);
+
             int time_after_sensor = rom.time_after_end_sensor;
             int sensor_to_wake = rom.end_sensor;
             ASSERT(err==0, "FAILED TO GET ROUTE");

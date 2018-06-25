@@ -30,6 +30,11 @@ typedef struct traindata {
     unsigned int train: 8;
 } __attribute__((packed)) TrainData;
 
+typedef struct routerequest{
+    unsigned int object: 16;
+    unsigned int distance_past: 16;
+} __attribute__((packed)) RouteRequest; // TODO move these structs into the c file.
+
 typedef struct routemessage{
     int end_sensor;
     int time_after_end_sensor;
@@ -58,7 +63,7 @@ int NotifySensorData(int trackstatetid, SensorData data);
 int NotifySwitchStatus(int trackstatetid, SwitchData data);
 int NotifyTrainSpeed(int trackstatetid, TrainData data);
 int GetSwitchState(int trackstatetid, int sw);
-int GetRoute(int trackstatetid, int sensor, RouteMessage *rom);
+int GetRoute(int trackstatetid, RouteRequest req, RouteMessage *rom);
 int GetTrainSpeed(int trackstatetid, int train);
 
 #endif

@@ -58,7 +58,7 @@ void task_sensor_timeout_notifier(int servertid){
 
 void task_sensor_courier(int servertid){
     SensorMessage sm = {MESSAGE_SENSOR, SENSOR_COURIER, 0};
-    CourierMessage cm = {0, {0, 0, 0}};
+    CourierMessage cm = {0, {0, 0, {.arg2 = 0}}};
     int commandtid = WhoIs(NAME_COMMANDSERVER);
     FOREVER{
         int err = Send(servertid, &sm, sizeof(sm), &cm, sizeof(cm));
@@ -73,7 +73,7 @@ void task_sensor_server(){
     SensorServer ss = {{0}, 0, 0, 0, 0, 1};
     SensorMessage sm;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
-    CourierMessage cm = {MESSAGE_SENSOR_COURIER, {COMMAND_SENSOR_REQUEST, 0, 0}};
+    CourierMessage cm = {MESSAGE_SENSOR_COURIER, {COMMAND_SENSOR_REQUEST, 0, {.arg2 = 0}}};
 
     int mytid = MyTid(), trackstatetid = WhoIs(NAME_TRACK_STATE), tid;
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_read_notifier, mytid);

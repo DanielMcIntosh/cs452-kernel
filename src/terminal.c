@@ -175,12 +175,16 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
 
         char sensor_char;
         int sensor_num;
+        int distance_past;
+        int train;
+
         cb_read(cb_input, &sensor_char); // RADIX
         err = cb_read_number(cb_input, &sensor_num); // SW #
         if (err)
             break;
-
-        int train;
+        err = cb_read_number(cb_input, &distance_past); // distance past sensor
+        if (err)
+            break;
         err = cb_read_number(cb_input, &train);
         if (err)
             break;        
@@ -188,7 +192,8 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
         // find <sensor> <train>
         cmd->type = COMMAND_ROUTE;
         cmd->arg1 = SENSOR_PAIR_TO_SENSOR(sensor_char - 'A', sensor_num - 1);
-        cmd->arg2 = train;
+        cmd->smallarg1 = distance_past;
+        cmd->smallarg2 = train;
         return 0;
     }
     case 'c': // cal
@@ -234,7 +239,7 @@ void task_terminal_command_parser(int terminaltid){
     char cb_input_buf[CB_INPUT_BUF_SIZE];
     circlebuffer_t cb_input;
     cb_init(&cb_input, cb_input_buf, CB_INPUT_BUF_SIZE);
-    TerminalParser t = {cb_input, {0, 0, 0}};
+    TerminalParser t = {cb_input, {0, 0, {.arg2 = 0}}};
     TerminalMessage tm = {MESSAGE_TERMINAL, 0, 0, 0};
     ReplyMessage rm = {0, 0};
     

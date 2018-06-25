@@ -35,7 +35,13 @@ typedef enum cmdtype{
 typedef struct command{
     CommandType type;
     int arg1;
-    int arg2;
+    union {
+        int arg2: 32;
+        struct {
+            int smallarg1: 16;
+            int smallarg2: 16;
+        } __attribute__((packed));
+    };
 } Command;
 
 int SendCommand(int servertid, Command c);

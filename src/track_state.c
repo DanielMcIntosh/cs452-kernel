@@ -43,6 +43,7 @@ typedef struct tsmessage{
         SensorData sensor_data;
         SwitchData switch_data;
         TrainData train_data;
+        RouteRequest route_request;
     };
 } TrackStateMessage;
 
@@ -195,8 +196,8 @@ int GetTrainSpeed(int trackstatetid, int train){
     return sendTrackState(trackstatetid, &msg);
 }
 
-int GetRoute(int trackstatetid, int sensor, RouteMessage *rom){
-    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = ROUTE, {.data = SENSOR_TO_NODE(sensor)}};
+int GetRoute(int trackstatetid, RouteRequest req, RouteMessage *rom){
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = ROUTE, {.route_request = req}};
     int r = Send(trackstatetid, &msg, sizeof(msg), rom, sizeof(*rom));
     return (r >= 0 ? 0 : -1);
 }
@@ -271,12 +272,15 @@ void task_track_state(int track){
         }
         case (ROUTE):
         {
-            track_node *d = &ts.track[(int) tm.data], *n = &ts.track[next_sensor], *f;
+            int object = SENSOR_TO_NODE(tm.route_request.object);
+            int distance_past = tm.route_request.distance_past;
+
+            track_node *d = &ts.track[object], *n = &ts.track[next_sensor], *f;
 
             TrackPath tp = {{0}, {{SWITCH_UNKNOWN}}}; 
             int possible = find_path_between_nodes(n, d, &tp, 0);
             if (possible) {
-                ASSERT(reverse_distance_from_node(&ts, d, stopping_distance[current_speed], predicted_velocity[current_speed], &tp, &f, &rom.time_after_end_sensor) == 0, "Reverse Distance Failed");
+                ASSERT(reverse_distance_from_node(&ts, d, stopping_distance[current_speed] - distance_past, predicted_velocity[current_speed], &tp, &f, &rom.time_after_end_sensor) == 0, "Reverse Distance Failed");
                 rom.end_sensor = (int) f->num; 
                 for (int i = 1; i <= NUM_SWITCHES; i++){
                     if (tp.switches[i].state != ts.switches[i].state) {
