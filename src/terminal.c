@@ -91,13 +91,12 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
     }
     case 't': // tr
     {
+        err = cb_read_match(cb_input, "r ");
+        if (err != 0) {
+            break;
+        }
+
         int train, speed;
-        if (cb_empty(cb_input))
-            break;
-        cb_read(cb_input, &c);
-        if (c != 'r')
-            break;
-        cb_read(cb_input, &c); // the space
         err = cb_read_number(cb_input, &train);
         if (err)
             break;
@@ -112,13 +111,12 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
     }
     case 'r': // rv
     {
+        err = cb_read_match(cb_input, "v ");
+        if (err != 0) {
+            break;
+        }
+
         int train;
-        if (cb_empty(cb_input))
-            break;
-        cb_read(cb_input, &c);
-        if (c != 'v')
-            break;
-        cb_read(cb_input, &c); // the space
         err = cb_read_number(cb_input, &train);
         if (err)
             break;
@@ -129,14 +127,13 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
     }
     case 's': // sw
     {
+        err = cb_read_match(cb_input, "w ");
+        if (err != 0) {
+            break;
+        }
+
         int sw;
         char dir;
-        if (cb_empty(cb_input))
-            break;
-        cb_read(cb_input, &c);
-        if (c != 'w')
-            break;
-        cb_read(cb_input, &c); // the space
         err = cb_read_number(cb_input, &sw);
         if (err)
             break;
@@ -151,55 +148,72 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
     }
     case 'g': // go
     {
-        if (cb_empty(cb_input))
+        err = cb_read_match(cb_input, "o");
+        if (err != 0) {
             break;
-        cb_read(cb_input, &c);
-        if (c != 'o')
-            break;
+        }
+
         cmd->type = COMMAND_GO;
         return 0;
     }
     case 'i': // inv
     {
-        if (cb_empty(cb_input))
+        err = cb_read_match(cb_input, "nv");
+        if (err != 0) {
             break;
-        cb_read(cb_input, &c);
-        if (c != 'n')
-            break;
-        if (cb_empty(cb_input))
-            break;
-        cb_read(cb_input, &c);
-        if (c != 'v')
-            break;
+        }
+
         cmd->type = COMMAND_INV;
         return 0;
     }
     case 'f': // find (TODO we need a better command parsing strategy)
     {
+        err = cb_read_match(cb_input, "ind ");
+        if (err != 0) {
+            break;
+        }
+
         char sensor_char;
         int sensor_num;
-        if (cb_empty(cb_input))
-            break;
-        cb_read(cb_input, &c);
-        if (c != 'i')
-            break;
-        if (cb_empty(cb_input))
-            break;
-        cb_read(cb_input, &c);
-        if (c != 'n')
-            break;
-        if (cb_empty(cb_input))
-            break;
-        cb_read(cb_input, &c);
-        if (c != 'd')
-            break;
-        cb_read(cb_input, &c); // the space
         cb_read(cb_input, &sensor_char); // RADIX
         err = cb_read_number(cb_input, &sensor_num); // SW #
         if (err)
             break;
+
+        int train;
+        err = cb_read_number(cb_input, &train);
+        if (err)
+            break;        
+
+        // find <sensor> <train>
         cmd->type = COMMAND_ROUTE;
         cmd->arg1 = SENSOR_PAIR_TO_SENSOR(sensor_char - 'A', sensor_num - 1);
+        cmd->arg2 = train;
+        return 0;
+    }
+    case 'c': // cal
+    {
+        err = cb_read_match(cb_input, "al ");
+        if (err != 0) {
+            break;
+        }
+
+        char sensor_char;
+        int sensor_num;
+        cb_read(cb_input, &sensor_char); // RADIX
+        err = cb_read_number(cb_input, &sensor_num); // SW #
+        if (err)
+            break;
+
+        int train;
+        err = cb_read_number(cb_input, &train);
+        if (err)
+            break;        
+
+        // cal <sensor> <train>
+        cmd->type = COMMAND_CAL;
+        cmd->arg1 = SENSOR_PAIR_TO_SENSOR(sensor_char - 'A', sensor_num - 1);
+        cmd->arg2 = train;
         return 0;
     }
     default:

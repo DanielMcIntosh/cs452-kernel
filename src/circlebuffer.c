@@ -1,5 +1,6 @@
 #include <ts7200.h>
 #include <circlebuffer.h>
+#include <err.h>
 
 void cb_init(struct circlebuffer *cb, char *buf, int size) {
     cb->buf = buf;
@@ -62,7 +63,20 @@ int cb_read_number(struct circlebuffer *cb, int *i){
 
     *i = num;
     return r;
+}
 
+int cb_read_match(circlebuffer_t *cb, char *str) {
+    char c;
+    while (!cb_empty(cb) && *str != '\0') {
+        cb_read(cb, &c);
+        if (c != *str++) {
+            return ERR_TEXT_MISMATCH;
+        }
+    }
+    if (*str != '\0') {
+        return ERR_TEXT_MISMATCH;
+    }
+    return 0;
 }
 
 int cb_write(struct circlebuffer *cb, char c){

@@ -15,5 +15,6 @@
 #define ERR_MH_FULL -12
 #define ERR_NOT_A_NUMBER -13
 #define ERR_INVALID_COMMAND -14
+#define ERR_TEXT_MISMATCH -15
 #define ERR_NOT_IMPLEMENTED -99;
 #endif //ERR_H

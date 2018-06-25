@@ -21,6 +21,7 @@ typedef enum cmdtype{
     COMMAND_QUIT,
     COMMAND_INV,
     COMMAND_ROUTE,
+    COMMAND_CAL,
     NO_COMMAND,
     // PARTIAL COMMANDS
     COMMAND_NOTIFY_RV_ACCEL,

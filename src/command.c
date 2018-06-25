@@ -119,6 +119,30 @@ void task_switch_courier(int cmdtid){
     }
 }
 
+void task_send_wakeup(int tid) {
+    MessageType msg = MESSAGE_WAKEUP;
+    Send(tid, &msg, sizeof(msg), NULL, 0);
+}
+
+void task_calibrate(int train, int sensor) {
+    /*
+    int cmdtid = WhoIs(NAME_COMMANDSERVER);
+    int my_tid = MyTid();
+
+    int timeout = ;
+    int intvl = ;
+    int num_over = 0, num_under = 0;
+    for (int i = 0; i < 8; ++i) {
+        //for now, assume we're always successful at reaching our start sensor
+        Runnable runnable = {&task_send_wakeup, my_tid, 0U, FALSE};
+        RunWhen(sensor, &runnable, PRIORITY_HIGHEST);
+        Receive(&tid, )
+        intvl = intvl * 4 / 5;
+    }
+    */
+    Destroy();
+}
+
 static inline void commandserver_exec_switch(CommandServer *cs, int arg1, int arg2, ReplyMessage *rm, int servertid){
     Putc(servertid, 1, arg1 == 'C' ? 34 : 33);
     Putc(servertid, 1, arg2);
@@ -229,6 +253,7 @@ void task_commandserver(){
         case COMMAND_ROUTE:
         {
             int sensor = cm.command.arg1;
+            int train = cm.command.arg2;
             int err = GetRoute(WhoIs(NAME_TRACK_STATE), sensor, &rom);
             ASSERT(err==0, "FAILED TO GET ROUTE");
             for (int i = 1; i <= NUM_SWITCHES; i++) {
@@ -243,11 +268,17 @@ void task_commandserver(){
                     }
                 }
             }
-            //TODO get train number somehow
-            Runnable runnable = {&stop_train, 24, 0U, '\0'};
+            Runnable runnable = {&stop_train, train, 0U, FALSE};
             RunWhen(sensor, &runnable, PRIORITY_MID);
             break;
 
+        }
+        case COMMAND_CAL:
+        {
+            int sensor = cm.command.arg1;
+            int train = cm.command.arg2;
+            CreateWith2Args(PRIORITY_HIGHEST, &task_calibrate, train, sensor);
+            break;
         }
         case COMMAND_QUIT:
         {

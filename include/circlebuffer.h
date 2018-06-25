@@ -15,6 +15,7 @@ int cb_empty(struct circlebuffer *cb);
 int cb_read(struct circlebuffer *cb, char *c);
 int cb_peek(struct circlebuffer *cb, char *c);
 int cb_read_number(struct circlebuffer *cb, int *i); // NOTE: reads 1 past the number rn
+int cb_read_match(circlebuffer_t *cb, char *str);
 
 int cb_write(struct circlebuffer *cb, char c);
 int cb_backspace(struct circlebuffer *cb);
