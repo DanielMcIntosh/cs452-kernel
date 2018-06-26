@@ -261,7 +261,7 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
         break;
     }
     }
-    while (cb_read(cb_input, &c) == 0);// clear input buffer
+
     cmd->type = INVALID_COMMAND;
     return 0;
 }
@@ -283,6 +283,7 @@ void task_terminal_command_parser(int terminaltid){
         c = Getc(rcv_tid, 2);
         if (c == '\15'){
             err = parse_command(&t.cmd, &t.input);
+            while(cb_read(&t.input, &c) == 0); // flush input buffer
             tm.rq = TERMINAL_NEWLINE;
             Send(terminaltid, &tm, sizeof(tm), &rm, sizeof(rm));
             if (t.cmd.type != INVALID_COMMAND)
@@ -349,8 +350,10 @@ void task_terminal() {
         }
         case(TERMINAL_BACKSPACE):
         {
-            if (t.input_col > TERMINAL_INPUT_BASE_COL)
+            if (t.input_col > TERMINAL_INPUT_BASE_COL){
                 cb_write_string(&t.output, "\x08 \x08");
+                t.input_col--;
+            }
             break;
         }
         case(TERMINAL_NEWLINE):
