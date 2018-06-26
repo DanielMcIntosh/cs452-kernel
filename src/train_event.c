@@ -33,7 +33,10 @@ void task_train_event_courier() {
             case QUEUE:
             {
                 //set waiting task for sensor
-                ASSERT(waiting_tid[tm.sensor] == 0, "task already queued");
+                //ASSERT(waiting_tid[tm.sensor] == 0, "task already queued");
+                if (waiting_tid[tm.sensor] != 0){
+                    PANIC("\r\ntask already queued: %d --> %d\r\n", tm.sensor, waiting_tid[tm.sensor]);
+                }
                 ASSERT(tm.sensor < NUM_SENSORS && tm.sensor >= 0, "invalid sensor to wait on");
                 waiting_tid[tm.sensor] = tid;
                 break;

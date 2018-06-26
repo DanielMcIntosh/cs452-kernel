@@ -33,6 +33,7 @@ typedef struct visited { // represents sensors
 typedef struct trackpath{
     Visited visited;
     Switch switches[NUM_SWITCHES+1];
+    Switch merges[NUM_SWITCHES+1]; // for doing reverse distance search later
 } TrackPath;
 
 typedef struct tsmessage{
@@ -83,7 +84,10 @@ static track_node* predict_next_sensor(TrackState *ts, track_node *last_sensor, 
         switch (n->type) {
         case (NODE_BRANCH):
         {
-            if (path && path->switches[SWCLAMP(n->num)].state != SWITCH_UNKNOWN)
+            //ASSERT(!(path &&path->merges[SWCLAMP(n->num)].state != SWITCH_UNKNOWN && path->switches[SWCLAMP(n->num)].state != SWITCH_UNKNOWN), "path covers branch & merge?");
+            if (path && path->merges[SWCLAMP(n->num)].state != SWITCH_UNKNOWN)
+                e = &n->edge[STATE_TO_DIR(path->merges[SWCLAMP(n->num)].state)];
+            else if (path && path->switches[SWCLAMP(n->num)].state != SWITCH_UNKNOWN)
                 e = &n->edge[STATE_TO_DIR(path->switches[SWCLAMP(n->num)].state)];
             else 
                 e = &n->edge[STATE_TO_DIR(ts->switches[SWCLAMP(n->num)].state)];
@@ -147,8 +151,8 @@ static int forward_distance_from_node(TrackState *ts, track_node *destination, i
     return 0;
 }
 
-static int find_path_between_nodes(track_node *origin, track_node *dest, int min_path_len, TrackPath * l, int level){
-    if (origin == dest && min_path_len <= 0) return 1;
+static int find_path_between_nodes(track_node *origin, track_node *dest, track_node *previous, int min_path_len, TrackPath * l, int level){
+    if (origin == dest && (1 ||  min_path_len <= 0)) return 1;
     if (origin == NULL || origin->type == NODE_NONE) return 0;
 
     switch (origin->type){
@@ -157,14 +161,14 @@ static int find_path_between_nodes(track_node *origin, track_node *dest, int min
         if (IsVisited(l->visited, origin->num)){
             return 0;
         }
-        if (min_path_len <= 0) {
+        if (1 || min_path_len <= 0) {
             Visit(l->visited, origin->num);
         }
 
-        if (find_path_between_nodes(origin->edge[DIR_STRAIGHT].dest, dest, min_path_len - origin->edge[DIR_STRAIGHT].dist, l, level+1)){
+        if (find_path_between_nodes(origin->edge[DIR_STRAIGHT].dest, dest, origin, min_path_len - origin->edge[DIR_STRAIGHT].dist, l, level+1)){
             l->switches[SWCLAMP(origin->num)].state = SWITCH_STRAIGHT;
             return 1;
-        } else if (find_path_between_nodes(origin->edge[DIR_CURVED].dest, dest, min_path_len - origin->edge[DIR_CURVED].dist, l, level+1)){
+        } else if (find_path_between_nodes(origin->edge[DIR_CURVED].dest, dest, origin, min_path_len - origin->edge[DIR_CURVED].dist, l, level+1)){
             l->switches[SWCLAMP(origin->num)].state = SWITCH_CURVED;
             if (origin->num >= 153){
                l->switches[SWCLAMP(SW3_COMPLEMENT(origin->num))].state = SWITCH_STRAIGHT; 
@@ -173,11 +177,22 @@ static int find_path_between_nodes(track_node *origin, track_node *dest, int min
         }
         return 0;
     }
-    case (NODE_SENSOR):
-    case (NODE_ENTER):
     case (NODE_MERGE):
     {
-        return find_path_between_nodes(origin->edge[DIR_AHEAD].dest, dest, min_path_len - origin->edge[DIR_AHEAD].dist, l, level+1);
+        // figure out which side of the branch we are:
+        track_node *pr = previous->reverse;
+        track_node *br = origin->reverse;
+        if (br->edge[DIR_STRAIGHT].dest == pr) {
+            l->merges[SWCLAMP(origin->num)].state = SWITCH_STRAIGHT;
+        } else {
+            l->merges[SWCLAMP(origin->num)].state = SWITCH_CURVED;
+        }
+        // no break on purpose: should fall through to the next case.
+    }
+    case (NODE_SENSOR):
+    case (NODE_ENTER):
+    {
+        return find_path_between_nodes(origin->edge[DIR_AHEAD].dest, dest, origin, min_path_len - origin->edge[DIR_AHEAD].dist, l, level+1);
     }
     case (NODE_EXIT):
     {
@@ -312,10 +327,10 @@ void task_track_state(int track){
                 next_sensor = predict_next_sensor(&ts, &ts.track[last_sensor], NULL, &distance)->num;
             }
 
-            track_node *d = &ts.track[object], *n = &ts.track[next_sensor], *f = 0;
+            track_node *d = &ts.track[object], *n = &ts.track[next_sensor], *o = &ts.track[last_sensor], *f = 0;
 
-            TrackPath tp = {{0}, {{SWITCH_UNKNOWN}}}; 
-            int possible = find_path_between_nodes(n, d, stopping_distance[current_speed] - distance_past, &tp, 0);
+            TrackPath tp = {{0}, {{SWITCH_UNKNOWN}}, {{SWITCH_UNKNOWN}}}; 
+            int possible = find_path_between_nodes(n, d, o, stopping_distance[current_speed] - distance_past, &tp, 0);
             if (possible) {
                 if (stopping_distance[current_speed] > distance_past) {
                     ASSERT(reverse_distance_from_node(&ts, d, stopping_distance[current_speed] - distance_past, predicted_velocity[current_speed], &tp, &f, &rom.time_after_end_sensor) == 0, "Reverse Distance Failed");
