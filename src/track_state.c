@@ -403,10 +403,8 @@ void task_track_state(int track){
                 interval = interval * 4 / 5;
             }
             ASSERT(interval >= 10, "interval < 10");
-            SendTerminalRequest(puttid, TERMINAL_ECHO, data.triggered ? '+' : '-', 0);
             stopping_distance[data.speed] += (data.triggered ? 1 : -1) * interval;
             if (stopping_distance[data.speed] <= 0) {
-                SendTerminalRequest(puttid, TERMINAL_ECHO, '0', 0);
                 stopping_distance[data.speed] = 1;
             }
             break;
