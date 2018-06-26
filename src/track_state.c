@@ -131,6 +131,22 @@ static int reverse_distance_from_node(TrackState *ts, track_node *destination, i
     return 0;
 }
 
+static int forward_distance_from_node(TrackState *ts, track_node *destination, int distance, int velocity, TrackPath *tp, track_node **wakeup_sensor, int * time_after_sensor){
+    ASSERT(distance >= 0, "Cannot forward find negative distance");
+    track_node * next_sensor = destination;
+    int tdist = 0, last_tdist = 0, cdist;
+    while (tdist < distance) {
+        *wakeup_sensor = next_sensor;
+        last_tdist = tdist;
+        next_sensor = predict_next_sensor(ts, next_sensor, tp, &cdist);
+        tdist += cdist;
+    }
+    cdist = distance - last_tdist; // remaining distance (in mm)
+    *time_after_sensor = (cdist * VELOCITY_PRECISION / (velocity)); // mm / (mm/10 ms) -> 10 ms 
+
+    return 0;
+}
+
 static int find_path_between_nodes(track_node *origin, track_node *dest, int min_path_len, TrackPath * l, int level){
     if (origin == dest && min_path_len <= 0) return 1;
     if (origin == NULL || origin->type == NODE_NONE) return 0;
@@ -296,12 +312,16 @@ void task_track_state(int track){
                 next_sensor = predict_next_sensor(&ts, &ts.track[last_sensor], NULL, &distance)->num;
             }
 
-            track_node *d = &ts.track[object], *n = &ts.track[next_sensor], *f;
+            track_node *d = &ts.track[object], *n = &ts.track[next_sensor], *f = 0;
 
             TrackPath tp = {{0}, {{SWITCH_UNKNOWN}}}; 
             int possible = find_path_between_nodes(n, d, stopping_distance[current_speed] - distance_past, &tp, 0);
             if (possible) {
-                ASSERT(reverse_distance_from_node(&ts, d, stopping_distance[current_speed] - distance_past, predicted_velocity[current_speed], &tp, &f, &rom.time_after_end_sensor) == 0, "Reverse Distance Failed");
+                if (stopping_distance[current_speed] > distance_past) {
+                    ASSERT(reverse_distance_from_node(&ts, d, stopping_distance[current_speed] - distance_past, predicted_velocity[current_speed], &tp, &f, &rom.time_after_end_sensor) == 0, "Reverse Distance Failed");
+                } else {
+                    ASSERT(forward_distance_from_node(&ts, d, distance_past - stopping_distance[current_speed], predicted_velocity[current_speed], &tp, &f, &rom.time_after_end_sensor) == 0, "Forward Distance Failed");
+                }
                 rom.end_sensor = (int) f->num; 
                 for (int i = 1; i <= NUM_SWITCHES; i++){
                     if (tp.switches[i].state != ts.switches[i].state) {

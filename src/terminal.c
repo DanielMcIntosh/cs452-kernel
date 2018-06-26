@@ -11,6 +11,7 @@
 #include <message.h>
 #include <clock.h>
 #include <sensor.h>
+#include <track_state.h> // TODO
 
 typedef struct terminalparser {
     circlebuffer_t input;
@@ -191,7 +192,41 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
 
         // find <sensor> <train>
         cmd->type = COMMAND_ROUTE;
-        cmd->arg1 = SENSOR_PAIR_TO_SENSOR(sensor_char - 'A', sensor_num - 1);
+        switch(sensor_char) {
+        case ('S'):
+        {
+            cmd->arg1 = SWITCH_TO_NODE(SWCLAMP(sensor_num)- 1);
+            break;
+        }
+        case ('M'):
+        {
+            cmd->arg1 = MERGE_TO_NODE(SWCLAMP(sensor_num) - 1);
+            break;
+        }
+        case ('N'):
+        {
+            cmd->arg1 = ENTER_TO_NODE(sensor_num - 1);
+            break;
+        }
+        case ('X'):
+        {
+            cmd->arg1 = EXIT_TO_NODE(sensor_num - 1);
+            break;
+        }
+        case ('A'):
+        case ('B'):
+        case ('C'):
+        case ('D'):
+        case ('E'):
+        {
+            cmd->arg1 = SENSOR_PAIR_TO_SENSOR(sensor_char - 'A', sensor_num - 1);
+            break;
+        }
+        default:
+        {
+            PANIC("INVALID SENSOR CHAR: %d\r\n", sensor_char)
+        }
+        }
         cmd->smallarg1 = distance_past;
         cmd->smallarg2 = train;
         return 0;

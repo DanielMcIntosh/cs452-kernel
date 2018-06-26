@@ -311,6 +311,7 @@ void task_commandserver(){
 
             int time_after_sensor = rom.time_after_end_sensor;
             int sensor_to_wake = rom.end_sensor;
+            //PANIC("%d || %d || %d", sensor, sensor_to_wake, time_after_sensor); //122 | 62 | 178
             for (int i = 1; i <= NUM_SWITCHES; i++) {
                 if (rom.switches[i].state != SWITCH_UNKNOWN){
                     char sw_state = STATE_TO_CHAR(rom.switches[i].state);
