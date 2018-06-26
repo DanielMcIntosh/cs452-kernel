@@ -158,8 +158,6 @@ void task_calibrate(int train, int sensor_dest) {
     int speed = GetTrainSpeed(track_state_tid, train);
     bool overshot;
 
-    int terminaltid = WhoIs(NAME_TERMINAL);
-
     int num_over = 0;
     while (num_over == 0 || num_over == CAL_ITERATIONS) {
         num_over = 0;

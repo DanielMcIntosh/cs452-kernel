@@ -126,7 +126,7 @@ static int reverse_distance_from_node(TrackState *ts, track_node *destination, i
     cdist = tdist - distance; // remaining distance (in mm)
     *wakeup_sensor = next_sensor->reverse;
     ASSERT(*wakeup_sensor != destination, "WRONG");
-    *time_after_sensor = (cdist * VELOCITY_PRECISION / (velocity* 10)); // mm / (10 mm/10 ms) -> ms 
+    *time_after_sensor = (cdist * VELOCITY_PRECISION / (velocity)); // mm / (mm/10 ms) -> 10 ms 
 
     return 0;
 }
@@ -248,8 +248,8 @@ void task_track_state(int track){
         50, 60,
         70, 80,
         90, 150,
-        200, 400,
-        900, 1100
+        400, 800,
+        1500, 2000
     };
     int current_speed = 0;
 
@@ -403,8 +403,10 @@ void task_track_state(int track){
                 interval = interval * 4 / 5;
             }
             ASSERT(interval >= 10, "interval < 10");
+            SendTerminalRequest(puttid, TERMINAL_ECHO, data.triggered ? '+' : '-', 0);
             stopping_distance[data.speed] += (data.triggered ? 1 : -1) * interval;
             if (stopping_distance[data.speed] <= 0) {
+                SendTerminalRequest(puttid, TERMINAL_ECHO, '0', 0);
                 stopping_distance[data.speed] = 1;
             }
             break;

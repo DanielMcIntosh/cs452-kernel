@@ -14,7 +14,7 @@
 #define CHAR_TO_TRACK(c) ((c) == 'A' ? TRACK_A : TRACK_B)
 #define VELOCITY_PRECISION 10000
 #define CAL_ITERATIONS 8
-#define BASE_STOP_DIST_ADJUSTMENT 80
+#define BASE_STOP_DIST_ADJUSTMENT 70
 
 typedef struct sensordata {
     unsigned int radix: 4;
