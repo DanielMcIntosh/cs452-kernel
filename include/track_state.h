@@ -14,6 +14,7 @@
 #define CHAR_TO_TRACK(c) ((c) == 'A' ? TRACK_A : TRACK_B)
 #define VELOCITY_PRECISION 10000
 #define CAL_ITERATIONS 8
+#define BASE_STOP_DIST_ADJUSTMENT 80
 
 typedef struct sensordata {
     unsigned int radix: 4;
@@ -37,7 +38,8 @@ typedef struct routerequest{
 } __attribute__((packed)) RouteRequest; // TODO move these structs into the c file.
 
 typedef struct caldata{
-    int iteration;
+    int iteration : 16;
+    int speed : 16;
     bool triggered;
 } __attribute__((packed)) CalData;
 

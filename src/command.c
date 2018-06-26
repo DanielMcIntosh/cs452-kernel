@@ -143,26 +143,8 @@ static inline void setup_track_state(int cmdtid, RouteMessage *rom) {
     }
 }
 
-static inline void stop_train(int train, int wait) {
-    int cmdtid = WhoIs(NAME_COMMANDSERVER);
-
-    Delay(wait);
-    Command stop_cmd = {COMMAND_TR, 0, {.arg2 = train}};
-    SendCommand(cmdtid, stop_cmd);
-}
-
-void calibration_wrapper(int iteration, int caller_tid, bool success) {
-    int track_state_tid = WhoIs(NAME_TRACK_STATE);
-
-    CalData cal_data = {iteration, success};
-    NotifyCalibrationResult(track_state_tid, cal_data);
-
-    Send(caller_tid, &success, sizeof(success), NULL, 0);
-}
-
 void send_wakeup(int tid, int __attribute__((unused)) arg1, bool success) {
-    MessageType msg = success ? MESSAGE_WAKEUP : MESSAGE_TIMEOUT;
-    Send(tid, &msg, sizeof(msg), NULL, 0);
+    Send(tid, &success, sizeof(success), NULL, 0);
 }
 
 void task_calibrate(int train, int sensor_dest) {
@@ -171,9 +153,12 @@ void task_calibrate(int train, int sensor_dest) {
 
     RouteMessage rom = {0, 0, {{0}}};
     int alarm_tid;
-    MessageType alarm_message;
+    bool runnable_success;
     int track_state_tid = WhoIs(NAME_TRACK_STATE);
     int speed = GetTrainSpeed(track_state_tid, train);
+    bool overshot;
+
+    int terminaltid = WhoIs(NAME_TERMINAL);
 
     int num_over = 0;
     while (num_over == 0 || num_over == CAL_ITERATIONS) {
@@ -183,28 +168,31 @@ void task_calibrate(int train, int sensor_dest) {
             RouteRequest rq = {.object = sensor_dest, .distance_past = 0};
             int err = GetRoute(WhoIs(NAME_TRACK_STATE), rq, &rom);
             ASSERT(err==0, "FAILED TO GET ROUTE");
-            setup_track_state(cmdtid, &rom);
-            int sensor_to_wake = rom.end_sensor;
+            //if (i < 2)
+                setup_track_state(cmdtid, &rom);
 
+            int sensor_to_wake = rom.end_sensor;
             //wait until we hit <sensor_to_wake>
             //for now, assume we're always successful in triggering <sensor_to_wake>
-            Runnable runnable_alarm = {&send_wakeup, my_tid, 0, 0U, FALSE};
-            RunWhen(sensor_to_wake, &runnable_alarm, PRIORITY_MID);
-            Receive(&alarm_tid, &alarm_message, sizeof(alarm_message));
+            Runnable runnable_alarm1 = {&send_wakeup, my_tid, 0, 0U, FALSE};
+            RunWhen(sensor_to_wake, &runnable_alarm1, PRIORITY_MID);
+            Receive(&alarm_tid, &runnable_success, sizeof(runnable_success));
             Reply(alarm_tid, NULL, 0);
 
             int delay = rom.time_after_end_sensor;
             //wait <delay> ticks, then send a stop command
-            stop_train(train, delay);
+            Delay(delay);
+            Command stop_cmd = {COMMAND_TR, 0, {.arg2 = train}};
+            SendCommand(cmdtid, stop_cmd);
 
-            //Timeout 1.5 s after we send stop command
-            Runnable runnable_calibrate = {&calibration_wrapper, i, my_tid, 250, TRUE};
-            RunWhen(sensor_dest, &runnable_calibrate, PRIORITY_MID);
+            //sleep until we hit sensor_dest, timeout 2.5 s after we send stop command
+            Runnable runnable_alarm2 = {&send_wakeup, my_tid, 0, 250U, TRUE};
+            RunWhen(sensor_dest, &runnable_alarm2, PRIORITY_MID);
+            Receive(&alarm_tid, &overshot, sizeof(overshot));
+            Reply(alarm_tid, NULL, 0);
 
-            int cal_tid;
-            bool overshot;
-            Receive(&cal_tid, &overshot, sizeof(overshot));
-            Reply(cal_tid, NULL, 0);
+            CalData cal_data = {i, speed, overshot};
+            NotifyCalibrationResult(track_state_tid, cal_data);
 
             Command accel_cmd = {COMMAND_TR, speed, {.arg2 = train}};
             SendCommand(cmdtid, accel_cmd);
@@ -218,7 +206,11 @@ void task_calibrate(int train, int sensor_dest) {
 }
 
 void stop_wrapper(int train, int wait, bool __attribute__((unused)) success) {
-    stop_train(train, wait);
+    int cmdtid = WhoIs(NAME_COMMANDSERVER);
+
+    Delay(wait);
+    Command stop_cmd = {COMMAND_TR, 0, {.arg2 = train}};
+    SendCommand(cmdtid, stop_cmd);
 }
 
 void task_commandserver(){
@@ -344,7 +336,7 @@ void task_commandserver(){
         {
             int sensor = cm.command.arg1;
             int train = cm.command.arg2;
-            CreateWith2Args(PRIORITY_HIGHEST, &task_calibrate, train, sensor);
+            CreateWith2Args(PRIORITY_MID, &task_calibrate, train, sensor);
             break;
         }
         case COMMAND_QUIT:

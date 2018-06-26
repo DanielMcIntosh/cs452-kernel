@@ -93,12 +93,15 @@ static track_node* predict_next_sensor(TrackState *ts, track_node *last_sensor, 
             break;
         }
         case (NODE_ENTER):
-        case (NODE_EXIT):
         case (NODE_MERGE):
         {
             *distance += n->edge[DIR_AHEAD].dist;
             n = n->edge[DIR_AHEAD].dest;
             break;
+        }
+        case (NODE_EXIT):
+        {
+            return NULL;
         }
         default:
         {
@@ -112,11 +115,12 @@ static track_node* predict_next_sensor(TrackState *ts, track_node *last_sensor, 
 }
 
 static int reverse_distance_from_node(TrackState *ts, track_node *destination, int distance, int velocity, TrackPath *tp, track_node ** wakeup_sensor, int* time_after_sensor){
-    ASSERT(distance >= 0, "Cannot reverse find negative distance");
+    ASSERT(distance > 0, "Cannot reverse find negative distance");
     track_node * next_sensor = destination->reverse;
     int tdist = 0, cdist;
     while (tdist < distance) {
         next_sensor = predict_next_sensor(ts, next_sensor, tp, &cdist);
+        ASSERT(next_sensor != NULL, "next sensor == null!");
         tdist += cdist;
     }
     cdist = tdist - distance; // remaining distance (in mm)
@@ -127,8 +131,8 @@ static int reverse_distance_from_node(TrackState *ts, track_node *destination, i
     return 0;
 }
 
-static int find_path_between_nodes(track_node *origin, track_node *dest, TrackPath * l, int level){
-    if (origin == dest) return 1;
+static int find_path_between_nodes(track_node *origin, track_node *dest, int min_path_len, TrackPath * l, int level){
+    if (origin == dest && min_path_len <= 0) return 1;
     if (origin == NULL || origin->type == NODE_NONE) return 0;
 
     switch (origin->type){
@@ -137,12 +141,14 @@ static int find_path_between_nodes(track_node *origin, track_node *dest, TrackPa
         if (IsVisited(l->visited, origin->num)){
             return 0;
         }
-        Visit(l->visited, origin->num);
+        if (min_path_len <= 0) {
+            Visit(l->visited, origin->num);
+        }
 
-        if (find_path_between_nodes(origin->edge[DIR_STRAIGHT].dest, dest, l, level+1)){
+        if (find_path_between_nodes(origin->edge[DIR_STRAIGHT].dest, dest, min_path_len - origin->edge[DIR_STRAIGHT].dist, l, level+1)){
             l->switches[SWCLAMP(origin->num)].state = SWITCH_STRAIGHT;
             return 1;
-        } else if (find_path_between_nodes(origin->edge[DIR_CURVED].dest, dest, l, level+1)){
+        } else if (find_path_between_nodes(origin->edge[DIR_CURVED].dest, dest, min_path_len - origin->edge[DIR_CURVED].dist, l, level+1)){
             l->switches[SWCLAMP(origin->num)].state = SWITCH_CURVED;
             if (origin->num >= 153){
                l->switches[SWCLAMP(SW3_COMPLEMENT(origin->num))].state = SWITCH_STRAIGHT; 
@@ -153,10 +159,13 @@ static int find_path_between_nodes(track_node *origin, track_node *dest, TrackPa
     }
     case (NODE_SENSOR):
     case (NODE_ENTER):
-    case (NODE_EXIT):
     case (NODE_MERGE):
     {
-        return find_path_between_nodes(origin->edge[DIR_AHEAD].dest, dest, l, level+1);
+        return find_path_between_nodes(origin->edge[DIR_AHEAD].dest, dest, min_path_len - origin->edge[DIR_AHEAD].dist, l, level+1);
+    }
+    case (NODE_EXIT):
+    {
+        return 0;
     }
     default:
     {
@@ -278,13 +287,19 @@ void task_track_state(int track){
         }
         case (ROUTE):
         {
-            int object = SENSOR_TO_NODE(tm.route_request.object);
+            ASSERT(current_speed != 0, "Trying to find route with speed == 0!");
+            int object = tm.route_request.object;
             int distance_past = tm.route_request.distance_past;
+
+            if (next_sensor < 0) {
+                int __attribute__((unused)) distance;
+                next_sensor = predict_next_sensor(&ts, &ts.track[last_sensor], NULL, &distance)->num;
+            }
 
             track_node *d = &ts.track[object], *n = &ts.track[next_sensor], *f;
 
             TrackPath tp = {{0}, {{SWITCH_UNKNOWN}}}; 
-            int possible = find_path_between_nodes(n, d, &tp, 0);
+            int possible = find_path_between_nodes(n, d, stopping_distance[current_speed] - distance_past, &tp, 0);
             if (possible) {
                 ASSERT(reverse_distance_from_node(&ts, d, stopping_distance[current_speed] - distance_past, predicted_velocity[current_speed], &tp, &f, &rom.time_after_end_sensor) == 0, "Reverse Distance Failed");
                 rom.end_sensor = (int) f->num; 
@@ -296,6 +311,7 @@ void task_track_state(int track){
                     }
                 }
             } else {
+                PANIC("failed to find path between %d and %d", object, next_sensor);
                 rom.end_sensor = -1;
                 for (int i = 0; i <= NUM_SWITCHES; i++){
                     rom.switches[i].state = SWITCH_UNKNOWN; // pick up differences and unnknowns
@@ -341,7 +357,7 @@ void task_track_state(int track){
                         SendTerminalRequest(puttid, TERMINAL_VELOCITY_DEBUG, predicted_velocity[current_speed], n->num);
                         SendTerminalRequest(puttid, TERMINAL_DISTANCE_DEBUG, distance, 0);
 
-                        last_sensor = c->num;
+                        last_sensor = sensor;
                         last_sensor_time = f.time;
                         last_sensor_distance = distance;
                         next_sensor = n->num;
@@ -379,12 +395,18 @@ void task_track_state(int track){
             Reply(tid, &rm, sizeof(rm));
             CalData data = tm.cal_data;
 
+            ASSERT(data.iteration < CAL_ITERATIONS, "iteration >= CAL_ITERATIONS");
+
             //adjust stopping_distance
-            int interval = 20;
+            int interval = BASE_STOP_DIST_ADJUSTMENT;
             for (int i = 0; i < data.iteration; ++i) {
                 interval = interval * 4 / 5;
             }
-            stopping_distance[current_speed] += (data.triggered ? -1 : 1) * interval;
+            ASSERT(interval >= 10, "interval < 10");
+            stopping_distance[data.speed] += (data.triggered ? 1 : -1) * interval;
+            if (stopping_distance[data.speed] <= 0) {
+                stopping_distance[data.speed] = 1;
+            }
             break;
         }
         default:
