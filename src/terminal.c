@@ -283,7 +283,7 @@ void task_terminal_command_parser(int terminaltid){
         c = Getc(rcv_tid, 2);
         if (c == '\15'){
             err = parse_command(&t.cmd, &t.input);
-            while(cb_read(&t.input, &c) == 0); // flush input buffer
+            cb_flush(&t.input);
             tm.rq = TERMINAL_NEWLINE;
             Send(terminaltid, &tm, sizeof(tm), &rm, sizeof(rm));
             if (t.cmd.type != INVALID_COMMAND)

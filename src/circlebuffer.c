@@ -18,6 +18,11 @@ int cb_empty(struct circlebuffer *cb){
     return (cb->rd == cb->wr) && cb->empty;
 }
 
+void cb_flush(struct circlebuffer *cb) {
+    cb->rd = cb->wr;
+    cb->empty = 1;   
+}
+
 int cb_read(struct circlebuffer *cb, char *c){
     if (cb_empty(cb)) {
         return 1;
