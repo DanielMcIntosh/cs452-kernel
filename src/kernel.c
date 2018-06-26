@@ -173,6 +173,7 @@ int main(){
         task = schedule(&task_ready_queue);
     }
     LOG("Kernel Exiting - No More Tasks");
+    vic2->IntEnableClear = 0xFFFFFFFF;
 
     return 0;
 }
