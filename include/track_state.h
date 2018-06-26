@@ -39,8 +39,8 @@ typedef struct traindata {
 } __attribute__((packed)) TrainData;
 
 typedef struct routerequest{
-    unsigned int object: 16;
-    unsigned int distance_past: 16;
+    int object: 16;
+    int distance_past: 16;
 } __attribute__((packed)) RouteRequest; // TODO move these structs into the c file.
 
 typedef struct caldata{

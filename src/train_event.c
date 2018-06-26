@@ -34,6 +34,7 @@ void task_train_event_courier() {
             {
                 //set waiting task for sensor
                 ASSERT(waiting_tid[tm.sensor] == 0, "task already queued");
+                ASSERT(tm.sensor < NUM_SENSORS && tm.sensor >= 0, "invalid sensor to wait on");
                 waiting_tid[tm.sensor] = tid;
                 break;
             }
