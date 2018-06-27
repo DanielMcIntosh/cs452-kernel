@@ -46,6 +46,7 @@ typedef struct tsmessage{
         TrainData train_data;
         RouteRequest route_request;
         CalData cal_data;
+        ParamData param_data;
     };
 } TrackStateMessage;
 
@@ -232,6 +233,11 @@ int NotifyCalibrationResult(int trackstatetid, CalData data) {
     return sendTrackState(trackstatetid, &msg);
 }
 
+int NotifyParam(int trackstatetid, ParamData data) {
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = NOTIFY_PARAM, {.param_data = data}};
+    return sendTrackState(trackstatetid, &msg);
+}
+
 int GetSwitchState(int trackstatetid, int sw){
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = SWITCH, {.data = sw}};
     return sendTrackState(trackstatetid, &msg);
@@ -240,6 +246,12 @@ int GetSwitchState(int trackstatetid, int sw){
 int GetRoute(int trackstatetid, RouteRequest req, RouteMessage *rom){
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = ROUTE, {.route_request = req}};
     int r = Send(trackstatetid, &msg, sizeof(msg), rom, sizeof(*rom));
+    return (r >= 0 ? 0 : -1);
+}
+
+int GetShort(int trackstatetid, int distance, ShortMessage *sm){
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = SHORT, {.data = distance}};
+    int r = Send(trackstatetid, &msg, sizeof(msg), sm, sizeof(*sm));
     return (r >= 0 ? 0 : -1);
 }
     
@@ -282,6 +294,22 @@ void task_track_state(int track){
         400, 800,
         1500, 2000
     };
+
+    int short_speed[NUM_SHORTS] = 
+    {
+        10, 10, 10,
+        11, 11, 11,
+        12, 12,
+        13, 13
+    };
+    int short_delay[NUM_SHORTS] = 
+    {
+        10, 20, 30,
+        10, 20, 30,
+        30, 40,
+        60, 80
+    };
+
     int current_speed = 0;
 
     int last_sensor = 0;
@@ -353,6 +381,14 @@ void task_track_state(int track){
                 }
             }
             Reply(tid, &rom, sizeof(rom));
+            break;
+        }
+        case (SHORT):
+        {
+            int distance = tm.data;
+            ASSERT(distance >= 0 && distance < NUM_SHORTS, "invalid short move");
+            ShortMessage sm = {short_speed[distance], short_delay[distance]};
+            Reply(tid, &sm, sizeof(sm));
             break;
         }
         case (NOTIFY_SENSOR_DATA):
@@ -441,6 +477,18 @@ void task_track_state(int track){
             stopping_distance[data.speed] += (data.triggered ? 1 : -1) * interval;
             if (stopping_distance[data.speed] <= 0) {
                 stopping_distance[data.speed] = 1;
+            }
+            break;
+        }
+        case (NOTIFY_PARAM):
+        {
+            Reply(tid, &rm, sizeof(rm));
+            ParamData data = tm.param_data;
+
+            if (data.param == PARAM_SPEED) {
+                short_speed[data.key] = data.value;
+            } else if (data.param == PARAM_DELAY) {
+                short_delay[data.key] = data.value;
             }
             break;
         }

@@ -11,6 +11,9 @@
 #define TRACK_A 1
 #define TRACK_B 0
 
+#define PARAM_SPEED 'S'
+#define PARAM_DELAY 'D'
+
 #define CHAR_TO_TRACK(c) ((c) == 'A' ? TRACK_A : TRACK_B)
 #define VELOCITY_PRECISION 10000
 #define CAL_ITERATIONS 8
@@ -21,6 +24,8 @@
 #define MERGE_TO_NODE(m) (81 + 2 * (m))
 #define ENTER_TO_NODE(n) (124 + 2 * (n))
 #define EXIT_TO_NODE(n) (125 + 2 * (n))
+
+#define NUM_SHORTS 10
 
 typedef struct sensordata {
     unsigned int radix: 4;
@@ -49,38 +54,51 @@ typedef struct caldata{
     bool triggered;
 } __attribute__((packed)) CalData;
 
-typedef struct routemessage{
+typedef struct paramdata{
+    int key: 16;
+    int param: 16;
+    int value;
+} __attribute__((packed)) ParamData;
+
+typedef struct routemessage{ // TODO MessageType
     int end_sensor;
     int time_after_end_sensor;
     Switch switches[NUM_SWITCHES+1];
 } RouteMessage;
+
+typedef struct shortmessage{
+    int speed;
+    int delay;
+} ShortMessage;
 
 typedef enum tsrequest{
     TRAIN_SPEED, // TODO other requests
     SWITCH,
     SENSOR,
     ROUTE,
+    SHORT,
 
     NOTIFY_SENSOR_DATA,
     NOTIFY_TRAIN_SPEED,
     NOTIFY_TRAIN_DIRECTION,
     NOTIFY_SWITCH,
     NOTIFY_CAL,
+    NOTIFY_PARAM,
 
     NUM_TRACK_STATE_REQUESTS
 } TrackStateRequest;
 
 void task_track_state();
 
-void requestTrackState(); // TODO
-
 int NotifySensorData(int trackstatetid, SensorData data);
 int NotifySwitchStatus(int trackstatetid, SwitchData data);
 int NotifyTrainSpeed(int trackstatetid, TrainData data);
 int NotifyCalibrationResult(int trackstatetid, CalData data);
+int NotifyParam(int trackstatetid, ParamData data);
 
 int GetSwitchState(int trackstatetid, int sw);
 int GetRoute(int trackstatetid, RouteRequest req, RouteMessage *rom);
+int GetShort(int trackstatetid, int distance, ShortMessage *sm);
 int GetTrainSpeed(int trackstatetid, int train);
 
 #endif

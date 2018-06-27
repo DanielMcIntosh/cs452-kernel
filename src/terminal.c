@@ -231,6 +231,53 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
         cmd->smallarg2 = train;
         return 0;
     }
+    case 'm': // move
+    {
+        err = cb_read_match(cb_input, "ove ");
+        if (err != 0) {
+            break;
+        }
+
+        int distance;
+        int train;
+
+        err = cb_read_number(cb_input, &distance); // Distance to move
+        if (err)
+            break;
+        err = cb_read_number(cb_input, &train); // distance past sensor
+        if (err)
+            break;
+        cmd->type = COMMAND_MOVE;
+        cmd->arg1 = distance;
+        cmd->arg2 = train;
+        return 0;
+    }
+    case 'p': // param
+    {
+        err = cb_read_match(cb_input, "aram ");
+        if (err != 0) {
+            break;
+        }
+
+        int key;
+        int param; // todo string?
+        int value; 
+
+        err = cb_read_number(cb_input, &key); // short move array key
+        if (err)
+            break;
+        err = cb_read_number(cb_input, &param); // param number ('S' = speed, 'D' = time)
+        if (err)
+            break;
+        err = cb_read_number(cb_input, &value); // param value
+        if (err)
+            break;
+        cmd->type = COMMAND_PARAM;
+        cmd->arg1 = value; // arg order is weird because value is the largest potential argument
+        cmd->smallarg1 = key;
+        cmd->smallarg2 = param;
+        return 0;
+    }
     case 'c': // cal
     {
         err = cb_read_match(cb_input, "al ");

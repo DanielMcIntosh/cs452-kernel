@@ -116,6 +116,15 @@ void task_switch_courier(int cmdtid){
     }
 }
 
+void task_short_move(int train, int delay){
+    int tid = WhoIs(NAME_COMMANDSERVER);
+    Delay(delay);
+    Command c = {COMMAND_TR, 0, {.arg2 = train}};
+    SendCommand(tid, c);
+    Destroy();
+}
+    
+
 static inline void commandserver_exec_switch(CommandServer *cs, int arg1, int arg2, ReplyMessage *rm, int servertid){
     Putc(servertid, 1, arg1 == 'C' ? 34 : 33);
     Putc(servertid, 1, arg2);
@@ -329,7 +338,29 @@ void task_commandserver(){
             Runnable runnable = {&stop_wrapper, train, time_after_sensor, 0U, FALSE};
             RunWhen(sensor_to_wake, &runnable, PRIORITY_MID);
             break;
+        }
+        case COMMAND_MOVE:
+        {
+            int train = cm.command.arg2;
+            int distance = cm.command.arg1;
+            ShortMessage sm;
+            int tstid = WhoIs(NAME_TRACK_STATE);
 
+            GetShort(tstid, distance, &sm); // TODO track state courier
+
+            Putc(servertid, 1, sm.speed);
+            Putc(servertid, 1, train);
+            TrainData td = {train, sm.speed};
+            NotifyTrainSpeed(tstid, td);
+            CreateWith2Args(PRIORITY_LOW, &task_short_move, train, sm.delay);
+
+            break;
+        }
+        case COMMAND_PARAM:
+        {
+            ParamData data = {.key = cm.command.smallarg1, .param = cm.command.smallarg2, .value = cm.command.arg1};
+            NotifyParam(WhoIs(NAME_TRACK_STATE), data); // TODO track state courier
+            break;
         }
         case COMMAND_CAL:
         {
