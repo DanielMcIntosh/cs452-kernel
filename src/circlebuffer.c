@@ -10,11 +10,11 @@ void cb_init(struct circlebuffer *cb, char *buf, int size) {
     cb->empty = 1;
 }
 
-int cb_full(struct circlebuffer *cb){
+inline int cb_full(struct circlebuffer *cb){
     return (cb->rd == cb->wr) && !cb->empty;
 }
 
-int cb_empty(struct circlebuffer *cb){
+inline int cb_empty(struct circlebuffer *cb){
     return (cb->rd == cb->wr) && cb->empty;
 }
 
@@ -100,22 +100,21 @@ int cb_backspace(struct circlebuffer *cb){
         return 1;
     }
 
-    cb->wr = (cb->wr - 1) % cb->size;
+    cb->wr = (cb->wr + cb->size - 1) % cb->size;
     cb->empty = (cb->wr == cb->rd);
     return 0;
 }
 
 int cb_write_string(struct circlebuffer *cb, char * s) {
-    while (*s) {
-        cb_write(cb, *s);
+    while (*s != '\0' && cb_write(cb, *s) == 0) {
         s++;
     }
 
-    return 0;
+    return (*s != '\0');
 }
 
 //d = base^(num_digits_to_print). This function will pad with 0's if necessary.
-int cb_write_fixed_size_number(struct circlebuffer *cb, unsigned int num, unsigned int base, unsigned int d) {
+inline int cb_write_fixed_size_number(struct circlebuffer *cb, unsigned int num, unsigned int base, unsigned int d) {
     int dgt;
     while (d != 0) {
         dgt = num / d; // get digit

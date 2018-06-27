@@ -20,6 +20,18 @@
 
 #define NAME_TERMINAL "term"
 
+#define FLAG_STRING "IFCM"
+#define STYLED_FLAG_STRING "\033[2mI\033[2mF\033[2mC\033[2mM\033[m"
+
+typedef enum status_flag{
+    STATUS_FLAG_INVALID         = (1 << 0),
+    STATUS_FLAG_FINDING         = (1 << 1),
+    STATUS_FLAG_CALIBRATING     = (1 << 2),
+    STATUS_FLAG_MOVING          = (1 << 3),
+    //NOT A REAL FLAG - used to determine when to stop iterating through flags
+    STATUS_FLAG_END             = (1 << 4)
+} StatusFlag;
+
 typedef enum terminalrequest {
     TERMINAL_ECHO,
     TERMINAL_BACKSPACE,
@@ -31,6 +43,8 @@ typedef enum terminalrequest {
     TERMINAL_SENSOR_PREDICT,
     TERMINAL_VELOCITY_DEBUG,
     TERMINAL_DISTANCE_DEBUG,
+    TERMINAL_FLAGS_SET,
+    TERMINAL_FLAGS_UNSET,
 
     TERMINAL_NOTIFY_COURIER,
     NUM_TERMINAL_REQUESTS
