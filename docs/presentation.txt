@@ -1,0 +1,13 @@
+1. calibration
+    a. Brake calibration --> 40s?
+    e. Position Prediction (Error, Time & Distance, internal representation) -> 40s
+    b. Velocity calibration (debug output @ bottom left, discuss units)--> 30s
+    c. Status flags --> 20s
+    d. Sensor Waiting (RunWhen) --> 40s?
+    f. Commands (find, move, param(?)) --> 30s
+2. Find sensors (0)
+3. Find sensors (+distance)
+4. Find exits
+5. Find branches
+6. Find merges
+7. Short moves
