@@ -174,10 +174,14 @@ void task_calibrate(int train, int sensor_dest) {
             int sensor_to_wake = rom.end_sensor;
             //wait until we hit <sensor_to_wake>
             //for now, assume we're always successful in triggering <sensor_to_wake>
-            Runnable runnable_alarm1 = {&send_wakeup, my_tid, 0, 0U, FALSE};
+            Runnable runnable_alarm1 = {&send_wakeup, my_tid, 0, 50000U, FALSE};
             RunWhen(sensor_to_wake, &runnable_alarm1, PRIORITY_MID);
             Receive(&alarm_tid, &runnable_success, sizeof(runnable_success));
             Reply(alarm_tid, NULL, 0);
+            if (!runnable_success)
+            {
+                continue;
+            }
 
             int delay = rom.time_after_end_sensor;
             //wait <delay> ticks, then send a stop command
@@ -210,9 +214,11 @@ void stop_wrapper(int train, int wait, bool __attribute__((unused)) success) {
     int cmdtid = WhoIs(NAME_COMMANDSERVER);
     int terminaltid = WhoIs(NAME_TERMINAL);
 
-    Delay(wait);
-    Command stop_cmd = {COMMAND_TR, 0, {.arg2 = train}};
-    SendCommand(cmdtid, stop_cmd);
+    if (success) {
+        Delay(wait);
+        Command stop_cmd = {COMMAND_TR, 0, {.arg2 = train}};
+        SendCommand(cmdtid, stop_cmd);
+    }
 
     SendTerminalRequest(terminaltid, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING, 0);
 }
@@ -335,7 +341,7 @@ void task_commandserver(){
                     }
                 }
             }
-            Runnable runnable = {&stop_wrapper, train, time_after_sensor, 0U, FALSE};
+            Runnable runnable = {&stop_wrapper, train, time_after_sensor, 3000U, TRUE};
             RunWhen(sensor_to_wake, &runnable, PRIORITY_MID);
             break;
         }
