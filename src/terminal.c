@@ -260,15 +260,20 @@ static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
         }
 
         int key;
-        int param; // todo string?
+        char param; // todo string?
         int value; 
 
         err = cb_read_number(cb_input, &key); // short move array key
         if (err)
             break;
-        err = cb_read_number(cb_input, &param); // param number ('S' = speed, 'D' = time)
+        err = cb_read(cb_input, &param); // param number ('S' = speed, 'D' = time)
         if (err)
             break;
+        
+        err = cb_read(cb_input, (char *) &err); // space after param
+        if (err)
+            break;
+
         err = cb_read_number(cb_input, &value); // param value
         if (err)
             break;

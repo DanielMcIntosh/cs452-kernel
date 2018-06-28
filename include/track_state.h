@@ -25,7 +25,10 @@
 #define ENTER_TO_NODE(n) (124 + 2 * (n))
 #define EXIT_TO_NODE(n) (125 + 2 * (n))
 
-#define NUM_SHORTS 10
+#define MAX_SHORT 20
+#define MIN_SHORT 2
+#define INCREMENT_SHORT 2
+#define NUM_SHORTS ((MAX_SHORT / INCREMENT_SHORT) + 1)
 
 typedef struct sensordata {
     unsigned int radix: 4;

@@ -297,17 +297,15 @@ void task_track_state(int track){
 
     int short_speed[NUM_SHORTS] = 
     {
-        10, 10, 10,
-        11, 11, 11,
-        12, 12,
-        13, 13
+         0, 
+         8,  8,  8,  8,  9,
+        10, 10, 10, 14, 12
     };
-    int short_delay[NUM_SHORTS] = 
+    int short_delay[NUM_SHORTS] =  // increments of 2 cm: 2 cm -> 20 cm
     {
-        10, 20, 30,
-        10, 20, 30,
-        30, 40,
-        60, 80
+         0, 
+         65,  80,  92, 100, 110, // i guess this is calibrated now
+        120, 122, 130, 135, 141
     };
 
     int current_speed = 0;
@@ -385,7 +383,7 @@ void task_track_state(int track){
         }
         case (SHORT):
         {
-            int distance = tm.data;
+            int distance = tm.data / (10 * INCREMENT_SHORT); // mm -> SHORT_INCREMENT CM
             ASSERT(distance >= 0 && distance < NUM_SHORTS, "invalid short move");
             ShortMessage sm = {short_speed[distance], short_delay[distance]};
             Reply(tid, &sm, sizeof(sm));
@@ -484,11 +482,12 @@ void task_track_state(int track){
         {
             Reply(tid, &rm, sizeof(rm));
             ParamData data = tm.param_data;
+            int key = data.key / (10 * INCREMENT_SHORT); // mm -> SHORT_INCREMENT CM
 
             if (data.param == PARAM_SPEED) {
-                short_speed[data.key] = data.value;
+                short_speed[key] = data.value;
             } else if (data.param == PARAM_DELAY) {
-                short_delay[data.key] = data.value;
+                short_delay[key] = data.value;
             }
             break;
         }
