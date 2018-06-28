@@ -41,7 +41,7 @@ int SendCommand(int servertid, Command c){
 static void init_switches(CommandServer *cs){
     ASSERT(cb_empty(cs->cb_switches), "Cannot init non-empty cb");
 
-    char SWITCH_INIT_STATES[] = {
+    const char SWITCH_INIT_STATES[] = {
         [1] = 'C', 
         [2] = 'C',
         [3] = 'C',
@@ -64,11 +64,6 @@ static void init_switches(CommandServer *cs){
         [154] = 'S',
         [155] = 'C',
         [156] = 'S',
-        // TODO why do I need 157-160? like literally I don't understand im iterating between 153->156
-        [157] = 'C',
-        [158] = 'S',
-        [159] = 'C',
-        [160] = 'S'
     };
 
     for (int i = 1; i <= 18; i++){
