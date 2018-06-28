@@ -49,5 +49,5 @@ typedef struct command{
 int SendCommand(int servertid, Command c);
 
 void task_commandserver();
-void task_switch_courier(int cmdtid);
+void task_switch_courier(int cmdtid, int term_tid);
 #endif

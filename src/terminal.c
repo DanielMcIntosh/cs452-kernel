@@ -33,6 +33,13 @@ typedef struct terminalmessage {
     int arg2;
 } TerminalMessage;
 
+inline int SendTerminalRequest(int terminaltid, TerminalRequest rq, int arg1, int arg2) {
+    TerminalMessage tm = {MESSAGE_TERMINAL, rq, arg1, arg2};
+    ReplyMessage rm = {0, 0};
+    int r = Send(terminaltid, &tm, sizeof(tm), &rm, sizeof(rm));
+    return ( r >= 0 ? rm.ret : r);
+}
+
 static inline void cursor_to_position(struct circlebuffer *cb, int line, int col) {
     cb_write_string(cb, "\033[");
     cb_write_number(cb, line, 10);
@@ -60,6 +67,7 @@ static void output_base_terminal(Terminal *t) {
     cb_write_string(cb, "VELO_PR: \r\n");
     cb_write_string(cb, "SNSR_NX: \r\n");
     cb_write_string(cb, "DIST_NX: \r\n");
+    cb_write_string(cb, "\n" STYLED_FLAG_STRING);
 
     cursor_to_position(cb, 5, 1);
     for (i = 1; i <= 18; i++) {
@@ -327,28 +335,26 @@ void task_terminal_command_parser(int terminaltid){
     circlebuffer_t cb_input;
     cb_init(&cb_input, cb_input_buf, CB_INPUT_BUF_SIZE);
     TerminalParser t = {cb_input, {0, 0, {.arg2 = 0}}};
-    TerminalMessage tm = {MESSAGE_TERMINAL, 0, 0, 0};
-    ReplyMessage rm = {0, 0};
     
     // main loop
     FOREVER {
         c = Getc(rcv_tid, 2);
         if (c == '\15'){
             err = parse_command(&t.cmd, &t.input);
-            while(cb_read(&t.input, &c) == 0); // flush input buffer
-            tm.rq = TERMINAL_NEWLINE;
-            Send(terminaltid, &tm, sizeof(tm), &rm, sizeof(rm));
-            if (t.cmd.type != INVALID_COMMAND)
-                SendCommand(command_tid, t.cmd);
+            cb_flush(&t.input);
+            SendTerminalRequest(terminaltid, TERMINAL_NEWLINE, 0, 0);
+            if (t.cmd.type != INVALID_COMMAND) {
+                SendCommand(command_tid, t.cmd);            
+                SendTerminalRequest(terminaltid, TERMINAL_FLAGS_UNSET, STATUS_FLAG_INVALID, 0);
+            } else {
+                SendTerminalRequest(terminaltid, TERMINAL_FLAGS_SET, STATUS_FLAG_INVALID, 0);
+            }
         } else if (c == 8) { //backspace
             if (cb_backspace(&t.input) == 0) {
-                tm.rq = TERMINAL_BACKSPACE;
-                Send(terminaltid, &tm, sizeof(tm), &rm, sizeof(rm));
+                SendTerminalRequest(terminaltid, TERMINAL_BACKSPACE, 0, 0);
             }
         } else {
-            tm.rq = TERMINAL_ECHO;
-            tm.arg1 = c;
-            Send(terminaltid, &tm, sizeof(tm), &rm, sizeof(rm));
+            SendTerminalRequest(terminaltid, TERMINAL_ECHO, c, 0);
             cb_write(&t.input, c);
         }
     }
@@ -363,6 +369,24 @@ void task_terminal_courier(int servertid) {
         Putc(gettid, 2, rm.ret);
     }
 
+}
+
+static inline void print_status(circlebuffer_t *cb, int status) {
+    cb_write_string(cb, "\033[s");
+    cursor_to_position(cb, 34, 0);
+
+    //append the 'restore cursor' to save a call to cb_write_string
+    char str[] = STYLED_FLAG_STRING;
+    char *cur = &(str[2]);
+    for (int i = 1; i < STATUS_FLAG_END; i <<= 1) {
+        if (status & i) {
+            //attribute 1 = Bright
+            *cur = '1';
+        }
+        cur += 5;
+    }
+    ASSERT(cb_write_string(cb, str) == 0, "TERMINAL OUTPUT CB FULL");
+    cb_write_string(cb, "\033[u");
 }
 
 void task_terminal() {
@@ -380,11 +404,13 @@ void task_terminal() {
 
     char cb_terminal_buf[CB_TERMINAL_BUF_SIZE];
     circlebuffer_t cb_terminal;
-    cb_init(&cb_terminal, cb_terminal_buf, CB_TERMINAL_BUF_SIZE);
+    cb_init(&cb_terminal, cb_terminal_buf, sizeof(cb_terminal_buf));
     Terminal t = {cb_terminal, TERMINAL_INPUT_BASE_LINE, TERMINAL_INPUT_BASE_COL, SENSOR_LINE_BASE, 0};
     int tid, err; char c;
     TerminalMessage tm = {0, 0, 0, 0};
     ReplyMessage rm = {MESSAGE_REPLY, 0};
+    int status = 0;
+
     output_base_terminal(&t);
 
     FOREVER{
@@ -542,6 +568,29 @@ void task_terminal() {
             cb_write_string(&t.output, "\0338");
             break;
         }
+        //*
+        case(TERMINAL_FLAGS_SET):
+        {
+            int flags = tm.arg1;
+            if (~status & flags)
+            {
+                status |= flags;
+
+                print_status(&t.output, status);
+            }
+            break;
+        }
+        case(TERMINAL_FLAGS_UNSET):
+        {
+            int flags = tm.arg1;
+            if (status & flags) {
+                status &= ~flags;
+
+                print_status(&t.output, status);
+            }
+            break;
+        }
+        //*/
         case(TERMINAL_NOTIFY_COURIER):
         {
             t.notifier = tid;
@@ -561,11 +610,4 @@ void task_terminal() {
             t.notifier = 0;
         }
     }
-}
-
-int SendTerminalRequest(int terminaltid, TerminalRequest rq, int arg1, int arg2) {
-    TerminalMessage tm = {MESSAGE_TERMINAL, rq, arg1, arg2};
-    ReplyMessage rm = {0, 0};
-    int r = Send(terminaltid, &tm, sizeof(tm), &rm, sizeof(rm));
-    return ( r >= 0 ? rm.ret : r);
 }

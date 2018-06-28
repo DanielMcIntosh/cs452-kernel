@@ -12,6 +12,7 @@ typedef struct circlebuffer {
 void cb_init(struct circlebuffer *cb, char * buf, int size);
 int cb_full(struct circlebuffer *cb);
 int cb_empty(struct circlebuffer *cb);
+void cb_flush(struct circlebuffer *cb);
 int cb_read(struct circlebuffer *cb, char *c);
 int cb_peek(struct circlebuffer *cb, char *c);
 int cb_read_number(struct circlebuffer *cb, int *i); // NOTE: reads 1 past the number rn

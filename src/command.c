@@ -104,8 +104,7 @@ void task_reverse_train(int train, int speed){
     Destroy();
 }
 
-void task_switch_courier(int cmdtid){
-    int terminaltid = WhoIs(NAME_TERMINAL);
+void task_switch_courier(int cmdtid, int terminaltid){
     Command c = {COMMAND_NOTIFY_COURIER, 0, {.arg2 = 0}};
     FOREVER {
         int r = SendCommand(cmdtid, c);
@@ -158,7 +157,10 @@ void send_wakeup(int tid, int __attribute__((unused)) arg1, bool success) {
 
 void task_calibrate(int train, int sensor_dest) {
     int cmdtid = WhoIs(NAME_COMMANDSERVER);
+    int terminaltid = WhoIs(NAME_TERMINAL);
     int my_tid = MyTid();
+
+    SendTerminalRequest(terminaltid, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING | STATUS_FLAG_CALIBRATING, 0);
 
     RouteMessage rom = {0, 0, {{0}}};
     int alarm_tid;
@@ -181,10 +183,14 @@ void task_calibrate(int train, int sensor_dest) {
             int sensor_to_wake = rom.end_sensor;
             //wait until we hit <sensor_to_wake>
             //for now, assume we're always successful in triggering <sensor_to_wake>
-            Runnable runnable_alarm1 = {&send_wakeup, my_tid, 0, 0U, FALSE};
+            Runnable runnable_alarm1 = {&send_wakeup, my_tid, 0, 50000U, FALSE};
             RunWhen(sensor_to_wake, &runnable_alarm1, PRIORITY_MID);
             Receive(&alarm_tid, &runnable_success, sizeof(runnable_success));
             Reply(alarm_tid, NULL, 0);
+            if (!runnable_success)
+            {
+                continue;
+            }
 
             int delay = rom.time_after_end_sensor;
             //wait <delay> ticks, then send a stop command
@@ -209,21 +215,28 @@ void task_calibrate(int train, int sensor_dest) {
             }
         }
     }
+    SendTerminalRequest(terminaltid, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING | STATUS_FLAG_CALIBRATING, 0);
     Destroy();
 }
 
 void stop_wrapper(int train, int wait, bool __attribute__((unused)) success) {
     int cmdtid = WhoIs(NAME_COMMANDSERVER);
+    int terminaltid = WhoIs(NAME_TERMINAL);
 
-    Delay(wait);
-    Command stop_cmd = {COMMAND_TR, 0, {.arg2 = train}};
-    SendCommand(cmdtid, stop_cmd);
+    if (success) {
+        Delay(wait);
+        Command stop_cmd = {COMMAND_TR, 0, {.arg2 = train}};
+        SendCommand(cmdtid, stop_cmd);
+    }
+
+    SendTerminalRequest(terminaltid, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING, 0);
 }
 
 void task_commandserver(){
     CommandServer cs = {0, 0, 0, -1, 0};
     RegisterAs(NAME_COMMANDSERVER);
     int servertid = WhoIs(NAME_UART1_SEND), tid;
+    int terminaltid = WhoIs(NAME_TERMINAL);
     CommandMessage cm;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
     RouteMessage rom = {0, 0, {{0}}};
@@ -311,6 +324,8 @@ void task_commandserver(){
         }
         case COMMAND_ROUTE:
         {
+            SendTerminalRequest(terminaltid, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING, 0);
+
             int sensor = cm.command.arg1;
             int distance_past = cm.command.smallarg1;
             int train = cm.command.smallarg2;
@@ -335,7 +350,7 @@ void task_commandserver(){
                     }
                 }
             }
-            Runnable runnable = {&stop_wrapper, train, time_after_sensor, 0U, FALSE};
+            Runnable runnable = {&stop_wrapper, train, time_after_sensor, 3000U, TRUE};
             RunWhen(sensor_to_wake, &runnable, PRIORITY_MID);
             break;
         }

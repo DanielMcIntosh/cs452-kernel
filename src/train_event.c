@@ -10,11 +10,12 @@
 
 typedef enum te_request{
     QUEUE,
+    UNQUEUE,
     NOTIFY
 } RequestType;
 
 typedef struct te_message{
-    RequestType type;
+    RequestType rq;
     int sensor;
 } TrainEventMessage;
 
@@ -29,16 +30,27 @@ void task_train_event_courier() {
     FOREVER{
         Receive(&tid, &tm, sizeof(tm));
         Reply(tid, NULL, 0);
-        switch (tm.type) {
+        switch (tm.rq) {
             case QUEUE:
             {
                 //set waiting task for sensor
                 //ASSERT(waiting_tid[tm.sensor] == 0, "task already queued");
                 if (waiting_tid[tm.sensor] != 0){
-                    PANIC("\r\ntask already queued: %d --> %d\r\n", tm.sensor, waiting_tid[tm.sensor]);
+                    PANIC("\r\ntask not currently queued: %d --> %d\r\n", tm.sensor, waiting_tid[tm.sensor]);
                 }
                 ASSERT(tm.sensor < NUM_SENSORS && tm.sensor >= 0, "invalid sensor to wait on");
                 waiting_tid[tm.sensor] = tid;
+                break;
+            }
+            case UNQUEUE:
+            {
+                //unset waiting task for sensor
+                //ASSERT(waiting_tid[tm.sensor] == tid, "task not queued");
+                if (waiting_tid[tm.sensor] != tid){
+                    PANIC("\r\ntask already queued: %d --> %d\r\n", tm.sensor, waiting_tid[tm.sensor]);
+                }
+                ASSERT(tm.sensor < NUM_SENSORS && tm.sensor >= 0, "invalid sensor to wait on");
+                waiting_tid[tm.sensor] = 0;
                 break;
             }
             case NOTIFY:
@@ -77,7 +89,6 @@ void task_runner(int sensor) {
     if (to_run.timeout != 0) {
         Timeout(to_run.timeout);
     }
-
     Receive(&tid, &type, sizeof(type));
     Reply(tid, NULL, 0);
 
@@ -85,7 +96,10 @@ void task_runner(int sensor) {
         to_run.func(to_run.arg0, to_run.arg1, type == MESSAGE_WAKEUP);
     }
 
-    if (to_run.timeout != 0) {
+    if (type == MESSAGE_TIMEOUT) {
+        tm.rq = UNQUEUE;
+        Send(train_evt_courrier_tid, &tm, sizeof(tm), NULL, 0);
+    } else if (to_run.timeout != 0) {
         Receive(&tid, &type, sizeof(type));
         Reply(tid, NULL, 0);
     }
