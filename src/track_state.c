@@ -312,9 +312,6 @@ void task_track_state(int track){
     int next_sensor = 0;
     int next_sensor_predict_time = 0;
 
-    int last_error = 0;
-
-
     FOREVER{
         Receive(&tid, &tm, sizeof(tm));
 
@@ -420,10 +417,13 @@ void task_track_state(int track){
                         SendTerminalRequest(puttid, TERMINAL_SENSOR, sensor, f.time); // TODO courier
                         // TODO: this process might eventually take too long to happen here - delegate it to another process at some point?
 
+                        int last_error_time = (next_sensor_predict_time - f.time);
+                        int last_error_dist = last_error_time * predicted_velocity[current_speed] / VELOCITY_PRECISION;
+                        SendTerminalRequest(puttid, TERMINAL_SENSOR_PREDICT, last_error_time, last_error_dist);
+
                         track_node *c = &(ts.track[SENSOR_TO_NODE(sensor)]); // last known train position
                         if (sensor == next_sensor) {
                             // Time is in ms, velocity is in cm/s -> error is in units of 10 micro meters
-                            last_error = (next_sensor_predict_time - f.time) * predicted_velocity[current_speed] / VELOCITY_PRECISION;
                             int dt = f.time - last_sensor_time;
                             int new_velocity = last_sensor_distance * VELOCITY_PRECISION / dt;
                             predicted_velocity[current_speed] = MOVING_AVERAGE(new_velocity, predicted_velocity[current_speed], alpha);
@@ -433,7 +433,6 @@ void task_track_state(int track){
                         track_node *n = predict_next_sensor(&ts, c, NULL, &distance); // next predicted train position
 
                         next_sensor_predict_time = f.time + distance * VELOCITY_PRECISION / predicted_velocity[current_speed];
-                        SendTerminalRequest(puttid, TERMINAL_SENSOR_PREDICT, next_sensor_predict_time, last_error);
                         SendTerminalRequest(puttid, TERMINAL_VELOCITY_DEBUG, predicted_velocity[current_speed], n->num);
                         SendTerminalRequest(puttid, TERMINAL_DISTANCE_DEBUG, distance, 0);
 

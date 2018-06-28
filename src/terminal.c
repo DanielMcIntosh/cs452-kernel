@@ -52,8 +52,8 @@ static void output_base_terminal(Terminal *t) {
     circlebuffer_t *cb = &t->output;
     cb_write_string(cb, "\033[2J\033[3g\033[H\n");
     cb_write_string(cb, "IDLE: %\r\n");
-    cb_write_string(cb, "NXT:\r\n");
-    cb_write_string(cb, "ERR:\r\n");
+    cb_write_string(cb, "E_T:\r\n");
+    cb_write_string(cb, "E_D:\r\n");
     int i;
     cursor_to_position(cb, t->input_line, t->input_col);
     cb_write_string(cb, "\033H> ");
@@ -523,16 +523,16 @@ void task_terminal() {
         }
         case (TERMINAL_SENSOR_PREDICT):
         {
-            int next_sensor_predicted_time = tm.arg1;
-            int last_difference = tm.arg2;
+            int last_error_time = tm.arg1;
+            int last_error_dist = tm.arg2;
             cb_write_string(&t.output, "\0337");
 
             cursor_to_position(&t.output, 3, 5);
-            cb_write_number(&t.output, next_sensor_predicted_time, 10);
+            cb_write_number(&t.output, last_error_time, 10);
             cb_write_string(&t.output, "   ");
 
             cursor_to_position(&t.output, 4, 5);
-            cb_write_number(&t.output, last_difference, 10);
+            cb_write_number(&t.output, last_error_dist, 10);
             cb_write_string(&t.output, "   ");
 
             cb_write_string(&t.output, "\0338");
