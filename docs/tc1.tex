@@ -20,6 +20,9 @@ Once run, the program will initialize the kernel, and then create the first user
 \section{Program Description}
 Note that each referenced file corresponds to a header file of the same name in the \verb|include| folder (for example, \verb|src/kernel.c| to \verb|include/kernel.h|)
 
+\subsection{ Clock additions}
+There is now a Timeout function which will sawn another task to send a TIMEOUT message to the calling task after a specified delay.
+
 \subsection{ Track State Server}
 The track state server is in \verb|track_state.c|.
 To keep track of the state of the track, we added a Track State server. This keeps track of triggered sensors, switch states, train states, and the map of the track. 
@@ -43,19 +46,36 @@ In addition, when sensors are hit, the data related to the train discussed previ
 Any time that a sensor triggered is not the calcualted next sensor, that measurement is dropped and the calibration begins again once the next, correct sensor is hit. This allows the program to handle sensors that are not working, or cases where the stored track state does not match reality.
 
 \subsubsection{ Stopping Distance Calibration}
-%todo daniel
+We start with an approximate stop distance calibration table for the various speeds, which is then updated when the user runs the \verb|cal| command. The calibration sequence is as follows: 
+\begin{enumerate}
+    \item In a loop of size 8:
+    \begin{enumerate}
+        \item Get a route to the sensor from the Track State Server, a route is described in greater detail under the \verb|find| command.
+        \item Set the necessary switches, just as in the \verb|find| command
+        \item Wait for the sensor specified in the route to be triggered
+        \item Wait the delay specified in the route
+        \item Send a stop command
+        \item Wait for the destination sensor (given as a parameter to \verb|cal|) to be triggered, or a timeout of 2.5 seconds
+        \item Notify the Track State Server of whether or not the sensor was triggered, and what iteration of the loop we're on, so it can adjust its stopping distance
+    \end{enumerate}
+    \item if every iteration of the previous loop ended on the same side of the sensor (i.e. the sensor was always triggered, or never triggered), restart.
+\end{enumerate}
+Since the Track State Server uses the stopping distance in it's calculations, every iteration of the loop will result in a route with a different delay, and potentially different sensor. The stopping distance is adjusted by a base value of 70, decreasing by a factor of 4/5 for each iteration of the inner loop, resseting if we re-start.
+
 \subsubsection{ Short Moves }
 To facilitate short moves, a table of speeds and delays was manually calibrated. This table is in $20mm$ increments, between $1$ and $219$ mm. When a short move request is sent to the track state server (containing a distance), the server returns the speed to start the train at and the time to wait before the train is stopped. This allows the train to move in short increments.
 
 \subsection{ Train Event Server}
-%todo daniel
+The train event server provides \verb|TrainEvent_Notify| and RunWhen calls. \verb|TrainEvent_Notify| is a wrapper around a send to the train event server, and is called by Track State to alert the train event server of sensor events. RunWhen allows other tasks to preform predefined actions when a sensor is triggered. It takes a sensor, a pointer Runnable struct and a priority, and spawns a new task with the specified priority, with the sensor as an argument, then sends the Runnable struct to it. The Runnable struct contains a function pointer, arguments, a timeout and \verb|run_on_timeout| boolean.
+The spawned task will call the function with the given arguments if the sensor is triggered before the timeout period. If the timeout period expires, and \verb|run_on_timeout| is true, the function is also called. To help distinguish between a timeout and sensor event, in addition to the given arguments, the function is passed a boolean to indicate whether it was called because of a timeout or sensor event.
+This is all accomplished by a call to the clock Timeout function, and a send to the train event server. The train event server maintains an array of tid's waiting for a sensor. When the train event server is notified of a sensor event, it then checks if a task is waiting on that sensor, and if so sends a WAKEUP message to it. The task RunWhen spawns queues in the train event server, and in the case of a timeout unqueues. 
 
 \subsection{New Commands}
 In addition to the commands previously implemented in K4, several new commands were implemented to allow the user to route the train to various track elements.
-\subsubsection{route}
-Route takes three arguments (a track object, a distance past that track object, and a train) and routes the train to a point that distance past that track object.
+\subsubsection{find}
+Find takes three arguments (a track object, a distance past that track object, and a train) and routes the train to a point that distance past that track object.
 It does this by retrieving a route from the Track State Server, which is returned in the form of a list of switches to change, a sensor, and a delay time. 
-It then switches all required switches, and begins a task which is notified once the required sensor is triggered. After this notification, it waits the given delay, and then sends the stop command. 
+It then switches all required switches, and begins a task which is notified once the required sensor is triggered (using RunWhen from the Train Event Server). After this notification, it waits the given delay, and then sends the stop command. 
 This delay is calculated based on the velocity and stopping distance of the train. 
 There are 4 types of objects that can be routed to:
 \begin{enumerate}
@@ -66,8 +86,7 @@ There are 4 types of objects that can be routed to:
 \end{enumerate}
 
 \subsubsection{cal}
-%todo daniel
-
+Cal takes two arguments: A sensor and a train, and initiates the calibration sequence on that sensor.
 \subsubsection{move}
 Move takes two arguments: A distance (between $0$ and $219$, in millimeters) and a train to move, and moves that train forward approximately the given distance. This is by requesting a short move from the Track State server (which returns a speed and a delay time), starting the train at that speed, and then starting a worker which delays the given time and stops that train.
 
@@ -85,18 +104,22 @@ Inv switches every switch to the opposite of the current state. It is mainly for
 
     As well, the kernel now disables interrupts in the VIC when exiting. This fixes an issue we encoutered preventing our program (and other programs) from running after we quit without resetting the arm box.
 \section{Explanation of Program Output}
-%todo daniel
+
 \subsection{Switches}
+There is a list of the current state of all the switches on the left side of the terminal
 \subsection{Sensors}
+Any time a sensor is triggered, we print it to right side of the terminal. Eventually we loop back and start printing them at the top again.
 \subsection{Command Terminal}
+There is a prompt in the middle of the terminal, where the user can input commands.
 \subsection{Status Bar}
+At the bottom of the terminal (just below the switch list), we output a small status bar. Currently it has 4 flags, 3 of which are implemented: \verb|(I)nvalid command|, \verb|(F)inding location on track|, and \verb|(C)alibration running|.
 \subsection{Data Display}
 At the top of the display, idle time, last error in ($ms$), and last error in ($mm$) are displayed.
 At the bottom of the display, various debugging data is printed.\\
 \begin{enumerate}
-    \item{\verb|STK_LIM|} %TODO daniel
-    \item{\verb|STK_MAX|}
-    \item{\verb|STK_AVG|}
+    \item{\verb|STK_LIM|} The maximum possible stack size for a task (i.e. the size at which we start to overwrite another task's stack) - this is only calculated (and printed) once at startup, since it does not change
+    \item{\verb|STK_MAX|} An ongoing maximum of the stack sizes of task - a task's stack size is only checked during a syscall, so this is only approximate
+    \item{\verb|STK_AVG|} A rolling average of stack sizes - similar to STK\_MAX this is only approximate, but still accurate enough to alert us if there is a problem
     \item{\verb|VELO_PR|} The predicted velocity of the train, in terms of $ \frac{cm}{10000s}$, which is just $\frac{cm}{s}$ multiplied by $10000$.
     \item{\verb|SNSR_NX|} The next sensor the program expects the train to hit.
     \item{\verb|DIST_NX|} The distance between the last sensor hit and the next expected sensor.
