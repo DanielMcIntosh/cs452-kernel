@@ -2,7 +2,7 @@
 #include <circlebuffer.h>
 #include <err.h>
 
-void cb_init(struct circlebuffer *cb, char *buf, int size) {
+void cb_init(struct circlebuffer * restrict cb, char *buf, int size) {
     cb->buf = buf;
     cb->size = size;
     cb->rd = 0;
@@ -23,7 +23,7 @@ void cb_flush(struct circlebuffer *cb) {
     cb->empty = 1;   
 }
 
-int cb_read(struct circlebuffer *cb, char *c){
+int cb_read(struct circlebuffer * restrict cb, char * restrict c){
     if (cb_empty(cb)) {
         return 1;
     }
@@ -36,7 +36,7 @@ int cb_read(struct circlebuffer *cb, char *c){
     return 0;
 }
 
-int cb_peek(struct circlebuffer *cb, char *c){
+int cb_peek(struct circlebuffer * restrict cb, char * restrict c){
     if (cb_empty(cb)) {
         return 1;
     }
@@ -50,7 +50,7 @@ int cb_ch2d(char ch){
 }
 
 // NOTE: cb_read_number reads 1 past the number; TODO: fix that?
-int cb_read_number(struct circlebuffer *cb, int *i){
+int cb_read_number(struct circlebuffer * restrict cb, int * restrict i){
     int num, digit;
 
     int r = 1;
@@ -70,7 +70,7 @@ int cb_read_number(struct circlebuffer *cb, int *i){
     return r;
 }
 
-int cb_read_match(circlebuffer_t *cb, char *str) {
+int cb_read_match(circlebuffer_t * restrict cb, char * restrict str) {
     char c;
     while (!cb_empty(cb) && *str != '\0') {
         cb_read(cb, &c);
@@ -105,7 +105,7 @@ int cb_backspace(struct circlebuffer *cb){
     return 0;
 }
 
-int cb_write_string(struct circlebuffer *cb, char * s) {
+int cb_write_string(struct circlebuffer * restrict cb, char * restrict s) {
     while (*s != '\0' && cb_write(cb, *s) == 0) {
         s++;
     }

@@ -70,7 +70,7 @@ void init_track_state(TrackState *ts, int track){
         init_trackb(ts->track);
 }
 
-static track_node* predict_next_sensor(const TrackState * const ts, const track_node * const last_sensor, const Switch * const path, int * const distance){
+static track_node* predict_next_sensor(const Switch * restrict ts, const track_node *last_sensor, const Switch * restrict path, int * restrict distance){
     // basic plan for this: linked list search: follow state given by TrackState
     // Stop when another sensor is found
 
@@ -85,7 +85,7 @@ static track_node* predict_next_sensor(const TrackState * const ts, const track_
             if (path && path[SWCLAMP(n->num)].state != SWITCH_UNKNOWN)
                 e = &n->edge[STATE_TO_DIR(path[SWCLAMP(n->num)].state)];
             else 
-                e = &n->edge[STATE_TO_DIR(ts->switches[SWCLAMP(n->num)].state)];
+                e = &n->edge[STATE_TO_DIR(ts[SWCLAMP(n->num)].state)];
 
             *distance += e->dist;
             n = e->dest;
@@ -113,9 +113,9 @@ static track_node* predict_next_sensor(const TrackState * const ts, const track_
     return n;
 }
 
-static int reverse_distance_from_node(TrackState *ts, track_node *destination, int distance, int velocity, Switch *path, track_node ** wakeup_sensor, int* time_after_sensor){
+static int reverse_distance_from_node(const Switch * restrict ts, const track_node *destination, int distance, int velocity, const Switch * restrict path, int * restrict wakeup_sensor, int * restrict time_after_sensor){
     ASSERT(distance > 0, "Cannot reverse find negative distance");
-    track_node * next_sensor = destination->reverse;
+    const track_node * restrict next_sensor = destination->reverse;
     int tdist = 0, cdist;
     while (tdist < distance) {
         next_sensor = predict_next_sensor(ts, next_sensor, path, &cdist);
@@ -123,19 +123,19 @@ static int reverse_distance_from_node(TrackState *ts, track_node *destination, i
         tdist += cdist;
     }
     cdist = tdist - distance; // remaining distance (in mm)
-    *wakeup_sensor = next_sensor->reverse;
-    ASSERT(*wakeup_sensor != destination, "WRONG");
+    *wakeup_sensor = next_sensor->reverse->num;
+    ASSERT(*wakeup_sensor != destination->num, "WRONG");
     *time_after_sensor = (cdist * VELOCITY_PRECISION / (velocity)); // mm / (mm/10 ms) -> 10 ms 
 
     return 0;
 }
 
-static int forward_distance_from_node(TrackState *ts, track_node *destination, int distance, int velocity, Switch *path, track_node **wakeup_sensor, int * time_after_sensor){
+static int forward_distance_from_node(const Switch * restrict ts, const track_node *destination, int distance, int velocity, const Switch * restrict path, int * restrict wakeup_sensor, int * restrict time_after_sensor){
     ASSERT(distance >= 0, "Cannot forward find negative distance");
-    track_node * next_sensor = destination;
+    const track_node * restrict next_sensor = destination;
     int tdist = 0, last_tdist = 0, cdist;
     while (tdist < distance) {
-        *wakeup_sensor = next_sensor;
+        *wakeup_sensor = next_sensor->num;
         last_tdist = tdist;
         next_sensor = predict_next_sensor(ts, next_sensor, path, &cdist);
         tdist += cdist;
@@ -146,7 +146,7 @@ static int forward_distance_from_node(TrackState *ts, track_node *destination, i
     return 0;
 }
 
-static int find_path_between_nodes(track_node *origin, track_node *dest, track_node *previous, TrackPath * l, int level){
+static int find_path_between_nodes(const track_node *origin, const track_node *dest, const track_node *previous, TrackPath * restrict l, int level){
     if (origin == dest) return 1;
     if (origin == NULL || origin->type == NODE_NONE) return 0;
 
@@ -173,8 +173,8 @@ static int find_path_between_nodes(track_node *origin, track_node *dest, track_n
     case (NODE_MERGE):
     {
         // figure out which side of the branch we are:
-        track_node *pr = previous->reverse;
-        track_node *br = origin->reverse;
+        const track_node *pr = previous->reverse;
+        const track_node *br = origin->reverse;
         if (br->edge[DIR_STRAIGHT].dest == pr) {
             l->merges[SWCLAMP(origin->num)].state = SWITCH_STRAIGHT;
         } else {
@@ -212,7 +212,7 @@ static inline int get_train_from_sensor(TrackState *ts, const int sensor) {
 }
 //*/
 
-static inline int sendTrackState(int trackstatetid, TrackStateMessage *msg){
+static inline int sendTrackState(int trackstatetid, const TrackStateMessage *msg){
     ReplyMessage rm;
     int r = Send(trackstatetid, msg, sizeof(*msg), &rm, sizeof(rm));
     return (r >= 0 ? rm.ret : r);
@@ -267,8 +267,8 @@ int GetTrainSpeed(int trackstatetid, int train){
 
 void task_track_state(int track){
     RegisterAs(NAME_TRACK_STATE);
-    int puttid = WhoIs(NAME_TERMINAL);
-    int train_evt_courrier_tid = Create(PRIORITY_MID, &task_train_event_courier);
+    const int puttid = WhoIs(NAME_TERMINAL);
+    const int train_evt_courrier_tid = Create(PRIORITY_MID, &task_train_event_courier);
 
     TrackState ts;
     init_track_state(&ts, track);
@@ -352,10 +352,10 @@ void task_track_state(int track){
 
             if (next_sensor < 0) {
                 int __attribute__((unused)) distance;
-                next_sensor = predict_next_sensor(&ts, &ts.track[last_sensor], NULL, &distance)->num;
+                next_sensor = predict_next_sensor(ts.switches, &ts.track[last_sensor], NULL, &distance)->num;
             }
 
-            track_node *d = &ts.track[object], *n = &ts.track[next_sensor], *o = &ts.track[last_sensor], *f = 0;
+            const track_node *d = &ts.track[object], *n = &ts.track[next_sensor], *o = &ts.track[last_sensor];
 
             TrackPath tp = {{0}, {{SWITCH_UNKNOWN}}, {{SWITCH_UNKNOWN}}}; 
             int possible = find_path_between_nodes(n, d, o, &tp, 0);
@@ -363,25 +363,24 @@ void task_track_state(int track){
                 if (stopping_distance[current_speed] > distance_past) {
                     //make sure we actually have enough distance to stop in
                     int dist_needed = stopping_distance[current_speed] - distance_past;
-                    track_node *walk_node = n;
+                    const track_node *walk_node = n;
                     for (int walked_dist = 0, temp; walked_dist < dist_needed; walked_dist += temp) {
                         if (walk_node == d) {
-                            walk_node = predict_next_sensor(&ts, walk_node, tp.switches, &temp);
+                            walk_node = predict_next_sensor(ts.switches, walk_node, tp.switches, &temp);
                             //add to &tp a loop from d to d
                             find_path_between_nodes(walk_node, d, d, &tp, 0);
                         }
-                        walk_node = predict_next_sensor(&ts, walk_node, tp.switches, &temp);
+                        walk_node = predict_next_sensor(ts.switches, walk_node, tp.switches, &temp);
                     }
 
 
-                    int err = reverse_distance_from_node(&ts, d, dist_needed, predicted_velocity[current_speed], tp.merges, &f, &rom.time_after_end_sensor);
+                    int err = reverse_distance_from_node(ts.switches, d, dist_needed, predicted_velocity[current_speed], tp.merges, &rom.end_sensor, &rom.time_after_end_sensor);
                     ASSERT(err == 0, "Reverse Distance Failed");
                 } else {
                     int dist_needed = distance_past - stopping_distance[current_speed];
-                    int err = forward_distance_from_node(&ts, d, dist_needed, predicted_velocity[current_speed], tp.switches, &f, &rom.time_after_end_sensor);
+                    int err = forward_distance_from_node(ts.switches, d, dist_needed, predicted_velocity[current_speed], tp.switches, &rom.end_sensor, &rom.time_after_end_sensor);
                     ASSERT(err == 0, "Forward Distance Failed");
                 }
-                rom.end_sensor = (int) f->num; 
                 for (int i = 1; i <= NUM_SWITCHES; i++){
                     if (tp.switches[i].state != ts.switches[i].state) {
                         rom.switches[i] = tp.switches[i]; // pick up differences and unnknowns
@@ -432,7 +431,7 @@ void task_track_state(int track){
                         int last_error_dist = last_error_time * predicted_velocity[current_speed] / VELOCITY_PRECISION;
                         SendTerminalRequest(puttid, TERMINAL_SENSOR_PREDICT, last_error_time, last_error_dist);
 
-                        track_node *c = &(ts.track[SENSOR_TO_NODE(sensor)]); // last known train position
+                        const track_node *c = &(ts.track[SENSOR_TO_NODE(sensor)]); // last known train position
                         if (sensor == next_sensor) {
                             // Time is in clock-ticks, velocity is in mm/(clock-tick) -> error is in units of mm
                             int dt = f.time - last_sensor_time;
@@ -441,7 +440,7 @@ void task_track_state(int track){
                         }
                         
                         int distance;
-                        track_node *n = predict_next_sensor(&ts, c, NULL, &distance); // next predicted train position
+                        const track_node *n = predict_next_sensor(ts.switches, c, NULL, &distance); // next predicted train position
 
                         next_sensor_predict_time = f.time + distance * VELOCITY_PRECISION / predicted_velocity[current_speed];
                         SendTerminalRequest(puttid, TERMINAL_VELOCITY_DEBUG, predicted_velocity[current_speed], n->num);

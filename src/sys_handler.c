@@ -220,13 +220,13 @@ static inline void handle_create_2_args(TD *task, TaskQueue *task_ready_queue){
     task->r0 = task_create(task_ready_queue, task_getTid(task), TD_arg(task, 0), TD_arg(task, 1), TD_arg(task, 2), TD_arg(task, 3));
 }
 
-static inline void handle_store_value(TD *task, ValueStore *v){
+static inline void handle_store_value(TD * restrict task, ValueStore * restrict v){
     LOG("HANDLE STORE VALUE\r\n");
     v->values[TD_arg(task, 0)] = TD_arg(task, 1);
     task->r0 = TD_arg(task, 1);
 }
 
-static inline void handle_get_value(TD *task, ValueStore *v){
+static inline void handle_get_value(TD * restrict task, ValueStore * restrict v){
     LOG("HANDLE GET VALUE\r\n");
     task->r0 = v->values[TD_arg(task, 0)];
 }
@@ -234,7 +234,7 @@ static inline void handle_get_value(TD *task, ValueStore *v){
 //////////////////////////////////////////////////////////////////////////////////////////////
 //                                     MAIN
 //////////////////////////////////////////////////////////////////////////////////////////////
-Syscall handle(Syscall a, TD *task, TaskQueue *task_ready_queue, ValueStore *values) {
+Syscall handle(Syscall a, TD *task, TaskQueue *task_ready_queue, ValueStore * restrict values) {
     LOGF("HANDLE: %d, %d\t", a, task);
     LOGF("ARGS: %d, %d, %d, %d, %d\t", TD_arg(task, 0), TD_arg(task, 1), TD_arg(task, 2), TD_arg(task, 3), TD_arg(task, 4));
     switch(a) {

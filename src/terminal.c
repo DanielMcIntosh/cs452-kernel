@@ -49,7 +49,7 @@ static inline void cursor_to_position(struct circlebuffer *cb, int line, int col
 }
 
 static void output_base_terminal(Terminal *t) {
-    circlebuffer_t *cb = &t->output;
+    circlebuffer_t * restrict cb = &t->output;
     cb_write_string(cb, "\033[2J\033[3g\033[H\n");
     cb_write_string(cb, "IDLE: %\r\n");
     cb_write_string(cb, "E_T:\r\n");
@@ -81,7 +81,7 @@ static void output_base_terminal(Terminal *t) {
     cursor_to_position(cb, t->input_line, t->input_col);
 }
 
-static inline int parse_command(Command *cmd, circlebuffer_t* cb_input) {
+static inline int parse_command(Command * restrict cmd, circlebuffer_t * restrict cb_input) {
     char c;
     if (cb_empty(cb_input)) {
         cmd->type = INVALID_COMMAND;

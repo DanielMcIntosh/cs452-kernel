@@ -55,9 +55,9 @@ void Pass();
 void Exit();
 
 // ==== K2 ====
-int Send(int tid, void *msg, int msglen, void *reply, int rplen);
+int Send(int tid, const void *msg, int msglen, void *reply, int rplen);
 int Receive(int *tid, void *msg, int msglen);
-int Reply(int tid, void *reply, int rplen);
+int Reply(int tid, const void *reply, int rplen);
 
 // ==== K3 ====
 int AwaitEvent(int eventType);

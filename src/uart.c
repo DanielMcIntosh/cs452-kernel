@@ -69,7 +69,7 @@ void task_uart2_rcv_notifier() {
     generic_uart_rcv_notifier(WhoIs(NAME_UART2_RCV), 2);
 }
 
-void generic_uart_send_notifier(int servertid, int uart) {
+static inline void generic_uart_send_notifier(int servertid, int uart) {
     int event = (uart == 1? EVENT_UART_1_SEND : EVENT_UART_2_SEND);
     struct uart *u = (uart == 1 ? uart1 : uart2);
     UARTMessage msg = {MESSAGE_UART, NOTIFY_SEND, 0, {0}};

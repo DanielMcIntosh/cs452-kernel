@@ -78,7 +78,7 @@ void task_stack_metric_printer(int terminaltid){
     }
 }
 
-void update_stack_size_metric(TD *task, ValueStore *value_store) {
+void update_stack_size_metric(TD * restrict task, ValueStore * restrict value_store) {
     int stack_limit = STACK_SPACE_SIZE/TASK_POOL_SIZE - 4;
     int size = task_get_stack_size(task);
     if (size >= stack_limit) {
