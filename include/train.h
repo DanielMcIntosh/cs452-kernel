@@ -14,10 +14,11 @@ typedef struct trainposition{
 typedef struct train{
     int speed;
     Direction direction;
-    int velocity_calculated;
-    int last_velocity_actual;
+    int velocity;
+    int next_sensor;
     int last_sensor;
     int last_sensor_time; // TODO when we do sensor attribution
+    int last_sensor_dist;
 } Train;
 
 void predict_train_position(int train, TrainPosition * position); // TODO

@@ -37,8 +37,8 @@ typedef struct trackpath{
 } TrackPath;
 
 typedef struct tsmessage{
-    MessageType type;
-    TrackStateRequest request;
+    const MessageType type;
+    const TrackStateRequest request;
     union {
         int data;
         SensorData sensor_data;
@@ -52,18 +52,14 @@ typedef struct tsmessage{
 
 void init_track_state(TrackState *ts, int track){
     ts->track_number = track;
-    Train init_train = {0, FORWARD, 0, 0, 0, 0};
-    Sensor init_sensor = {{0}, SENSOR_OFF, 0};
+    Train init_train = {0, FORWARD, 0, 0, 0, 0, 0};
+    Sensor init_sensor = {SENSOR_OFF};
     Switch init_switch = {SWITCH_STRAIGHT};
     for (int i = 0; i < NUM_TRAINS; i++){
         ts->trains[i] = init_train;
     }
     for (int i = 0; i < NUM_SENSORS; i++){
         ts->sensors[i] = init_sensor;
-        ts->sensors[i].name[0] = 'A' + i/16;
-        ts->sensors[i].name[1] = '0' + ((i%16) / 10);
-        ts->sensors[i].name[2] = '0' + ((i%16) % 10);
-        ts->sensors[i].name[3] = '\0';
     }
     for (int i = 0; i < NUM_SWITCHES; i++){
         ts->switches[i] = init_switch;
@@ -74,7 +70,7 @@ void init_track_state(TrackState *ts, int track){
         init_trackb(ts->track);
 }
 
-static track_node* predict_next_sensor(TrackState *ts, track_node *last_sensor, Switch *path, int *distance){
+static track_node* predict_next_sensor(const TrackState * const ts, const track_node * const last_sensor, const Switch * const path, int * const distance){
     // basic plan for this: linked list search: follow state given by TrackState
     // Stop when another sensor is found
 
@@ -203,6 +199,19 @@ static int find_path_between_nodes(track_node *origin, track_node *dest, track_n
     return 0;
 }
 
+/*
+static inline int get_train_from_sensor(TrackState *ts, const int sensor) {
+    for (int i = 0; i < NUM_TRAINS; ++i) {
+        Train cur = ts->trains[i];
+        if ((sensor != 0 || cur.last_sensor_time != 0) && cur.next_sensor == sensor) {
+            return i;
+        }
+    }
+
+
+}
+//*/
+
 static inline int sendTrackState(int trackstatetid, TrackStateMessage *msg){
     ReplyMessage rm;
     int r = Send(trackstatetid, msg, sizeof(*msg), &rm, sizeof(rm));
@@ -269,8 +278,6 @@ void task_track_state(int track){
     RouteMessage rom = {0, 0, {{SWITCH_UNKNOWN}}};
     int tid;
 
-    int alpha = 15;
-
     int predicted_velocity[NUM_SPEEDS] = 
     { 0, 0, 0, // 0->2
         VELOCITY_PRECISION, VELOCITY_PRECISION, //3, 4
@@ -336,9 +343,12 @@ void task_track_state(int track){
         }
         case (ROUTE):
         {
+            int object = tm.route_request.position.object;
+            int distance_past = tm.route_request.position.distance_past;
+            int train = tm.route_request.train;
+
+            current_speed = ts.trains[train].speed;
             ASSERT(current_speed != 0, "Trying to find route with speed == 0!");
-            int object = tm.route_request.object;
-            int distance_past = tm.route_request.distance_past;
 
             if (next_sensor < 0) {
                 int __attribute__((unused)) distance;
@@ -407,7 +417,8 @@ void task_track_state(int track){
                 if (f.data & k) {
                     if (ts.sensors[sensor].state != SENSOR_ON){
                         ts.sensors[sensor].state = SENSOR_ON;
-                        ts.sensors[sensor].lastTriggeredTime = f.time;
+
+                        //int train = get_train_from_sensor(sensor);
 
                         TrainEvent_Notify(train_evt_courrier_tid, sensor);
 
@@ -423,10 +434,10 @@ void task_track_state(int track){
 
                         track_node *c = &(ts.track[SENSOR_TO_NODE(sensor)]); // last known train position
                         if (sensor == next_sensor) {
-                            // Time is in ms, velocity is in cm/s -> error is in units of 10 micro meters
+                            // Time is in clock-ticks, velocity is in mm/(clock-tick) -> error is in units of mm
                             int dt = f.time - last_sensor_time;
                             int new_velocity = last_sensor_distance * VELOCITY_PRECISION / dt;
-                            predicted_velocity[current_speed] = MOVING_AVERAGE(new_velocity, predicted_velocity[current_speed], alpha);
+                            predicted_velocity[current_speed] = MOVING_AVERAGE(new_velocity, predicted_velocity[current_speed], 15);
                         }
                         
                         int distance;

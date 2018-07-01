@@ -11,9 +11,7 @@ typedef enum sensorstate{
 } SensorState;
 
 typedef struct sensor {
-    char name[4]; // TODO use TrackData? 
     SensorState state;
-    int lastTriggeredTime;
 } Sensor;
 
 void task_sensor_server();

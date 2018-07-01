@@ -101,7 +101,7 @@ void fut(){
     // get any important values here
     uart2->ctrl |= UARTEN_MASK;
     bwputstr(COM2, "TRACK? [A/B] >> ");
-    char track = bwgetc(COM2);
+    const char track = bwgetc(COM2);
     for (volatile int i = 0; i < 55; i++);
     uart2->ctrl &= ~UARTEN_MASK;
 

@@ -20,6 +20,7 @@
 #define BASE_STOP_DIST_ADJUSTMENT 70
 
 //TODO move these:
+#define SENSOR_TO_NODE(s) (s)
 #define SWITCH_TO_NODE(s) (80 + 2 * (s))
 #define MERGE_TO_NODE(m) (81 + 2 * (m))
 #define ENTER_TO_NODE(n) (124 + 2 * (n))
@@ -30,37 +31,42 @@
 #define INCREMENT_SHORT 2
 #define NUM_SHORTS ((MAX_SHORT / INCREMENT_SHORT) + 1)
 
+typedef struct position {
+    const int object : 16;
+    const int distance_past : 16;
+} TrackPosition;
+
 typedef struct sensordata {
-    unsigned int radix: 4;
-    unsigned int data: 16;
-    int time: 32;
+    const unsigned int radix: 4;
+    const unsigned int data: 16;
+    const int time: 32;
 } __attribute__((packed)) SensorData;
 
 typedef struct switchdata{
-    unsigned int state: 4;
-    unsigned int sw: 32;
+    const unsigned int state: 4;
+    const unsigned int sw: 32;
 } __attribute__((packed)) SwitchData;
 
 typedef struct traindata {
-    unsigned int speed;
-    unsigned int train;
+    const unsigned int speed;
+    const unsigned int train;
 } __attribute__((packed)) TrainData;
 
 typedef struct routerequest{
-    int object: 16;
-    int distance_past: 16;
+    const TrackPosition position;
+    const int train;
 } __attribute__((packed)) RouteRequest; // TODO move these structs into the c file.
 
 typedef struct caldata{
-    int iteration : 16;
-    int speed : 16;
-    bool triggered;
+    const int iteration : 16;
+    const int speed : 16;
+    const bool triggered;
 } __attribute__((packed)) CalData;
 
 typedef struct paramdata{
-    int key: 16;
-    int param: 16;
-    int value;
+    const int key: 16;
+    const int param: 16;
+    const int value;
 } __attribute__((packed)) ParamData;
 
 typedef struct routemessage{ // TODO MessageType
@@ -70,8 +76,8 @@ typedef struct routemessage{ // TODO MessageType
 } RouteMessage;
 
 typedef struct shortmessage{
-    int speed;
-    int delay;
+    const int speed;
+    const int delay;
 } ShortMessage;
 
 typedef enum tsrequest{

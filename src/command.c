@@ -169,7 +169,8 @@ void task_calibrate(int train, int sensor_dest) {
         num_over = 0;
         for (int i = 0; i < CAL_ITERATIONS; ++i) {
             //set the train on course to hit sensor_dest, and get timing info
-            RouteRequest rq = {.object = sensor_dest, .distance_past = 0};
+            const TrackPosition pos = {.object = sensor_dest, .distance_past = 0};
+            const RouteRequest rq = {.position = pos, .train = train};
             int err = GetRoute(WhoIs(NAME_TRACK_STATE), rq, &rom);
             ASSERT(err==0, "FAILED TO GET ROUTE");
             //if (i < 2)
@@ -324,7 +325,8 @@ void task_commandserver(){
             int sensor = cm.command.arg1;
             int distance_past = cm.command.smallarg1;
             int train = cm.command.smallarg2;
-            RouteRequest rq = {.object = sensor, .distance_past = distance_past};
+            const TrackPosition pos = {.object = SENSOR_TO_NODE(sensor), .distance_past = distance_past};
+            const RouteRequest rq = {.position = pos, .train = train};
             int err = GetRoute(WhoIs(NAME_TRACK_STATE), rq, &rom);
             ASSERT(err==0, "FAILED TO GET ROUTE");
 
