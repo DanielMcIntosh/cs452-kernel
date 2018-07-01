@@ -9,11 +9,19 @@ void * memcpy(void * const dest, const void* const src, unsigned int sz){
 
     if (!((int)src & 0xFFFFFFFC) && !((int)dest & 0xFFFFFFFC))
     {
-        while (sz >= 4)
-        {
-            *plDst++ = *plSrc++;
-            sz -= 4;
+        //copy word by word, but use duffs device to unroll loop
+        register int n = sz >> 4;
+        switch (sz & 0xC) {
+            do {
+                    *plDst++ = *plSrc++;
+        case 0xC:   *plDst++ = *plSrc++;
+        case 0x8:   *plDst++ = *plSrc++;
+        case 0x4:   *plDst++ = *plSrc++;
+        case 0x0:   ;
+            } while (n-- > 0);
         }
+
+        sz &= 0x3;
     }
 
     char * pcDst = (char *) plDst;
