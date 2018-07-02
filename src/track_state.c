@@ -455,17 +455,16 @@ void task_track_state(int track){
                     int active_train = get_active_train_from_sensor(&ts, sensor);
                     ASSERT(active_train >= 0, "Could not find which train hit sensor");
 
-                    if (ts.active_trains[active_train].last_sensor >= 0) {
+                    //we haven't reset our calculations && we actually hit the sensor we expected to (and not the one after?)
+                    if (ts.active_trains[active_train].last_sensor >= 0 && sensor == ts.active_trains[active_train].next_sensor) {
                         int last_error_time = (next_sensor_predict_time - f.time);
                         int last_error_dist = last_error_time * predicted_velocity[current_speed] / VELOCITY_PRECISION;
                         SendTerminalRequest(puttid, TERMINAL_SENSOR_PREDICT, last_error_time, last_error_dist);
 
-                        if (sensor == ts.active_trains[active_train].next_sensor) {
-                            // Time is in clock-ticks, velocity is in mm/(clock-tick) -> error is in units of mm
-                            int dt = f.time - last_sensor_time;
-                            int new_velocity = last_sensor_distance * VELOCITY_PRECISION / dt;
-                            predicted_velocity[current_speed] = MOVING_AVERAGE(new_velocity, predicted_velocity[current_speed], 15);
-                        }
+                        // Time is in clock-ticks, velocity is in mm/(clock-tick) -> error is in units of mm
+                        int dt = f.time - last_sensor_time;
+                        int new_velocity = last_sensor_distance * VELOCITY_PRECISION / dt;
+                        predicted_velocity[current_speed] = MOVING_AVERAGE(new_velocity, predicted_velocity[current_speed], 15);
                     }
 
                     int distance;
