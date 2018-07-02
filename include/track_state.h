@@ -69,6 +69,11 @@ typedef struct paramdata{
     const int value;
 } __attribute__((packed)) ParamData;
 
+typedef struct newtrain{
+    const int train;
+    const int sensor;
+} __attribute__((packed)) NewTrain; // TODO move these structs into the c file.
+
 typedef struct routemessage{ // TODO MessageType
     int end_sensor;
     int time_after_end_sensor;
@@ -93,6 +98,7 @@ typedef enum tsrequest{
     NOTIFY_SWITCH,
     NOTIFY_CAL,
     NOTIFY_PARAM,
+    NOTIFY_NEW_TRAIN,
 
     NUM_TRACK_STATE_REQUESTS
 } TrackStateRequest;
@@ -104,6 +110,7 @@ int NotifySwitchStatus(int trackstatetid, SwitchData data);
 int NotifyTrainSpeed(int trackstatetid, TrainData data);
 int NotifyCalibrationResult(int trackstatetid, CalData data);
 int NotifyParam(int trackstatetid, ParamData data);
+int NotifyNewTrain(int trackstatetid, NewTrain data);
 
 int GetSwitchState(int trackstatetid, int sw);
 int GetRoute(int trackstatetid, RouteRequest req, RouteMessage *rom);

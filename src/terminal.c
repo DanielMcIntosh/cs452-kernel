@@ -308,12 +308,37 @@ static inline int parse_command(Command * restrict cmd, circlebuffer_t * restric
         int train;
         err = cb_read_number(cb_input, &train);
         if (err)
-            break;        
+            break;
 
         // cal <sensor> <train>
         cmd->type = COMMAND_CAL;
         cmd->arg1 = SENSOR_PAIR_TO_SENSOR(sensor_char - 'A', sensor_num - 1);
         cmd->arg2 = train;
+        return 0;
+    }
+    case 'a': //add
+    {
+        err = cb_read_match(cb_input, "dd ");
+        if (err != 0) {
+            break;
+        }
+
+        int train;
+        err = cb_read_number(cb_input, &train);
+        if (err)
+            break;
+
+        char sensor_char;
+        int sensor_num;
+        cb_read(cb_input, &sensor_char); // RADIX
+        err = cb_read_number(cb_input, &sensor_num); // SW #
+        if (err)
+            break;
+
+        // add <train> <sensor>
+        cmd->type = COMMAND_ADD;
+        cmd->arg1 = train;
+        cmd->arg2 = SENSOR_PAIR_TO_SENSOR(sensor_char - 'A', sensor_num - 1);
         return 0;
     }
     default:
@@ -323,7 +348,7 @@ static inline int parse_command(Command * restrict cmd, circlebuffer_t * restric
     }
 
     cmd->type = INVALID_COMMAND;
-    return 0;
+    return err;
 }
 
 void task_terminal_command_parser(int terminaltid){

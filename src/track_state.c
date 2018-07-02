@@ -15,11 +15,15 @@
 
 typedef struct track{
     int track_number;
-    Train trains[NUM_TRAINS];
+    int total_trains;
+    int active_train_map[NUM_TRAINS];
+    Train active_trains[MAX_CONCURRENT_TRAINS];
     Switch switches[NUM_SWITCHES+1];
     Sensor sensors[NUM_SENSORS];
     track_node track[TRACK_MAX];
 } TrackState;
+
+#define TRAIN(ts, tr) (ts)->active_trains[(ts)->active_train_map[(tr)]]
 
 typedef struct visited { // represents sensors
     long long switches: NUM_SWITCHES;
@@ -47,16 +51,23 @@ typedef struct tsmessage{
         RouteRequest route_request;
         CalData cal_data;
         ParamData param_data;
+        NewTrain new_train;
     };
 } TrackStateMessage;
 
 void init_track_state(TrackState *ts, int track){
     ts->track_number = track;
-    Train init_train = {0, FORWARD, 0, 0, 0, 0, 0};
+    ts->total_trains = 0;
+    Train init_train = {0, FORWARD, 0, -1, -1, 0, 0};
     Sensor init_sensor = {SENSOR_OFF};
     Switch init_switch = {SWITCH_STRAIGHT};
-    for (int i = 0; i < NUM_TRAINS; i++){
-        ts->trains[i] = init_train;
+
+    for (int i = 0; i < NUM_TRAINS; ++i) {
+        ts->active_train_map[i] = -1;
+    }
+
+    for (int i = 0; i < MAX_CONCURRENT_TRAINS; i++){
+        ts->active_trains[i] = init_train;
     }
     for (int i = 0; i < NUM_SENSORS; i++){
         ts->sensors[i] = init_sensor;
@@ -199,18 +210,25 @@ static int find_path_between_nodes(const track_node *origin, const track_node *d
     return 0;
 }
 
-/*
-static inline int get_train_from_sensor(TrackState *ts, const int sensor) {
-    for (int i = 0; i < NUM_TRAINS; ++i) {
-        Train cur = ts->trains[i];
-        if ((sensor != 0 || cur.last_sensor_time != 0) && cur.next_sensor == sensor) {
+
+static inline int get_active_train_from_sensor(TrackState *ts, const int sensor) {
+    for (int i = 0; i < ts->total_trains; ++i) {
+        if (ts->active_trains[i].next_sensor == sensor) {
             return i;
         }
     }
 
+    for (int i = 0; i < ts->total_trains; ++i) {
+        int next_sensor = ts->active_trains[i].next_sensor;
+        int distance;
+        int predicted = predict_next_sensor(ts->switches, &ts->track[next_sensor], NULL, &distance)->num;
+        if (predicted == sensor) {
+            return i;
+        }
+    }
 
+    return -1;
 }
-//*/
 
 static inline int sendTrackState(int trackstatetid, const TrackStateMessage *msg){
     ReplyMessage rm;
@@ -240,6 +258,11 @@ int NotifyCalibrationResult(int trackstatetid, CalData data) {
 
 int NotifyParam(int trackstatetid, ParamData data) {
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = NOTIFY_PARAM, {.param_data = data}};
+    return sendTrackState(trackstatetid, &msg);
+}
+
+int NotifyNewTrain(int trackstatetid, NewTrain data) {
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = NOTIFY_NEW_TRAIN, {.new_train = data}};
     return sendTrackState(trackstatetid, &msg);
 }
 
@@ -316,7 +339,6 @@ void task_track_state(int track){
     int last_sensor_time = 0;
     int last_sensor_distance = 0;
 
-    int next_sensor = 0;
     int next_sensor_predict_time = 0;
 
     FOREVER{
@@ -325,7 +347,7 @@ void task_track_state(int track){
         switch (tm.request){
         case (TRAIN_SPEED):
         {
-            rm.ret = ts.trains[(int) tm.data].speed;
+            rm.ret = TRAIN(&ts, (int) tm.data).speed;
             Reply(tid, &rm, sizeof(rm));
             break;
         }
@@ -345,9 +367,14 @@ void task_track_state(int track){
         {
             int object = tm.route_request.position.object;
             int distance_past = tm.route_request.position.distance_past;
-            int train = tm.route_request.train;
+            int tr = tm.route_request.train;
+            Train *train = &(TRAIN(&ts, tr));
 
-            current_speed = ts.trains[train].speed;
+            current_speed = train->speed;
+            int next_sensor = train->next_sensor;
+
+            SendTerminalRequest(puttid, TERMINAL_ECHO, '0' + current_speed, 0); // TODO courier
+
             ASSERT(current_speed != 0, "Trying to find route with speed == 0!");
 
             if (next_sensor < 0) {
@@ -417,7 +444,7 @@ void task_track_state(int track){
                     if (ts.sensors[sensor].state != SENSOR_ON){
                         ts.sensors[sensor].state = SENSOR_ON;
 
-                        //int train = get_train_from_sensor(sensor);
+                        int active_train = get_active_train_from_sensor(&ts, sensor);
 
                         TrainEvent_Notify(train_evt_courrier_tid, sensor);
 
@@ -432,7 +459,7 @@ void task_track_state(int track){
                         SendTerminalRequest(puttid, TERMINAL_SENSOR_PREDICT, last_error_time, last_error_dist);
 
                         const track_node *c = &(ts.track[SENSOR_TO_NODE(sensor)]); // last known train position
-                        if (sensor == next_sensor) {
+                        if (sensor == ts.active_trains[active_train].next_sensor) {
                             // Time is in clock-ticks, velocity is in mm/(clock-tick) -> error is in units of mm
                             int dt = f.time - last_sensor_time;
                             int new_velocity = last_sensor_distance * VELOCITY_PRECISION / dt;
@@ -449,7 +476,7 @@ void task_track_state(int track){
                         last_sensor = sensor;
                         last_sensor_time = f.time;
                         last_sensor_distance = distance;
-                        next_sensor = n->num;
+                        ts.active_trains[active_train].next_sensor = n->num;
                     }
                 } else {
                     ts.sensors[sensor].state = SENSOR_OFF;
@@ -461,9 +488,10 @@ void task_track_state(int track){
         case (NOTIFY_TRAIN_SPEED):
         {
             Reply(tid, &rm, sizeof(rm));
-            ts.trains[(int) tm.train_data.train].speed = tm.train_data.speed;
-            current_speed = tm.train_data.speed;
-            next_sensor = -1; // reset prediction;
+            TrainData data = tm.train_data;
+            current_speed = data.speed;
+            TRAIN(&ts, (int) data.train).speed = data.speed;
+            TRAIN(&ts, (int) data.train).next_sensor = -1; // reset prediction;
             break;
         }
         case (NOTIFY_TRAIN_DIRECTION):
@@ -509,6 +537,17 @@ void task_track_state(int track){
             } else if (data.param == PARAM_DELAY) {
                 short_delay[key] = data.value;
             }
+            break;
+        }
+        case (NOTIFY_NEW_TRAIN):
+        {
+            Reply(tid, &rm, sizeof(rm));
+            NewTrain data = tm.new_train;
+
+            ts.active_train_map[data.train] = ts.total_trains;
+            ts.active_trains[ts.total_trains].next_sensor = data.sensor;
+
+            ++ts.total_trains;
             break;
         }
         default:

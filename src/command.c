@@ -245,6 +245,7 @@ void task_commandserver(){
     Putc(servertid, 1, 0x60);
     init_switches(&cs);
 
+    int tstid = WhoIs(NAME_TRACK_STATE);
     FOREVER {
         Receive(&tid, &cm, sizeof(cm));
         if (cm.command.type >= INVALID_COMMAND){
@@ -269,18 +270,18 @@ void task_commandserver(){
             Putc(servertid, 1, speed);
             Putc(servertid, 1, train);
             TrainData td = {speed, train};
-            NotifyTrainSpeed(WhoIs(NAME_TRACK_STATE), td);
+            NotifyTrainSpeed(tstid, td);
             break;
         }
         case COMMAND_RV:
         {
             int train = cm.command.arg1;
-            int speed = GetTrainSpeed(WhoIs(NAME_TRACK_STATE), train);
+            int speed = GetTrainSpeed(tstid, train);
             Putc(servertid, 1, 0);
             Putc(servertid, 1, train);
             CreateWith2Args(PRIORITY_NOTIFIER, &task_reverse_train, train, speed);
             TrainData td = {0, train};
-            NotifyTrainSpeed(WhoIs(NAME_TRACK_STATE), td); // TODO track state courier
+            NotifyTrainSpeed(tstid, td); // TODO track state courier
             break;
         }
         case COMMAND_SW:
@@ -300,20 +301,19 @@ void task_commandserver(){
         case COMMAND_INV:
         {
             int i = 1;
-            int tid = WhoIs(NAME_TRACK_STATE);
             if (cs.notifier_waiting) {
                 Reply(cs.notifier_waiting, &rm, sizeof(rm));
                 cs.notifier_waiting = 0;
-                commandserver_exec_switch(&cs, INV_STATE_TO_CHAR(GetSwitchState(tid, i)), i, &rm, servertid);
+                commandserver_exec_switch(&cs, INV_STATE_TO_CHAR(GetSwitchState(tstid, i)), i, &rm, servertid);
                 i++;
             } 
 
             for (; i <= 18; i++) {
-                cb_write(cs.cb_switches, INV_STATE_TO_CHAR(GetSwitchState(tid, i)));
+                cb_write(cs.cb_switches, INV_STATE_TO_CHAR(GetSwitchState(tstid, i)));
                 cb_write(cs.cb_switches, i);
             }
             for (int y = 153; y <= 156; y++) {
-                cb_write(cs.cb_switches, INV_STATE_TO_CHAR(GetSwitchState(tid, y)));
+                cb_write(cs.cb_switches, INV_STATE_TO_CHAR(GetSwitchState(tstid, y)));
                 cb_write(cs.cb_switches, y);
             }
             break;
@@ -327,7 +327,7 @@ void task_commandserver(){
             int train = cm.command.smallarg2;
             const TrackPosition pos = {.object = SENSOR_TO_NODE(sensor), .distance_past = distance_past};
             const RouteRequest rq = {.position = pos, .train = train};
-            int err = GetRoute(WhoIs(NAME_TRACK_STATE), rq, &rom);
+            int err = GetRoute(tstid, rq, &rom);
             ASSERT(err==0, "FAILED TO GET ROUTE");
 
             int time_after_sensor = rom.time_after_end_sensor;
@@ -356,7 +356,6 @@ void task_commandserver(){
             int train = cm.command.arg2;
             int distance = cm.command.arg1;
             ShortMessage sm;
-            int tstid = WhoIs(NAME_TRACK_STATE);
 
             GetShort(tstid, distance, &sm); // TODO track state courier
 
@@ -371,7 +370,7 @@ void task_commandserver(){
         case COMMAND_PARAM:
         {
             ParamData data = {.key = cm.command.smallarg1, .param = cm.command.smallarg2, .value = cm.command.arg1};
-            NotifyParam(WhoIs(NAME_TRACK_STATE), data); // TODO track state courier
+            NotifyParam(tstid, data); // TODO track state courier
             break;
         }
         case COMMAND_CAL:
@@ -379,6 +378,14 @@ void task_commandserver(){
             int sensor = cm.command.arg1;
             int train = cm.command.arg2;
             CreateWith2Args(PRIORITY_MID, &task_calibrate, train, sensor);
+            break;
+        }
+        case COMMAND_ADD:
+        {
+            int train = cm.command.arg1;
+            int sensor = cm.command.arg2;
+            NewTrain new = {.train = train, .sensor = sensor};
+            NotifyNewTrain(tstid, new);
             break;
         }
         case COMMAND_QUIT:
@@ -396,7 +403,7 @@ void task_commandserver(){
             Putc(servertid, 1, speed);
             Putc(servertid, 1, train);
             TrainData td = {speed, train};
-            NotifyTrainSpeed(WhoIs(NAME_TRACK_STATE), td);
+            NotifyTrainSpeed(tstid, td);
             break;
         }
         case COMMAND_NOTIFY_RV_REVERSE:
