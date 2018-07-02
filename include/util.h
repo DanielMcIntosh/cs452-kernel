@@ -38,4 +38,7 @@ void * memcpy(void * dest, const void* src, unsigned int sz);
 #define MS_TO_S(ms) ((ms)/1000)
 #endif
 
+#define likely(x)       __builtin_expect((x),1)
+#define unlikely(x)     __builtin_expect((x),0)
+
 #endif
