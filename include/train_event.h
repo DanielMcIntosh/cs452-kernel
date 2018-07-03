@@ -3,7 +3,7 @@
 #include <syscall.h>
 #include <util.h>
 
-#define NAME_TRAIN_EVENT_COURRIER "trn_evt"
+#define NAME_TRAIN_EVENT_COURIER "trn_evt"
 
 typedef struct {
     void (*func)(int arg0, int arg1, bool success);

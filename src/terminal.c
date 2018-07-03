@@ -87,7 +87,7 @@ static inline int parse_command(Command * restrict cmd, circlebuffer_t * restric
         cmd->type = INVALID_COMMAND;
         return 0;
     }
-    int err;
+    int err = 0;
     cb_read(cb_input, &c);
     switch(c) {
     case 'q':
@@ -339,6 +339,60 @@ static inline int parse_command(Command * restrict cmd, circlebuffer_t * restric
         cmd->type = COMMAND_ADD;
         cmd->arg1 = train;
         cmd->arg2 = SENSOR_PAIR_TO_SENSOR(sensor_char - 'A', sensor_num - 1);
+        return 0;
+    }
+    case 'd': // drop
+    {
+        err = cb_read_match(cb_input, "rop ");
+        if (err != 0) {
+            break;
+        }
+
+        char sensor_char;
+        int sensor_num;
+
+        cb_read(cb_input, &sensor_char); // RADIX
+        err = cb_read_number(cb_input, &sensor_num); // SW #
+        if (err)
+            break;
+
+        // drop <node>
+        cmd->type = COMMAND_RESERVE;
+        switch(sensor_char) {
+        case ('S'):
+        {
+            cmd->arg1 = SWITCH_TO_NODE(SWCLAMP(sensor_num)- 1);
+            break;
+        }
+        case ('M'):
+        {
+            cmd->arg1 = MERGE_TO_NODE(SWCLAMP(sensor_num) - 1);
+            break;
+        }
+        case ('N'):
+        {
+            cmd->arg1 = ENTER_TO_NODE(sensor_num - 1);
+            break;
+        }
+        case ('X'):
+        {
+            cmd->arg1 = EXIT_TO_NODE(sensor_num - 1);
+            break;
+        }
+        case ('A'):
+        case ('B'):
+        case ('C'):
+        case ('D'):
+        case ('E'):
+        {
+            cmd->arg1 = SENSOR_PAIR_TO_SENSOR(sensor_char - 'A', sensor_num - 1);
+            break;
+        }
+        default:
+        {
+            PANIC("INVALID SENSOR CHAR: %d\r\n", sensor_char)
+        }
+        }
         return 0;
     }
     default:

@@ -388,6 +388,11 @@ void task_commandserver(){
             NotifyNewTrain(tstid, new);
             break;
         }
+        case COMMAND_RESERVE:
+        {
+            NotifyReservation(tstid, cm.command.arg1);
+            break;
+        }
         case COMMAND_QUIT:
         {
             Quit();

@@ -20,7 +20,7 @@ typedef struct te_message{
 } TrainEventMessage;
 
 void task_train_event_courier() {
-    RegisterAs(NAME_TRAIN_EVENT_COURRIER);
+    RegisterAs(NAME_TRAIN_EVENT_COURIER);
 
     TrainEventMessage tm;
     int tid;
@@ -67,9 +67,9 @@ void task_train_event_courier() {
     }
 }
 
-void TrainEvent_Notify(int courrier_tid, int sensor) {
+void TrainEvent_Notify(int courier_tid, int sensor) {
     TrainEventMessage msg = {NOTIFY, sensor};
-    Send(courrier_tid, &msg, sizeof(msg), NULL, 0);
+    Send(courier_tid, &msg, sizeof(msg), NULL, 0);
 }
 
 void task_runner(int sensor) {
@@ -78,11 +78,11 @@ void task_runner(int sensor) {
     Receive(&caller_tid, &to_run, sizeof(to_run));
     Reply(caller_tid, NULL, 0);
 
-    int train_evt_courrier_tid = WhoIs(NAME_TRAIN_EVENT_COURRIER);
+    int train_evt_courier_tid = WhoIs(NAME_TRAIN_EVENT_COURIER);
     
     //queue up to receive alert
     TrainEventMessage tm = {QUEUE, sensor};
-    Send(train_evt_courrier_tid, &tm, sizeof(tm), NULL, 0);
+    Send(train_evt_courier_tid, &tm, sizeof(tm), NULL, 0);
 
     int tid;
     MessageType type;
@@ -98,7 +98,7 @@ void task_runner(int sensor) {
 
     if (type == MESSAGE_TIMEOUT) {
         tm.rq = UNQUEUE;
-        Send(train_evt_courrier_tid, &tm, sizeof(tm), NULL, 0);
+        Send(train_evt_courier_tid, &tm, sizeof(tm), NULL, 0);
     } else if (to_run.timeout != 0) {
         Receive(&tid, &type, sizeof(type));
         Reply(tid, NULL, 0);

@@ -21,6 +21,7 @@ typedef struct track{
     Switch switches[NUM_SWITCHES+1];
     Sensor sensors[NUM_SENSORS];
     track_node track[TRACK_MAX];
+    int reservations[TRACK_MAX];
 } TrackState;
 
 #define TRAIN(ts, tr) ((ts)->active_trains[(ts)->active_train_map[(tr)]])
@@ -55,7 +56,7 @@ typedef struct tsmessage{
     };
 } TrackStateMessage;
 
-void init_track_state(TrackState *ts, int track){
+void init_track_state(TrackState *ts, int track) {
     ts->track_number = track;
     ts->total_trains = 0;
     Train init_train = {0, FORWARD, 0, -1, -1, 0, 0};
@@ -66,29 +67,33 @@ void init_track_state(TrackState *ts, int track){
         ts->active_train_map[i] = -1;
     }
 
-    for (int i = 0; i < MAX_CONCURRENT_TRAINS; i++){
+    for (int i = 0; i < MAX_CONCURRENT_TRAINS; i++) {
         ts->active_trains[i] = init_train;
     }
-    for (int i = 0; i < NUM_SENSORS; i++){
+    for (int i = 0; i < NUM_SENSORS; i++) {
         ts->sensors[i] = init_sensor;
     }
-    for (int i = 0; i < NUM_SWITCHES; i++){
+    for (int i = 0; i < NUM_SWITCHES; i++) {
         ts->switches[i] = init_switch;
     }
     if (track == TRACK_A)
         init_tracka(ts->track);
     else
         init_trackb(ts->track);
+
+    for (int i = 0; i < TRACK_MAX; i++) {
+        ts->reservations[i] = -1;
+    }
 }
 
-static track_node* predict_next_sensor(const Switch * restrict ts, const track_node *last_sensor, const Switch * restrict path, int * restrict distance){
+static track_node* predict_next_sensor(const Switch * restrict ts, const track_node *last_sensor, const Switch * restrict path, int * restrict distance) {
     // basic plan for this: linked list search: follow state given by TrackState
     // Stop when another sensor is found
 
     track_node *n = last_sensor->edge[DIR_AHEAD].dest;
     *distance = last_sensor->edge[DIR_AHEAD].dist;
     track_edge *e;
-    while (n != NULL && n->type != NODE_SENSOR){
+    while (n != NULL && n->type != NODE_SENSOR) {
         switch (n->type) {
         case (NODE_BRANCH):
         {
@@ -124,7 +129,7 @@ static track_node* predict_next_sensor(const Switch * restrict ts, const track_n
     return n;
 }
 
-static int reverse_distance_from_node(const Switch * restrict ts, const track_node *destination, int distance, int velocity, const Switch * restrict path, int * restrict wakeup_sensor, int * restrict time_after_sensor){
+static int reverse_distance_from_node(const Switch * restrict ts, const track_node *destination, int distance, int velocity, const Switch * restrict path, int * restrict wakeup_sensor, int * restrict time_after_sensor) {
     ASSERT(distance > 0, "Cannot reverse find negative distance");
     const track_node * restrict next_sensor = destination->reverse;
     int tdist = 0, cdist;
@@ -141,7 +146,7 @@ static int reverse_distance_from_node(const Switch * restrict ts, const track_no
     return 0;
 }
 
-static int forward_distance_from_node(const Switch * restrict ts, const track_node *destination, int distance, int velocity, const Switch * restrict path, int * restrict wakeup_sensor, int * restrict time_after_sensor){
+static int forward_distance_from_node(const Switch * restrict ts, const track_node *destination, int distance, int velocity, const Switch * restrict path, int * restrict wakeup_sensor, int * restrict time_after_sensor) {
     ASSERT(distance >= 0, "Cannot forward find negative distance");
     const track_node * restrict next_sensor = destination;
     int tdist = 0, last_tdist = 0, cdist;
@@ -157,24 +162,25 @@ static int forward_distance_from_node(const Switch * restrict ts, const track_no
     return 0;
 }
 
-static int find_path_between_nodes(const track_node *origin, const track_node *dest, const track_node *previous, TrackPath * restrict l, int level){
+static int find_path_between_nodes(const TrackState* ts, const track_node *origin, const track_node *dest, const track_node *previous, TrackPath * restrict l, int level) {
     if (origin == dest) return 1;
-    if (origin == NULL || origin->type == NODE_NONE) return 0;
+    if (origin == NULL || origin->type == NODE_NONE || 
+            ts->reservations[TRACK_NODE_TO_INDEX(origin)] != -1) return 0; // TODO allow trains to use their own reserved track
 
-    switch (origin->type){
+    switch (origin->type) {
     case (NODE_BRANCH):
     {
-        if (IsVisited(l->visited, origin->num)){
+        if (IsVisited(l->visited, origin->num)) {
             return 0;
         }
         Visit(l->visited, origin->num);
 
-        if (find_path_between_nodes(origin->edge[DIR_STRAIGHT].dest, dest, origin, l, level+1)){
+        if (find_path_between_nodes(ts, origin->edge[DIR_STRAIGHT].dest, dest, origin, l, level+1)) {
             l->switches[SWCLAMP(origin->num)].state = SWITCH_STRAIGHT;
             return 1;
-        } else if (find_path_between_nodes(origin->edge[DIR_CURVED].dest, dest, origin, l, level+1)){
+        } else if (find_path_between_nodes(ts, origin->edge[DIR_CURVED].dest, dest, origin, l, level+1)) {
             l->switches[SWCLAMP(origin->num)].state = SWITCH_CURVED;
-            if (origin->num >= 153){
+            if (origin->num >= 153) {
                l->switches[SWCLAMP(SW3_COMPLEMENT(origin->num))].state = SWITCH_STRAIGHT; 
             }
             return 1;
@@ -196,7 +202,7 @@ static int find_path_between_nodes(const track_node *origin, const track_node *d
     case (NODE_SENSOR):
     case (NODE_ENTER):
     {
-        return find_path_between_nodes(origin->edge[DIR_AHEAD].dest, dest, origin, l, level+1);
+        return find_path_between_nodes(ts, origin->edge[DIR_AHEAD].dest, dest, origin, l, level+1);
     }
     case (NODE_EXIT):
     {
@@ -213,7 +219,7 @@ static int find_path_between_nodes(const track_node *origin, const track_node *d
 
 static inline int get_active_train_from_sensor(TrackState *ts, const int sensor) {
     int distance;
-    for (int skipped = 0; skipped < 4; ++skipped) {
+    for (int skipped = 0; skipped < 4; ++skipped) { // TODO instead of this - build auxiliary sensor array?
         for (int cur = 0; cur < ts->total_trains; ++cur) {
             int next_sensor = ts->active_trains[cur].next_sensor;
             for (int i = 0; unlikely(i < skipped); ++i) {
@@ -227,23 +233,23 @@ static inline int get_active_train_from_sensor(TrackState *ts, const int sensor)
     return -1;
 }
 
-static inline int sendTrackState(int trackstatetid, const TrackStateMessage *msg){
+static inline int sendTrackState(int trackstatetid, const TrackStateMessage *msg) {
     ReplyMessage rm;
     int r = Send(trackstatetid, msg, sizeof(*msg), &rm, sizeof(rm));
     return (r >= 0 ? rm.ret : r);
 }
 
-int NotifySensorData(int trackstatetid, SensorData data){
+int NotifySensorData(int trackstatetid, SensorData data) {
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = NOTIFY_SENSOR_DATA, {.sensor_data = data}};
     return sendTrackState(trackstatetid, &msg);
 }
 
-int NotifySwitchStatus(int trackstatetid, SwitchData data){
+int NotifySwitchStatus(int trackstatetid, SwitchData data) {
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = NOTIFY_SWITCH, {.switch_data = data}};
     return sendTrackState(trackstatetid, &msg);
 }
 
-int NotifyTrainSpeed(int trackstatetid, TrainData data){
+int NotifyTrainSpeed(int trackstatetid, TrainData data) {
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = NOTIFY_TRAIN_SPEED, {.train_data = data}};
     return sendTrackState(trackstatetid, &msg);
 }
@@ -262,33 +268,37 @@ int NotifyNewTrain(int trackstatetid, NewTrain data) {
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = NOTIFY_NEW_TRAIN, {.new_train = data}};
     return sendTrackState(trackstatetid, &msg);
 }
+int NotifyReservation(int trackstatetid, int data) {
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = NOTIFY_RESERVATION, {.data = data}};
+    return sendTrackState(trackstatetid, &msg);
+}
 
-int GetSwitchState(int trackstatetid, int sw){
+int GetSwitchState(int trackstatetid, int sw) {
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = SWITCH, {.data = sw}};
     return sendTrackState(trackstatetid, &msg);
 }
 
-int GetRoute(int trackstatetid, RouteRequest req, RouteMessage *rom){
+int GetRoute(int trackstatetid, RouteRequest req, RouteMessage *rom) {
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = ROUTE, {.route_request = req}};
     int r = Send(trackstatetid, &msg, sizeof(msg), rom, sizeof(*rom));
     return (r >= 0 ? 0 : -1);
 }
 
-int GetShort(int trackstatetid, int distance, ShortMessage *sm){
+int GetShort(int trackstatetid, int distance, ShortMessage *sm) {
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = SHORT, {.data = distance}};
     int r = Send(trackstatetid, &msg, sizeof(msg), sm, sizeof(*sm));
     return (r >= 0 ? 0 : -1);
 }
     
-int GetTrainSpeed(int trackstatetid, int train){
+int GetTrainSpeed(int trackstatetid, int train) {
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = TRAIN_SPEED, {.data = train}};
     return sendTrackState(trackstatetid, &msg);
 }
 
-void task_track_state(int track){
+void task_track_state(int track) {
     RegisterAs(NAME_TRACK_STATE);
     const int puttid = WhoIs(NAME_TERMINAL);
-    const int train_evt_courrier_tid = Create(PRIORITY_MID, &task_train_event_courier);
+    const int train_evt_courier_tid = Create(PRIORITY_MID, &task_train_event_courier);
 
     TrackState ts;
     init_track_state(&ts, track);
@@ -326,8 +336,8 @@ void task_track_state(int track){
     int short_delay[NUM_SHORTS] =  // increments of 2 cm: 2 cm -> 20 cm
     {
          0, 
-         65,  80,  92, 100, 110, // i guess this is calibrated now
-        120, 122, 130, 135, 141
+         65,  80,  92, 100, 110, // i guess this is calibrated now 
+        120, 122, 130, 135, 141 // TODO fix the whole short move framework
     };
 
     int current_speed = 0;
@@ -340,7 +350,7 @@ void task_track_state(int track){
     FOREVER{
         Receive(&tid, &tm, sizeof(tm));
 
-        switch (tm.request){
+        switch (tm.request) {
         case (TRAIN_SPEED):
         {
             rm.ret = TRAIN(&ts, (int) tm.data).speed;
@@ -380,7 +390,7 @@ void task_track_state(int track){
             const track_node *d = &ts.track[object], *n = &ts.track[next_sensor], *o = &ts.track[last_sensor];
 
             TrackPath tp = {{0}, {{SWITCH_UNKNOWN}}, {{SWITCH_UNKNOWN}}}; 
-            int possible = find_path_between_nodes(n, d, o, &tp, 0);
+            int possible = find_path_between_nodes(&ts, n, d, o, &tp, 0);
             if (possible) {
                 if (stopping_distance[current_speed] > distance_past) {
                     //make sure we actually have enough distance to stop in
@@ -390,7 +400,7 @@ void task_track_state(int track){
                         if (walk_node == d) {
                             walk_node = predict_next_sensor(ts.switches, walk_node, tp.switches, &temp);
                             //add to &tp a loop from d to d
-                            find_path_between_nodes(walk_node, d, d, &tp, 0);
+                            find_path_between_nodes(&ts, walk_node, d, d, &tp, 0);
                         }
                         walk_node = predict_next_sensor(ts.switches, walk_node, tp.switches, &temp);
                     }
@@ -403,7 +413,7 @@ void task_track_state(int track){
                     int err = forward_distance_from_node(ts.switches, d, dist_needed, predicted_velocity[current_speed], tp.switches, &rom.end_sensor, &rom.time_after_end_sensor);
                     ASSERT(err == 0, "Forward Distance Failed");
                 }
-                for (int i = 1; i <= NUM_SWITCHES; i++){
+                for (int i = 1; i <= NUM_SWITCHES; i++) {
                     if (tp.switches[i].state != ts.switches[i].state) {
                         rom.switches[i] = tp.switches[i]; // pick up differences and unnknowns
                     } else {
@@ -413,7 +423,7 @@ void task_track_state(int track){
             } else {
                 PANIC("failed to find path between %d and %d", object, next_sensor);
                 rom.end_sensor = -1;
-                for (int i = 0; i <= NUM_SWITCHES; i++){
+                for (int i = 0; i <= NUM_SWITCHES; i++) {
                     rom.switches[i].state = SWITCH_UNKNOWN; // pick up differences and unnknowns
                 }
             }
@@ -433,15 +443,14 @@ void task_track_state(int track){
             Reply(tid, &rm, sizeof(rm));
             SensorData f = tm.sensor_data;
             int k = 1 << 15;
-            for (int i = 0; i <= 15; i++, k >>= 1){
+            for (int i = 0; i <= 15; i++, k >>= 1) {
                 int sensor = SENSOR_PAIR_TO_SENSOR(f.radix, i);
                 if (likely(!(f.data & k))) {
                     ts.sensors[sensor].state = SENSOR_OFF;
-                }
-                else if (ts.sensors[sensor].state != SENSOR_ON){
+                } else if (ts.sensors[sensor].state != SENSOR_ON) {
                     ts.sensors[sensor].state = SENSOR_ON;
 
-                    TrainEvent_Notify(train_evt_courrier_tid, sensor);
+                    TrainEvent_Notify(train_evt_courier_tid, sensor);
 
                     //TODO change all of this to use RunWhen instead of running here
                     //first need to be able to have multiple tasks waiting per sensor
@@ -545,6 +554,15 @@ void task_track_state(int track){
             ts.active_train_map[data.train] = ts.total_trains;
             ts.active_trains[ts.total_trains].next_sensor = data.sensor;
             ++ts.total_trains;
+            break;
+        }
+        case (NOTIFY_RESERVATION):
+        {
+            Reply(tid, &rm, sizeof(rm));
+            if (ts.reservations[tm.data] != -1)
+                ts.reservations[tm.data] = -1;
+            else
+                ts.reservations[tm.data] = 1;
             break;
         }
         default:
