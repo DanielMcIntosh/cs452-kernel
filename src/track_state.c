@@ -25,7 +25,7 @@ typedef struct track{
     int reservations[TRACK_MAX];
 } TrackState;
 
-#define TRAIN(ts, tr) ((ts)->active_trains[(ts)->active_train_map[(tr)]])
+#define TRAIN(ts, tr) (&((ts)->active_trains[(ts)->active_train_map[(tr)]]))
 
 typedef struct visited { // represents sensors
     long long switches: NUM_SWITCHES;
@@ -60,7 +60,7 @@ typedef struct tsmessage{
 void init_track_state(TrackState *ts, int track) {
     ts->track_number = track;
     ts->total_trains = 0;
-    Train init_train = {0, FORWARD, 0, -1, -1, 0, 0};
+    Train init_train = {0, FORWARD, 0, -1, 0, -1, 0, 0};
     Sensor init_sensor = {SENSOR_OFF};
     Switch init_switch = {SWITCH_STRAIGHT};
 
@@ -423,20 +423,13 @@ void task_track_state(int track) {
         120, 122, 130, 135, 141 // TODO fix the whole short move framework
     };
 
-    int current_speed = 0;
-
-    int last_sensor_time = 0;
-    int last_sensor_distance = 0;
-
-    int next_sensor_predict_time = 0;
-
     FOREVER{
         Receive(&tid, &tm, sizeof(tm));
 
         switch (tm.request) {
         case (TRAIN_SPEED):
         {
-            rm.ret = TRAIN(&ts, (int) tm.data).speed;
+            rm.ret = TRAIN(&ts, (int) tm.data)->speed;
             Reply(tid, &rm, sizeof(rm));
             break;
         }
@@ -457,27 +450,23 @@ void task_track_state(int track) {
             int object = tm.route_request.position.object;
             int distance_past = tm.route_request.position.distance_past;
             int tr = tm.route_request.train;
-            Train *train = &(TRAIN(&ts, tr));
+            Train *train = TRAIN(&ts, tr);
 
-            current_speed = train->speed;
-            int next_sensor = train->next_sensor;
-            int last_sensor = train->last_sensor;
+            ASSERT(train->speed != 0, "Trying to find route with speed == 0!");
 
-            ASSERT(current_speed != 0, "Trying to find route with speed == 0!");
-
-            if (next_sensor < 0) {
+            if (train->next_sensor < 0) {
                 int __attribute__((unused)) distance;
-                next_sensor = predict_next_sensor(ts.switches, &ts.track[last_sensor], NULL, &distance)->num;
+                train->next_sensor = predict_next_sensor(ts.switches, &ts.track[train->last_sensor], NULL, &distance)->num;
             }
 
-            const track_node *d = &ts.track[object], *n = &ts.track[next_sensor], *o = &ts.track[last_sensor];
+            const track_node *d = &ts.track[object], *n = &ts.track[train->next_sensor], *o = &ts.track[train->last_sensor];
 
             TrackPath tp = {{0}, {{SWITCH_UNKNOWN}}, {{SWITCH_UNKNOWN}}}; 
             int possible = find_path_between_nodes(&ts, n, d, o, &tp, 0);
             if (possible) {
-                if (stopping_distance[current_speed] > distance_past) {
+                if (stopping_distance[train->speed] > distance_past) {
                     //make sure we actually have enough distance to stop in
-                    int dist_needed = stopping_distance[current_speed] - distance_past;
+                    int dist_needed = stopping_distance[train->speed] - distance_past;
                     const track_node *walk_node = n;
                     for (int walked_dist = 0, temp; walked_dist < dist_needed; walked_dist += temp) {
                         if (walk_node == d) {
@@ -489,11 +478,11 @@ void task_track_state(int track) {
                     }
 
 
-                    int err = reverse_distance_from_node(ts.switches, d, dist_needed, predicted_velocity[current_speed], tp.merges, &rom.end_sensor, &rom.time_after_end_sensor);
+                    int err = reverse_distance_from_node(ts.switches, d, dist_needed, predicted_velocity[train->speed], tp.merges, &rom.end_sensor, &rom.time_after_end_sensor);
                     ASSERT(err == 0, "Reverse Distance Failed");
                 } else {
-                    int dist_needed = distance_past - stopping_distance[current_speed];
-                    int err = forward_distance_from_node(ts.switches, d, dist_needed, predicted_velocity[current_speed], tp.switches, &rom.end_sensor, &rom.time_after_end_sensor);
+                    int dist_needed = distance_past - stopping_distance[train->speed];
+                    int err = forward_distance_from_node(ts.switches, d, dist_needed, predicted_velocity[train->speed], tp.switches, &rom.end_sensor, &rom.time_after_end_sensor);
                     ASSERT(err == 0, "Forward Distance Failed");
                 }
                 for (int i = 1; i <= NUM_SWITCHES; i++) {
@@ -504,7 +493,7 @@ void task_track_state(int track) {
                     }
                 }
             } else {
-                PANIC("failed to find path between %d and %d", object, next_sensor);
+                PANIC("failed to find path between %d and %d", object, train->next_sensor);
                 rom.end_sensor = -1;
                 for (int i = 0; i <= NUM_SWITCHES; i++) {
                     rom.switches[i].state = SWITCH_UNKNOWN; // pick up differences and unnknowns
@@ -544,33 +533,35 @@ void task_track_state(int track) {
                     if (unlikely(ts.total_trains <= 0)) {
                         continue;
                     }
-                    int active_train = get_active_train_from_sensor(&ts, sensor);
-                    ASSERT(active_train >= 0, "Could not find which train hit sensor");
+                    int tr = get_active_train_from_sensor(&ts, sensor);
+                    ASSERT(tr >= 0, "Could not find which train hit sensor");
+
+                    Train *train = &(ts.active_trains[tr]);
 
                     //we haven't reset our calculations && we actually hit the sensor we expected to (and not the one after?)
-                    if (ts.active_trains[active_train].last_sensor >= 0 && sensor == ts.active_trains[active_train].next_sensor) {
-                        int last_error_time = (next_sensor_predict_time - f.time);
-                        int last_error_dist = last_error_time * predicted_velocity[current_speed] / VELOCITY_PRECISION;
+                    if (train->last_sensor >= 0 && sensor == train->next_sensor) {
+                        int last_error_time = (train->next_sensor_predict_time - f.time);
+                        int last_error_dist = last_error_time * predicted_velocity[train->speed] / VELOCITY_PRECISION;
                         SendTerminalRequest(puttid, TERMINAL_SENSOR_PREDICT, last_error_time, last_error_dist);
 
                         // Time is in clock-ticks, velocity is in mm/(clock-tick) -> error is in units of mm
-                        int dt = f.time - last_sensor_time;
-                        int new_velocity = last_sensor_distance * VELOCITY_PRECISION / dt;
-                        predicted_velocity[current_speed] = MOVING_AVERAGE(new_velocity, predicted_velocity[current_speed], 15);
+                        int dt = f.time - train->last_sensor_time;
+                        int new_velocity = train->last_sensor_dist * VELOCITY_PRECISION / dt;
+                        predicted_velocity[train->speed] = MOVING_AVERAGE(new_velocity, predicted_velocity[train->speed], 15);
                     }
 
                     int distance;
                     const track_node *c = &(ts.track[SENSOR_TO_NODE(sensor)]); // last known train position
                     const track_node *n = predict_next_sensor(ts.switches, c, NULL, &distance); // next predicted train position
 
-                    next_sensor_predict_time = f.time + distance * VELOCITY_PRECISION / predicted_velocity[current_speed];
-                    SendTerminalRequest(puttid, TERMINAL_VELOCITY_DEBUG, predicted_velocity[current_speed], n->num);
+                    train->next_sensor_predict_time = f.time + distance * VELOCITY_PRECISION / predicted_velocity[train->speed];
+                    SendTerminalRequest(puttid, TERMINAL_VELOCITY_DEBUG, predicted_velocity[train->speed], n->num);
                     SendTerminalRequest(puttid, TERMINAL_DISTANCE_DEBUG, distance, 0);
 
-                    ts.active_trains[active_train].last_sensor = sensor;
-                    last_sensor_time = f.time;
-                    last_sensor_distance = distance;
-                    ts.active_trains[active_train].next_sensor = n->num;
+                    train->last_sensor = sensor;
+                    train->last_sensor_time = f.time;
+                    train->last_sensor_dist = distance;
+                    train->next_sensor = n->num;
                 }
             }
             break;
@@ -579,9 +570,8 @@ void task_track_state(int track) {
         {
             Reply(tid, &rm, sizeof(rm));
             TrainData data = tm.train_data;
-            current_speed = data.speed;
-            TRAIN(&ts, (int) data.train).speed = data.speed;
-            TRAIN(&ts, (int) data.train).last_sensor = -1; // reset prediction;
+            TRAIN(&ts, (int) data.train)->speed = data.speed;
+            TRAIN(&ts, (int) data.train)->last_sensor = -1; // reset prediction;
             break;
         }
         case (NOTIFY_TRAIN_DIRECTION):

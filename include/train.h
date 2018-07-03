@@ -16,6 +16,7 @@ typedef struct train{
     Direction direction;
     int velocity;
     int next_sensor;
+    int next_sensor_predict_time;
     int last_sensor;
     int last_sensor_time; // TODO when we do sensor attribution
     int last_sensor_dist;

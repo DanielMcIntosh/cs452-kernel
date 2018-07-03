@@ -16,7 +16,7 @@ typedef struct sensorserver{
     int current_sensor_query;
     int current_sensor_radix;
     int query_complete;
-    int notifier_tid;
+    int courier_tid;
     int send_cm;
 } SensorServer;
 
@@ -40,10 +40,9 @@ typedef struct couriermessage {
 void task_sensor_read_notifier(int servertid){
     int gettid = WhoIs(NAME_UART1_RCV);
     SensorMessage sm = {MESSAGE_SENSOR, SENSOR_READ_NOTIFY, 0};
-    ReplyMessage rm = {0, 0};
     FOREVER{
         sm.data = Getc(gettid, 1);
-        Send(servertid, &sm, sizeof(sm), &rm, sizeof(rm));
+        Send(servertid, &sm, sizeof(sm), NULL, 0);
     }
 }
 
@@ -79,6 +78,8 @@ void task_sensor_server(){
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_read_notifier, mytid);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_timeout_notifier, mytid);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_courier, mytid);
+
+    int time_of_resp = 0;
     FOREVER{
         Receive(&tid, &sm, sizeof(sm));
         switch(sm.request){
@@ -89,7 +90,7 @@ void task_sensor_server(){
                 Reply(tid, &cm, sizeof(cm));
                 ss.send_cm = 0;
             } else
-                ss.notifier_tid = tid;
+                ss.courier_tid = tid;
             break;
         }
         case SENSOR_TIMEOUT:
@@ -98,10 +99,10 @@ void task_sensor_server(){
             Reply(tid, &rm, sizeof(rm));
 
             if (!ss.query_complete){
-                if (ss.notifier_tid != 0){
+                if (ss.courier_tid != 0){
                     cm.c.arg1 = ss.current_sensor_radix;
-                    Reply(ss.notifier_tid, &cm, sizeof(cm));
-                    ss.notifier_tid = 0;
+                    Reply(ss.courier_tid, &cm, sizeof(cm));
+                    ss.courier_tid = 0;
                 } else 
                     ss.send_cm = 1;
 
@@ -113,22 +114,25 @@ void task_sensor_server(){
         }
         case SENSOR_READ_NOTIFY:
         {
-            rm.ret = 0;
-            Reply(tid, &rm, sizeof(rm));
-            ss.sensor_data[ss.current_sensor_query++] = sm.data; 
+            //we want to get the time as close to when we get the first byte as possible?
+            int cur_time = Time();
+            Reply(tid, NULL, 0);
+            ss.sensor_data[ss.current_sensor_query++] = sm.data;
             if (ss.current_sensor_query == 2) {
-                SensorData s = {ss.current_sensor_radix, (ss.sensor_data[0] << 8) | ss.sensor_data[1], Time()};
+                SensorData s = {ss.current_sensor_radix, (ss.sensor_data[0] << 8) | ss.sensor_data[1], time_of_resp};
                 NotifySensorData(trackstatetid, s);
 
                 ss.current_sensor_query = 0;
                 ss.current_sensor_radix = (ss.current_sensor_radix + 1) % 5;
                 ss.query_complete = 1;
-                if (ss.notifier_tid != 0){
+                if (ss.courier_tid != 0){
                     cm.c.arg1 = ss.current_sensor_radix;
-                    Reply(ss.notifier_tid, &cm, sizeof(cm));
-                    ss.notifier_tid = 0;
+                    Reply(ss.courier_tid, &cm, sizeof(cm));
+                    ss.courier_tid = 0;
                 } else 
                     ss.send_cm = 1;
+            } else {
+                time_of_resp = cur_time;
             }
             break;
         }

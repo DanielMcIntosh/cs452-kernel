@@ -440,7 +440,8 @@ void task_commandserver(){
         }
         case COMMAND_SENSOR_REQUEST:
         {
-            Putc(servertid, 1, 193 + cm.command.arg1); // individual sensor query TODO: does it make sense to do the full thing actually? since that uses less bandwidth
+            // individual sensor query TODO: does it make sense to do the full thing actually? since that uses less bandwidth
+            Putc(servertid, 1, 193 + cm.command.arg1);
             break;
         }
         case COMMAND_NOTIFY_COURIER:
