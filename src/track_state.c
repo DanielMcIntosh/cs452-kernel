@@ -12,6 +12,7 @@
 #include <track_data.h>
 #include <train_event.h>
 #include <util.h>
+#include <minheap.h>
 
 typedef struct track{
     int track_number;
@@ -162,57 +163,139 @@ static int forward_distance_from_node(const Switch * restrict ts, const track_no
     return 0;
 }
 
-static int find_path_between_nodes(const TrackState* ts, const track_node *origin, const track_node *dest, const track_node *previous, TrackPath * restrict l, int level) {
-    if (origin == dest) return 1;
-    if (origin == NULL || origin->type == NODE_NONE || 
-            ts->reservations[TRACK_NODE_TO_INDEX(origin)] != -1) return 0; // TODO allow trains to use their own reserved track
 
-    switch (origin->type) {
-    case (NODE_BRANCH):
-    {
-        if (IsVisited(l->visited, origin->num)) {
-            return 0;
+typedef struct bfsnode {
+    TrackPath tp;
+    const track_node *current_node;
+    const track_node *previous_node;
+    struct bfsnode *next;
+} BFSNode;
+
+static BFSNode* q_pop(BFSNode** freeQ, BFSNode** freeQTail){
+    ASSERT(freeQ != NULL, "Cannot pop from empty free queue");
+    BFSNode *ret = *freeQ;
+    *freeQ = (*freeQ)->next;
+    if (*freeQ == NULL)
+        *freeQTail = NULL;
+
+    ret->next = NULL;
+    return ret;
+}
+
+static void q_add(BFSNode** freeQ, BFSNode** freeQTail, BFSNode *node){
+    if (*freeQTail == NULL) {
+        *freeQ = node;
+        *freeQTail = node;
+        return;
+    }
+
+    (*freeQTail)->next = node;
+    *freeQTail = node;
+}
+
+static int find_path_between_nodes(const TrackState* ts, const track_node *origin, const track_node *dest, const track_node *previous, TrackPath * restrict l, int __attribute__((unused)) level) {
+    // TODO: in progress conversion to BFS
+
+    entry_t mh_array[BFS_MH_SIZE]; // TODO pick a better size
+    minheap_t mh = {mh_array, 0, BFS_MH_SIZE};
+    entry_t entry;
+    // IDEA: minheap contains pointers to some struct. That struct contains a TrackPath and some other data I guess? We allocate those structs in a big array on the stack here.
+    // Keep a free queue of those structs so we can free them whenever we drop a node?
+    BFSNode bfsnodes[BFS_MH_SIZE];
+
+    BFSNode* freeQ = &bfsnodes[1];
+    BFSNode* freeQTail = &bfsnodes[BFS_MH_SIZE-1];
+
+    for (int i = 0; i < BFS_MH_SIZE; i++) {
+        bfsnodes[i].next = (i < BFS_MH_SIZE - 1 ? &(bfsnodes[i+1]) : NULL);
+        bfsnodes[i].tp.visited.switches = 0ll;
+        for (int i = 0; i < NUM_SWITCHES + 1; i++) {
+            bfsnodes[i].tp.switches[i].state = SWITCH_UNKNOWN;
+            bfsnodes[i].tp.merges[i].state = SWITCH_UNKNOWN;
         }
-        Visit(l->visited, origin->num);
+    }
+    bfsnodes[0].tp = *l;
+    bfsnodes[0].current_node = origin;
+    bfsnodes[0].previous_node = previous;
+    mh_add(&mh, (int) &bfsnodes[0], 0);
 
-        if (find_path_between_nodes(ts, origin->edge[DIR_STRAIGHT].dest, dest, origin, l, level+1)) {
-            l->switches[SWCLAMP(origin->num)].state = SWITCH_STRAIGHT;
+    bfsnodes[BFS_MH_SIZE-1].next = NULL;
+    int k = 0;
+
+    //int tid = WhoIs(NAME_TERMINAL);
+
+    while (!mh_empty(&mh)){
+        ASSERT(k++ <= 10000, "probably an infinite loop");
+        ASSERT(mh_remove_min(&mh, &entry) == 0, "Failed to pop from non-empty minheap");
+        BFSNode *bn = (BFSNode*) entry.item;
+        int distance = entry.value;
+        TrackPath tp = bn->tp;
+        const track_node *cn = bn->current_node;
+        const track_node *pn = bn->previous_node;
+        q_add(&freeQ, &freeQTail, bn);
+        /*
+        SendTerminalRequest(tid, TERMINAL_ECHO, cn->name[0], 0);
+        SendTerminalRequest(tid, TERMINAL_ECHO, cn->name[1], 0);
+        SendTerminalRequest(tid, TERMINAL_ECHO, cn->name[2] != NULL ? cn->name[2] : ' ', 0);
+        SendTerminalRequest(tid, TERMINAL_ECHO, (cn->name[2] != NULL && cn->name[3] != NULL) ? cn->name[3] : ' ', 0);
+        SendTerminalRequest(tid, TERMINAL_ECHO, (cn->num >= 153) ? cn->name[4] : ' ', 0);
+        //*/
+        ASSERT( !(tp.switches[SWCLAMP(153)].state == SWITCH_CURVED && tp.switches[SWCLAMP(154)].state == SWITCH_CURVED) &&
+                !(tp.switches[SWCLAMP(156)].state == SWITCH_CURVED && tp.switches[SWCLAMP(155)].state == SWITCH_CURVED), "CC");
+
+        if (unlikely(cn == dest)) { // found shortest path
+            *l = tp;
             return 1;
-        } else if (find_path_between_nodes(ts, origin->edge[DIR_CURVED].dest, dest, origin, l, level+1)) {
-            l->switches[SWCLAMP(origin->num)].state = SWITCH_CURVED;
-            if (origin->num >= 153) {
-               l->switches[SWCLAMP(SW3_COMPLEMENT(origin->num))].state = SWITCH_STRAIGHT; 
+        } else if (cn == NULL || cn->type == NODE_NONE || 
+                ts->reservations[TRACK_NODE_TO_INDEX(cn)] != -1) { // TODO allow trains to use their own reserved track
+            continue;
+        } 
+        ASSERT(cn->num != dest->num || cn->type != dest->type, "Failed to register equivalency");
+        // continue the search
+
+        if (cn->type == NODE_BRANCH) {
+            if (IsVisited(tp.visited, cn->num)) {
+                continue;
             }
-            return 1;
+            Visit(tp.visited, cn->num);
+
+            BFSNode * straight = q_pop(&freeQ, &freeQTail);
+            straight->current_node = cn->edge[DIR_STRAIGHT].dest;
+            straight->previous_node = cn;
+            tp.switches[SWCLAMP(cn->num)].state = SWITCH_STRAIGHT;
+            memcpy(&straight->tp, &tp, sizeof(TrackPath));
+            mh_add(&mh, (unsigned long int) straight, distance + cn->edge[DIR_STRAIGHT].dist);
+
+            BFSNode * curved = q_pop(&freeQ, &freeQTail);
+            curved->current_node = cn->edge[DIR_CURVED].dest;
+            curved->previous_node = cn;
+            tp.switches[SWCLAMP(cn->num)].state = SWITCH_CURVED;
+            if (cn->num >= 153){
+               tp.switches[SWCLAMP(SW3_COMPLEMENT(cn->num))].state = SWITCH_STRAIGHT; 
+               Visit(tp.visited, SW3_COMPLEMENT(cn->num));
+            }
+            memcpy(&curved->tp, &tp, sizeof(TrackPath));
+            mh_add(&mh, (unsigned long int) curved, distance + cn->edge[DIR_CURVED].dist);
         }
-        return 0;
-    }
-    case (NODE_MERGE):
-    {
-        // figure out which side of the branch we are:
-        const track_node *pr = previous->reverse;
-        const track_node *br = origin->reverse;
-        if (br->edge[DIR_STRAIGHT].dest == pr) {
-            l->merges[SWCLAMP(origin->num)].state = SWITCH_STRAIGHT;
-        } else {
-            l->merges[SWCLAMP(origin->num)].state = SWITCH_CURVED;
+        if (cn->type == NODE_MERGE) {
+            // figure out which side of the branch we are:
+            const track_node *pr = pn->reverse;
+            const track_node *br = cn->reverse;
+            if (br->edge[DIR_STRAIGHT].dest == pr) {
+                tp.merges[SWCLAMP(cn->num)].state = SWITCH_STRAIGHT;
+            } else {
+                tp.merges[SWCLAMP(cn->num)].state = SWITCH_CURVED;
+            }
         }
-        // no break on purpose: should fall through to the next case.
+        if (cn->type == NODE_MERGE || cn->type == NODE_SENSOR || cn->type == NODE_ENTER) {
+            BFSNode * ahead = q_pop(&freeQ, &freeQTail);
+            ahead->current_node = cn->edge[DIR_AHEAD].dest;
+            ahead->previous_node = cn;
+            memcpy(&ahead->tp, &tp, sizeof(TrackPath));
+            mh_add(&mh, (unsigned long int) ahead, distance + cn->edge[DIR_AHEAD].dist);
+        }
     }
-    case (NODE_SENSOR):
-    case (NODE_ENTER):
-    {
-        return find_path_between_nodes(ts, origin->edge[DIR_AHEAD].dest, dest, origin, l, level+1);
-    }
-    case (NODE_EXIT):
-    {
-        return 0;
-    }
-    default:
-    {
-        PANIC("in: find_path_between_nodes - INVALID TRACK NODE TYPE: %d", origin->type);
-    }
-    }
+
     return 0;
 }
 

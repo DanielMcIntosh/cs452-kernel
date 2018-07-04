@@ -29,8 +29,8 @@
 // TODO is there a nicer way to do this?
 #define TRACK_NODE_TO_INDEX(n) \
     (n->type == NODE_SENSOR ? SENSOR_TO_NODE(n->num) : \
-     (n->type == NODE_BRANCH ? SWITCH_TO_NODE(n->num) : \
-      (n->type == NODE_MERGE ? MERGE_TO_NODE(n->num) : \
+     (n->type == NODE_BRANCH ? SWITCH_TO_NODE(SWCLAMP(n->num)) : \
+      (n->type == NODE_MERGE ? MERGE_TO_NODE(SWCLAMP(n->num)) : \
        (n->type == NODE_ENTER ? ENTER_TO_NODE(n->num) : \
         (n->type == NODE_EXIT ? EXIT_TO_NODE(n->num) : -1)))))
 
@@ -38,6 +38,8 @@
 #define MIN_SHORT 2
 #define INCREMENT_SHORT 2
 #define NUM_SHORTS ((MAX_SHORT / INCREMENT_SHORT) + 1)
+
+#define BFS_MH_SIZE 100
 
 typedef struct position {
     const int object : 16;

@@ -84,3 +84,7 @@ int mh_peek_min(minheap_t *mh, entry_t* min){
     *min = mh->entries[0];
     return 0;
 }
+
+int mh_empty(minheap_t *mh){
+    return mh->count == 0;
+}
