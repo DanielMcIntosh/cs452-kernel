@@ -180,7 +180,7 @@ void task_calibrate(int train, int sensor_dest) {
             //wait until we hit <sensor_to_wake>
             //for now, assume we're always successful in triggering <sensor_to_wake>
             Runnable runnable_alarm1 = {&send_wakeup, my_tid, 0, 50000U, FALSE};
-            RunWhen(sensor_to_wake, &runnable_alarm1, PRIORITY_MID);
+            RunWhen(sensor_to_wake, GetActiveTrain(track_state_tid, train), &runnable_alarm1, PRIORITY_MID);
             Receive(&alarm_tid, &runnable_success, sizeof(runnable_success));
             Reply(alarm_tid, NULL, 0);
             if (!runnable_success)
@@ -196,7 +196,7 @@ void task_calibrate(int train, int sensor_dest) {
 
             //sleep until we hit sensor_dest, timeout 2.5 s after we send stop command
             Runnable runnable_alarm2 = {&send_wakeup, my_tid, 0, 250U, TRUE};
-            RunWhen(sensor_dest, &runnable_alarm2, PRIORITY_MID);
+            RunWhen(sensor_dest, GetActiveTrain(track_state_tid, train), &runnable_alarm2, PRIORITY_MID);
             Receive(&alarm_tid, &overshot, sizeof(overshot));
             Reply(alarm_tid, NULL, 0);
 
@@ -348,7 +348,7 @@ void task_commandserver(){
                 }
             }
             Runnable runnable = {&stop_wrapper, train, time_after_sensor, 3000U, TRUE};
-            RunWhen(sensor_to_wake, &runnable, PRIORITY_MID);
+            RunWhen(sensor_to_wake, GetActiveTrain(tstid, train), &runnable, PRIORITY_MID);
             break;
         }
         case COMMAND_MOVE:

@@ -99,6 +99,7 @@ typedef enum tsrequest{
     TRAIN_SPEED, // TODO other requests
     SWITCH,
     SENSOR,
+    ACTIVE_TRAIN,
     ROUTE,
     SHORT,
 
@@ -124,9 +125,10 @@ int NotifyParam(int trackstatetid, ParamData data);
 int NotifyNewTrain(int trackstatetid, NewTrain data);
 int NotifyReservation(int trackstatetid, int data);
 
+int GetTrainSpeed(int trackstatetid, int train);
 int GetSwitchState(int trackstatetid, int sw);
+int GetActiveTrain(int trackstatetid, int train);
 int GetRoute(int trackstatetid, RouteRequest req, RouteMessage *rom);
 int GetShort(int trackstatetid, int distance, ShortMessage *sm);
-int GetTrainSpeed(int trackstatetid, int train);
 
 #endif

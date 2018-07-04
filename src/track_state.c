@@ -351,13 +351,24 @@ int NotifyNewTrain(int trackstatetid, NewTrain data) {
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = NOTIFY_NEW_TRAIN, {.new_train = data}};
     return sendTrackState(trackstatetid, &msg);
 }
+
 int NotifyReservation(int trackstatetid, int data) {
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = NOTIFY_RESERVATION, {.data = data}};
+    return sendTrackState(trackstatetid, &msg);
+}
+    
+int GetTrainSpeed(int trackstatetid, int train){
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = TRAIN_SPEED, {.data = train}};
     return sendTrackState(trackstatetid, &msg);
 }
 
 int GetSwitchState(int trackstatetid, int sw) {
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = SWITCH, {.data = sw}};
+    return sendTrackState(trackstatetid, &msg);
+}
+    
+int GetActiveTrain(int trackstatetid, int train){
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = ACTIVE_TRAIN, {.data = train}};
     return sendTrackState(trackstatetid, &msg);
 }
 
@@ -371,11 +382,6 @@ int GetShort(int trackstatetid, int distance, ShortMessage *sm) {
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = SHORT, {.data = distance}};
     int r = Send(trackstatetid, &msg, sizeof(msg), sm, sizeof(*sm));
     return (r >= 0 ? 0 : -1);
-}
-    
-int GetTrainSpeed(int trackstatetid, int train) {
-    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = TRAIN_SPEED, {.data = train}};
-    return sendTrackState(trackstatetid, &msg);
 }
 
 void task_track_state(int track) {
@@ -442,6 +448,12 @@ void task_track_state(int track) {
         case (SENSOR):
         {
             rm.ret = ts.sensors[(int) tm.data].state;
+            Reply(tid, &rm, sizeof(rm));
+            break;
+        }
+        case (ACTIVE_TRAIN):
+        {
+            rm.ret = ts.active_train_map[tm.data];
             Reply(tid, &rm, sizeof(rm));
             break;
         }
@@ -522,8 +534,6 @@ void task_track_state(int track) {
                 } else if (ts.sensors[sensor].state != SENSOR_ON) {
                     ts.sensors[sensor].state = SENSOR_ON;
 
-                    TrainEvent_Notify(train_evt_courier_tid, sensor);
-
                     //TODO change all of this to use RunWhen instead of running here
                     //first need to be able to have multiple tasks waiting per sensor
 
@@ -535,6 +545,8 @@ void task_track_state(int track) {
                     }
                     int tr = get_active_train_from_sensor(&ts, sensor);
                     ASSERT(tr >= 0, "Could not find which train hit sensor");
+
+                    TrainEvent_Notify(train_evt_courier_tid, sensor, tr);
 
                     Train *train = &(ts.active_trains[tr]);
 
