@@ -101,7 +101,7 @@ void task_runner(int sensor, int active_train) {
         to_run.func(to_run.arg0, to_run.arg1, type == MESSAGE_WAKEUP);
     }
 
-    if (type == MESSAGE_TIMEOUT) {
+    if (unlikely(type == MESSAGE_TIMEOUT)) {
         tm.rq = UNQUEUE;
         Send(train_evt_courier_tid, &tm, sizeof(tm), NULL, 0);
     } else if (to_run.timeout != 0) {

@@ -12,6 +12,8 @@
 #define NAME_CLOCK "CLK"
 #define CLOCK_MH_SIZE 40
 
+#define NAME_TIMEOUT "T_OUT"
+
 extern struct clock {
     volatile unsigned int load;
     volatile unsigned int value;
@@ -27,7 +29,6 @@ extern struct debugclock {
 } __attribute__ ((packed)) *clk4;  //have to specify packed to ensure GCC doesn't word align enable
 
 void task_clockserver();
-void task_clocknotifier();
 void task_clockprinter(int terminaltid);
 
 int Time();
@@ -35,6 +36,6 @@ int Delay(int ticks);
 int DelayUntil(int ticks); //FIXME: pass in tid_clk
 
 //sends to the calling task MESSAGE_TIMEOUT after a specified number of ticks
-void Timeout(int ticks);
+void Timeout(unsigned int ticks);
 
 #endif

@@ -19,7 +19,9 @@ typedef enum clockrequest{
     NOTIFIER,
     TIME,
     DELAY,
-    DELAYUNTIL
+    DELAYUNTIL,
+    UPDATE_TIMEOUT,
+    REQUEST_TIMEOUT
 } ClockRequest;
     
 typedef struct clockserver {
@@ -33,8 +35,23 @@ typedef struct clockmessage{
     int argument;
 } ClockMessage;
 
+typedef struct timeoutmessage{
+    int caller_tid;
+    unsigned int ticks;
+} TimeoutMessage;
+
+void task_timeout(int clock_tid);
+void task_clocknotifier(int clk_tid);
+
 void task_clockserver(){
     LOG("ClockServer init\r\n");
+    RegisterAs(NAME_CLOCK);
+
+    int mytid = MyTid();
+    CreateWithArgument(PRIORITY_NOTIFIER, &task_clocknotifier, mytid);
+    //create task_timeout with a slightly lower priority than warehouse since
+    // it's not _quite_ as important as eg. the clock server
+    CreateWithArgument(PRIORITY_WAREHOUSE+1, &task_timeout, mytid);
 
     entry_t mh_array[CLOCK_MH_SIZE];
     ClockServer cs = {0, {mh_array, 0, CLOCK_MH_SIZE}};
@@ -42,17 +59,17 @@ void task_clockserver(){
     ReplyMessage rm = {MESSAGE_REPLY, 0};
     int tid, err;
     entry_t mh_entry;
+    unsigned int timeout = INT_MAX;
+    int timeout_tid = -1;
     
-    RegisterAs(NAME_CLOCK);
-    Create(PRIORITY_NOTIFIER, &task_clocknotifier);
     FOREVER {
         Receive(&tid, &cm, sizeof(cm));
         switch(cm.request){
         case NOTIFIER:
             LOGF("Time Server: NOTIFIER\r\n");
-            cs.ticks++;
             rm.ret = 0;
             Reply(tid, &rm, sizeof(rm));
+            cs.ticks++;
 
             // reply to all tasks to wakeup now
             err = mh_peek_min(&cs.mh, &mh_entry);
@@ -61,6 +78,10 @@ void task_clockserver(){
                 Reply(mh_entry.item, &rm, sizeof(rm));
                 mh_remove_min(&cs.mh, &mh_entry);
                 err = mh_peek_min(&cs.mh, &mh_entry);
+            }
+            if (unlikely(timeout <= cs.ticks)) {
+                Reply(timeout_tid, NULL, 0);
+                timeout = INT_MAX;
             }
             break;
         case TIME:
@@ -78,6 +99,15 @@ void task_clockserver(){
             err = mh_add(&cs.mh, tid, cm.argument);
             ASSERT(err == 0, "MINHEAP ADD ERROR");
             break;
+        case UPDATE_TIMEOUT:
+            LOGF("Update Timeout: %d\r\n", cm.argument);
+            timeout = cm.argument;
+            Reply(tid, NULL, 0);
+            break;
+        case REQUEST_TIMEOUT:
+            LOGF("Request Timeout: %d\r\n", cm.argument);
+            timeout_tid = tid;
+            break;
         default:
            rm.ret = ERR_NOT_IMPLEMENTED;
            Reply(tid, &rm, sizeof(rm));
@@ -85,14 +115,12 @@ void task_clockserver(){
     }
 }
 
-void task_clocknotifier(){
+void task_clocknotifier(int clk_tid){
     ReplyMessage rm = {0, 0};
     LOG("ClockNotifier init\r\n");
-    int clk_tid = WhoIs(NAME_CLOCK);
     ClockMessage cm;
     cm.id = MESSAGE_CLOCK;
     cm.request = NOTIFIER;
-
 
     // Initialize Timer
     clk3->load = CYCLES_PER_TEN_MILLIS;
@@ -106,7 +134,7 @@ void task_clocknotifier(){
     }
 }
 
-int clockSend(int req, int arg){
+static inline int clockSend(int req, int arg){
     ClockMessage cm;
     cm.id = MESSAGE_CLOCK;
     cm.request = req;
@@ -128,16 +156,95 @@ int DelayUntil(int ticks){
     return clockSend(DELAYUNTIL, ticks);
 }
 
-void task_timeout(int caller_tid, int timeout) {
-    Delay(timeout);
-    MessageType msg = MESSAGE_TIMEOUT;
-    Send(caller_tid, &msg, sizeof(msg), NULL, 0);
-    Destroy();
+void task_timeout_update_courier(int timeout_srv_tid, int clock_tid) {
+    ClockMessage cm = {MESSAGE_CLOCK, UPDATE_TIMEOUT, 0};
+    TimeoutMessage tm = {0, 0};
+
+    FOREVER {
+        Send(timeout_srv_tid, &tm, sizeof(tm), &cm.argument, sizeof(cm.argument));
+        Send(clock_tid, &cm, sizeof(cm), NULL, 0);
+    }
 }
 
-void Timeout(int ticks) {
+void task_timeout_courier(int timeout_srv_tid, int clock_tid) {
+    ClockMessage cm = {MESSAGE_CLOCK, REQUEST_TIMEOUT, 0};
+    TimeoutMessage tm = {0, 0};
+
+    FOREVER {
+        Send(clock_tid, &cm, sizeof(cm), NULL, 0);
+        Send(timeout_srv_tid, &tm, sizeof(tm), NULL, 0);
+    }
+}
+
+void task_timeout(int clock_tid) {
+    RegisterAs(NAME_TIMEOUT);
     int mytid = MyTid();
-    CreateWith2Args(PRIORITY_LOW, &task_timeout, mytid, ticks);
+    int rcv_courier = CreateWith2Args(PRIORITY_HIGHER, &task_timeout_courier, mytid, clock_tid);
+    int snd_courier = CreateWith2Args(PRIORITY_HIGHER, &task_timeout_update_courier, mytid, clock_tid);
+
+    entry_t mh_array[CLOCK_MH_SIZE];
+    minheap_t mh = {mh_array, 0, CLOCK_MH_SIZE};
+    entry_t mh_entry;
+
+    TimeoutMessage tm;
+    bool snd_ready = FALSE, min_changed = FALSE;
+    int tid, err;
+    FOREVER{
+        Receive(&tid, &tm, sizeof(tm));
+        if (tid == snd_courier) {
+            //since the clock server should reply immdiately, most of the send courier's time will be spent waiting on us, so
+            // we will normally be able to reply to the send courier as soon as the min changes. Thus, it is unlikely that min_changed is true
+            if (unlikely(min_changed)){
+                ASSERT(mh_peek_min(&mh, &mh_entry) == 0, "min heap should not be empty if the min has changed");
+                err = Reply(snd_courier, &mh_entry.item, sizeof(mh_entry.item));
+                ASSERT(err >= 0, "Error replying to send courier");
+                snd_ready = FALSE;
+                min_changed = FALSE;
+            }
+            else {
+                snd_ready = TRUE;
+            }
+        } else if (tid == rcv_courier) {
+            //because we reply to rcv before we reply to snd, rcv is queued first. Since the immediate next instruction in
+            // rcv is a send, it is always receive-blocked on the clock server by the time snd sends a TIMEOUT_UPDATE
+            Reply(tid, NULL, 0);
+            mh_remove_min(&mh, &mh_entry);
+
+            if ((min_changed = (mh_peek_min(&mh, &mh_entry) == 0)) && likely(snd_ready)) {
+                err = Reply(snd_courier, &mh_entry.item, sizeof(mh_entry.item));
+                ASSERT(err >= 0, "Error replying to send courier");
+                snd_ready = FALSE;
+                min_changed = FALSE;
+            }
+            //NOTE: this should be a very quick srr since the task which called Timeout(int) is very likely already receive blocked
+            MessageType msg = MESSAGE_TIMEOUT;
+            err = Send(mh_entry.item, &msg, sizeof(msg), NULL, 0);
+            ASSERT(err >= 0, "Error sending to caller of Timeout(int)");
+        } else { //from a call to Timeout(int)
+            //get time immediately, then reply to unblock the caller
+            int timeout = Time() + tm.ticks;
+            Reply(tid, NULL, 0);
+
+            unsigned int old_min = UINT_MAX;
+            if (mh_peek_min(&mh, &mh_entry) == 0) {
+                old_min = (unsigned int)mh_entry.value;
+            }
+            mh_add(&mh, tm.caller_tid, timeout);
+            mh_peek_min(&mh, &mh_entry);
+            if ((min_changed = (mh_entry.value < old_min)) && likely(snd_ready)) {
+                err = Reply(snd_courier, &timeout, sizeof(timeout));
+                ASSERT(err >= 0, "Error replying to send courier");
+                snd_ready = FALSE;
+                min_changed = FALSE;
+            }
+        }
+    }
+}
+
+void Timeout(unsigned int ticks) {
+    int mytid = MyTid(), timeout_tid = WhoIs(NAME_TIMEOUT);
+    TimeoutMessage tm = {.caller_tid = mytid, .ticks = ticks};
+    Send(timeout_tid, &tm, sizeof(tm), NULL, 0);
 }
 
 void task_clockprinter(int terminaltid){

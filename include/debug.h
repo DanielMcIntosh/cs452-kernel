@@ -3,6 +3,7 @@
 
 #include <ts7200.h>
 #include <bwio.h>
+#include <util.h>
 
 #define DEBUG 0
 #define DEBUG_COM2 0
@@ -15,7 +16,7 @@
 #define IS(x) #x
 #define S(x) IS(x) 
 #define ASSERT(x, y) \
-if (!(x)) {\
+if (unlikely(!(x))) {\
     PANIC("ASSERT FAILED: " S(x) "\r\nFUNCTION: " S(__func__) "\r\nFILE: "S(__FILE__) "\r\nLINE: " S(__LINE__) "\r\n" S(y) "\r\n")\
 }
 

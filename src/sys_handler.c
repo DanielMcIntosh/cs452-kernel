@@ -44,7 +44,7 @@ static inline void handle_send(TD *task, TaskQueue *task_ready_queue){
     LOG("SEND called\r\n");
 
     TD *receiver = task_lookup(task_ready_queue, TD_arg(task, 0));
-    if (receiver == NULL) {
+    if (unlikely(receiver == NULL)) {
         task->r0 = ERR_TASK_DOES_NOT_EXIST;
         return;
     }
@@ -54,7 +54,7 @@ static inline void handle_send(TD *task, TaskQueue *task_ready_queue){
     if (receiver->state == STATE_BLK_SEND)
     {
         *((int *)(TD_arg(receiver, 0))) = task_getTid(task); //set the tid of the receive caller
-        if (TD_arg(task, 2) != TD_arg(receiver, 2)){
+        if (unlikely(TD_arg(task, 2) != TD_arg(receiver, 2))){
             receiver->r0 = ERR_MSG_TRUNCATED;
         } else {
             receiver->r0 = TD_arg(task, 2);
@@ -115,16 +115,16 @@ static inline void handle_reply(TD *task, TaskQueue *task_ready_queue) {
     LOG("REPLY called\r\n");
     
     TD *sender = task_lookup(task_ready_queue, TD_arg(task, 0));
-    if (sender == NULL) {
+    if (unlikely(sender == NULL)) {
         task->r0 = ERR_TASK_DOES_NOT_EXIST;
         return;
     }
-    if (sender->state != STATE_BLK_REPLY) {
+    if (unlikely(sender->state != STATE_BLK_REPLY)) {
         task->r0 = ERR_TASK_NOT_REPLY_BLOCKED;
         return;
     }
 
-    if (TD_arg(sender, 4) != TD_arg(task, 2)) {
+    if (unlikely(TD_arg(sender, 4) != TD_arg(task, 2))) {
         task->r0 = ERR_MSG_TRUNCATED;
         sender->r0 = ERR_MSG_TRUNCATED;
     } else {

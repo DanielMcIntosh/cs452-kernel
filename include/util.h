@@ -13,6 +13,14 @@
 #define NULL 0
 #endif
 
+#ifndef UINT_MAX
+#define UINT_MAX ((unsigned int)-1)
+#endif
+
+#ifndef INT_MAX
+#define INT_MAX (UINT_MAX / 2)
+#endif
+
 #define bool int
 
 void memswap(void * a, void * b, unsigned int sz);

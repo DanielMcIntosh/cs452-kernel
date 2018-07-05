@@ -224,9 +224,8 @@ static int find_path_between_nodes(const TrackState* ts, const track_node *origi
 
     //int tid = WhoIs(NAME_TERMINAL);
 
-    while (!mh_empty(&mh)){
+    while (mh_remove_min(&mh, &entry) == 0){
         ASSERT(k++ <= 10000, "probably an infinite loop");
-        ASSERT(mh_remove_min(&mh, &entry) == 0, "Failed to pop from non-empty minheap");
         BFSNode *bn = (BFSNode*) entry.item;
         int distance = entry.value;
         TrackPath tp = bn->tp;

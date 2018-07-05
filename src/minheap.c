@@ -58,9 +58,11 @@ int mh_add(minheap_t *mh, int item, unsigned int value) {
     return 0;
 }
 
-int mh_remove_min(minheap_t *mh, entry_t* min){
+int mh_remove_min(minheap_t * restrict mh, entry_t * restrict min){
     ASSERT(min != 0, "Return ptr cannot be null");
-    ASSERT(mh->count > 0, "Cannot remove min from empty minheap");
+    if (mh->count == 0) {
+        return ERR_MH_EMPTY;
+    }
 
     entry_t item;
     if (mh->count > 1){
@@ -75,7 +77,7 @@ int mh_remove_min(minheap_t *mh, entry_t* min){
     return 0;
 }
 
-int mh_peek_min(minheap_t *mh, entry_t* min){
+int mh_peek_min(minheap_t * restrict mh, entry_t * restrict min){
     ASSERT(min != 0, "Return ptr cannot be null");
     if (mh -> count == 0){
         return ERR_MH_EMPTY;
