@@ -13,6 +13,8 @@
 #include <train_event.h>
 #include <util.h>
 #include <minheap.h>
+#include <terminalcourier.h>
+#include <circlebuffer.h>
 
 typedef struct track{
     int track_number;
@@ -57,6 +59,35 @@ typedef struct tsmessage{
         NewTrain new_train;
     };
 } TrackStateMessage;
+
+typedef struct bfsnode {
+    TrackPath tp;
+    const track_node *current_node;
+    const track_node *previous_node;
+    struct bfsnode *next;
+} BFSNode;
+
+static BFSNode* q_pop(BFSNode** freeQ, BFSNode** freeQTail){
+    ASSERT(freeQ != NULL, "Cannot pop from empty free queue");
+    BFSNode *ret = *freeQ;
+    *freeQ = (*freeQ)->next;
+    if (*freeQ == NULL)
+        *freeQTail = NULL;
+
+    ret->next = NULL;
+    return ret;
+}
+
+static void q_add(BFSNode** freeQ, BFSNode** freeQTail, BFSNode *node){
+    if (*freeQTail == NULL) {
+        *freeQ = node;
+        *freeQTail = node;
+        return;
+    }
+
+    (*freeQTail)->next = node;
+    *freeQTail = node;
+}
 
 void init_track_state(TrackState *ts, int track) {
     ts->track_number = track;
@@ -164,40 +195,8 @@ static int forward_distance_from_node(const Switch * restrict ts, const track_no
     return 0;
 }
 
-
-typedef struct bfsnode {
-    TrackPath tp;
-    const track_node *current_node;
-    const track_node *previous_node;
-    struct bfsnode *next;
-} BFSNode;
-
-static BFSNode* q_pop(BFSNode** freeQ, BFSNode** freeQTail){
-    ASSERT(freeQ != NULL, "Cannot pop from empty free queue");
-    BFSNode *ret = *freeQ;
-    *freeQ = (*freeQ)->next;
-    if (*freeQ == NULL)
-        *freeQTail = NULL;
-
-    ret->next = NULL;
-    return ret;
-}
-
-static void q_add(BFSNode** freeQ, BFSNode** freeQTail, BFSNode *node){
-    if (*freeQTail == NULL) {
-        *freeQ = node;
-        *freeQTail = node;
-        return;
-    }
-
-    (*freeQTail)->next = node;
-    *freeQTail = node;
-}
-
 static int find_path_between_nodes(const TrackState* ts, const track_node *origin, const track_node *dest, const track_node *previous, TrackPath * restrict l, int __attribute__((unused)) level) {
-    // TODO: in progress conversion to BFS
-
-    entry_t mh_array[BFS_MH_SIZE]; // TODO pick a better size
+    entry_t mh_array[BFS_MH_SIZE];
     minheap_t mh = {mh_array, 0, BFS_MH_SIZE};
     entry_t entry;
     // IDEA: minheap contains pointers to some struct. That struct contains a TrackPath and some other data I guess? We allocate those structs in a big array on the stack here.
@@ -241,13 +240,6 @@ static int find_path_between_nodes(const TrackState* ts, const track_node *origi
         const track_node *cn = bn->current_node;
         const track_node *pn = bn->previous_node;
         q_add(&freeQ, &freeQTail, bn);
-        /*
-        SendTerminalRequest(tid, TERMINAL_ECHO, cn->name[0], 0);
-        SendTerminalRequest(tid, TERMINAL_ECHO, cn->name[1], 0);
-        SendTerminalRequest(tid, TERMINAL_ECHO, cn->name[2] != NULL ? cn->name[2] : ' ', 0);
-        SendTerminalRequest(tid, TERMINAL_ECHO, (cn->name[2] != NULL && cn->name[3] != NULL) ? cn->name[3] : ' ', 0);
-        SendTerminalRequest(tid, TERMINAL_ECHO, (cn->num >= 153) ? cn->name[4] : ' ', 0);
-        //*/
         ASSERT( !(tp.switches[SWCLAMP(153)].state == SWITCH_CURVED && tp.switches[SWCLAMP(154)].state == SWITCH_CURVED) &&
                 !(tp.switches[SWCLAMP(156)].state == SWITCH_CURVED && tp.switches[SWCLAMP(155)].state == SWITCH_CURVED), "CC");
 
@@ -306,7 +298,6 @@ static int find_path_between_nodes(const TrackState* ts, const track_node *origi
     return 0;
 }
 
-
 static inline int get_active_train_from_sensor(TrackState *ts, const int sensor) {
     int distance;
     for (int skipped = 0; skipped < 4; ++skipped) { // TODO instead of this - build auxiliary sensor array?
@@ -363,6 +354,16 @@ int NotifyReservation(int trackstatetid, int data) {
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = NOTIFY_RESERVATION, {.data = data}};
     return sendTrackState(trackstatetid, &msg);
 }
+
+int NotifyTerminalCourier(int trackstatetid, TerminalReq *treq) {
+    ASSERT(treq != NULL, "null TerminalRequest return");
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = NOTIFY_TERMINAL_COURIER, {.data = 0}};
+    TerminalCourierMessage tcm;
+    int r = Send(trackstatetid, &msg, sizeof(msg), &tcm, sizeof(tcm));
+    if (r < 0) return r;
+    *treq = tcm.req;
+    return r;
+}
     
 int GetTrainSpeed(int trackstatetid, int train){
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = TRAIN_SPEED, {.data = train}};
@@ -398,6 +399,12 @@ void task_track_state(int track) {
 
     TrackState ts;
     init_track_state(&ts, track);
+
+    circlebuffer_t cb_terminal;
+    char cb_terminal_buf[TRACK_STATE_TERMINAL_BUFFER_SIZE];
+    cb_init(&cb_terminal, cb_terminal_buf, TRACK_STATE_TERMINAL_BUFFER_SIZE);
+    TerminalCourier tc = { -1, &cb_terminal};
+    CreateWith2Args(PRIORITY_NOTIFIER, &task_terminal_courier, MyTid(), (int) &NotifyTerminalCourier);
 
     TrackStateMessage tm;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
@@ -547,12 +554,7 @@ void task_track_state(int track) {
                     ts.sensors[sensor].state = SENSOR_OFF;
                 } else if (ts.sensors[sensor].state != SENSOR_ON) {
                     ts.sensors[sensor].state = SENSOR_ON;
-
-                    //TODO change all of this to use RunWhen instead of running here
-                    //first need to be able to have multiple tasks waiting per sensor
-
-                    SendTerminalRequest(puttid, TERMINAL_SENSOR, sensor, f.time); // TODO courier
-                    // TODO: this process might eventually take too long to happen here - delegate it to another process at some point?
+                    tc_send(&tc, TERMINAL_SENSOR, sensor, f.time);
 
                     if (unlikely(ts.total_trains <= 0)) {
                         continue;
@@ -569,6 +571,7 @@ void task_track_state(int track) {
                         int last_error_time = (train->next_sensor_predict_time - f.time);
                         int last_error_dist = last_error_time * predicted_velocity[train->speed] / VELOCITY_PRECISION;
                         SendTerminalRequest(puttid, TERMINAL_SENSOR_PREDICT, last_error_time, last_error_dist);
+                        tc_send(&tc, TERMINAL_SENSOR_PREDICT, last_error_time, last_error_dist);
 
                         // Time is in clock-ticks, velocity is in mm/(clock-tick) -> error is in units of mm
                         int dt = f.time - train->last_sensor_time;
@@ -581,8 +584,8 @@ void task_track_state(int track) {
                     const track_node *n = predict_next_sensor(ts.switches, c, NULL, &distance); // next predicted train position
 
                     train->next_sensor_predict_time = f.time + distance * VELOCITY_PRECISION / predicted_velocity[train->speed];
-                    SendTerminalRequest(puttid, TERMINAL_VELOCITY_DEBUG, predicted_velocity[train->speed], n->num);
-                    SendTerminalRequest(puttid, TERMINAL_DISTANCE_DEBUG, distance, 0);
+                    tc_send(&tc, TERMINAL_VELOCITY_DEBUG, predicted_velocity[train->speed], n->num);
+                    tc_send(&tc, TERMINAL_DISTANCE_DEBUG, distance, 0);
 
                     train->last_sensor = sensor;
                     train->last_sensor_time = f.time;
@@ -662,6 +665,11 @@ void task_track_state(int track) {
                 ts.reservations[tm.data] = -1;
             else
                 ts.reservations[tm.data] = 1;
+            break;
+        }
+        case (NOTIFY_TERMINAL_COURIER):
+        {
+            tc_update_notifier(&tc, tid);
             break;
         }
         default:

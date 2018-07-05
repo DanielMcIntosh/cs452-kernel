@@ -41,6 +41,8 @@
 
 #define BFS_MH_SIZE 80
 
+#define TRACK_STATE_TERMINAL_BUFFER_SIZE 80
+
 typedef struct position {
     const int object : 16;
     const int distance_past : 16;
@@ -113,6 +115,7 @@ typedef enum tsrequest{
     NOTIFY_PARAM,
     NOTIFY_NEW_TRAIN,
     NOTIFY_RESERVATION,
+    NOTIFY_TERMINAL_COURIER,
 
     NUM_TRACK_STATE_REQUESTS
 } TrackStateRequest;

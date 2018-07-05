@@ -84,6 +84,17 @@ int cb_read_match(circlebuffer_t * restrict cb, char * restrict str) {
     return 0;
 }
 
+int cb_read_int(struct circlebuffer *cb, int *i){ // reads 4-char int
+    *i = 0;
+    char k = 0;
+    for (int y = 0; y < 4; y++) {
+        int err = cb_read(cb, &k);
+        if (err) return err;
+        *i |= (((int) k) << (y * 8));
+    }
+    return 0;
+}
+
 int cb_write(struct circlebuffer *cb, char c){
     if (cb_full(cb)) {
         return 1;
@@ -111,6 +122,15 @@ int cb_write_string(struct circlebuffer * restrict cb, char * restrict s) {
     }
 
     return (*s != '\0');
+}
+
+int cb_write_int(struct circlebuffer *cb, int i) {
+    for (int y = 0; y < 4; y++) {
+        int err = cb_write(cb, i & 0xFF);
+        if (err) return err;
+        i >>= 8;
+    }
+    return 0;
 }
 
 //d = base^(num_digits_to_print). This function will pad with 0's if necessary.

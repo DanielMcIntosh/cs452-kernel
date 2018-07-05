@@ -441,7 +441,7 @@ void task_terminal_command_parser(int terminaltid){
     }
 }
 
-void task_terminal_courier(int servertid) {
+void task_uart2_courier(int servertid) {
     int gettid = WhoIs(NAME_UART2_SEND);
     TerminalMessage tm = {MESSAGE_TERMINAL, TERMINAL_NOTIFY_COURIER, 0, 0};
     ReplyMessage rm;
@@ -478,7 +478,7 @@ void task_terminal() {
     RegisterAs(NAME_TERMINAL);
     int mytid = MyTid();
     CreateWithArgument(PRIORITY_HIGH, &task_terminal_command_parser, mytid);
-    CreateWithArgument(PRIORITY_NOTIFIER, &task_terminal_courier, mytid);
+    CreateWithArgument(PRIORITY_NOTIFIER, &task_uart2_courier, mytid);
     CreateWithArgument(PRIORITY_LOW, &task_clockprinter, mytid);
     Create(PRIORITY_HIGH, &task_sensor_server);
     CreateWithArgument(PRIORITY_LOW, &task_stack_metric_printer, mytid);
