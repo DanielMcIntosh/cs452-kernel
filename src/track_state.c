@@ -204,7 +204,7 @@ static int find_path_between_nodes(const TrackState* ts, const track_node *origi
     // Keep a free queue of those structs so we can free them whenever we drop a node?
     BFSNode bfsnodes[BFS_MH_SIZE];
 
-    BFSNode* freeQ = &bfsnodes[1];
+    BFSNode* freeQ = &bfsnodes[0];
     BFSNode* freeQTail = &bfsnodes[BFS_MH_SIZE-1];
 
     for (int i = 0; i < BFS_MH_SIZE; i++) {
@@ -215,10 +215,18 @@ static int find_path_between_nodes(const TrackState* ts, const track_node *origi
             bfsnodes[i].tp.merges[i].state = SWITCH_UNKNOWN;
         }
     }
-    bfsnodes[0].tp = *l;
-    bfsnodes[0].current_node = origin;
-    bfsnodes[0].previous_node = previous;
-    mh_add(&mh, (int) &bfsnodes[0], 0);
+
+    BFSNode * fw = q_pop(&freeQ, &freeQTail);
+    fw->tp = *l;
+    fw->current_node = origin;
+    fw->previous_node = previous;
+    mh_add(&mh, (int) fw, 0);
+    BFSNode * rv = q_pop(&freeQ, &freeQTail);
+    rv->tp = *l;
+    rv->tp.speed *= -1;
+    rv->current_node = origin->reverse;
+    rv->previous_node = previous; // TODO get actual reverse?
+    mh_add(&mh, (int) rv, 200 * l->speed); // count reversing as 200 * speed for now
 
     bfsnodes[BFS_MH_SIZE-1].next = NULL;
     int k = 0;

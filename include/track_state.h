@@ -39,7 +39,7 @@
 #define INCREMENT_SHORT 2
 #define NUM_SHORTS ((MAX_SHORT / INCREMENT_SHORT) + 1)
 
-#define BFS_MH_SIZE 100
+#define BFS_MH_SIZE 80
 
 typedef struct position {
     const int object : 16;

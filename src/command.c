@@ -134,6 +134,13 @@ static inline void commandserver_exec_switch(CommandServer * restrict cs, int ar
     }
 }
 
+static inline void commandserver_exec_reverse(int train, int speed, int servertid, int tstid) {
+    Putc(servertid, 1, 0);
+    Putc(servertid, 1, train);
+    CreateWith2Args(PRIORITY_NOTIFIER, &task_reverse_train, train, speed);
+    TrainData td = {0, train};
+    NotifyTrainSpeed(tstid, td); // TODO track state courier
+}
 //cannot be used from within the commandserver task
 static inline void setup_track_state(int cmdtid, RouteMessage *rom) {
     for (int i = 1; i <= NUM_SWITCHES; i++) {
@@ -278,11 +285,7 @@ void task_commandserver(){
         {
             int train = cm.command.arg1;
             int speed = GetTrainSpeed(tstid, train);
-            Putc(servertid, 1, 0);
-            Putc(servertid, 1, train);
-            CreateWith2Args(PRIORITY_NOTIFIER, &task_reverse_train, train, speed);
-            TrainData td = {0, train};
-            NotifyTrainSpeed(tstid, td); // TODO track state courier
+            commandserver_exec_reverse(train, speed, servertid, tstid);
             break;
         }
         case COMMAND_SW:
@@ -349,8 +352,12 @@ void task_commandserver(){
                 }
             }
             if (rom.speed != CURRENT_SPEED) {
-                Putc(servertid, 1, rom.speed);
-                Putc(servertid, 1, train);
+                if (rom.speed < 0) {
+                    commandserver_exec_reverse(train, -1 * rom.speed, servertid, tstid);
+                } else {
+                    Putc(servertid, 1, rom.speed); 
+                    Putc(servertid, 1, train);
+                }
             }
             Runnable runnable = {&stop_wrapper, train, time_after_sensor, 3000U, TRUE};
             RunWhen(sensor_to_wake, GetActiveTrain(tstid, train), &runnable, PRIORITY_MID);
