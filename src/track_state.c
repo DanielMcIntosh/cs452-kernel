@@ -250,7 +250,6 @@ static int find_path_between_nodes(const TrackState* ts, const track_node *origi
                 ts->reservations[TRACK_NODE_TO_INDEX(cn)] != -1) { // TODO allow trains to use their own reserved track
             continue;
         } 
-        ASSERT(cn->num != dest->num || cn->type != dest->type, "Failed to register equivalency");
         // continue the search
 
         if (cn->type == NODE_BRANCH) {
