@@ -99,15 +99,14 @@ void update_stack_size_metric(TD * restrict task, ValueStore * restrict value_st
 void fut(){
     LOG("First User Task: Start\r\n");
     // get any important values here
-    uart2->ctrl |= UARTEN_MASK;
-    bwputstr(COM2, "TRACK? [A/B] >> ");
-    const char track = bwgetc(COM2);
-    for (volatile int i = 0; i < 55; i++);
-    uart2->ctrl &= ~UARTEN_MASK;
+     // get track:
+     *((int *) 0x8001004c) &= ~(7); // reading the current track off the MAC address (which apparently works? - thnx jennifer)
+     const char track = (*((unsigned char *) 0x80010055) == 0xc5) ? 'A' : 'B';
 
     StoreValue(VALUE_IDLE, 0); // init idle value
     StoreValue(VALUE_STACK_AVG, 0); // init avg task stack size
     StoreValue(VALUE_STACK_MAX, 0); // init max task stack size
+    StoreValue(VALUE_TRACK_NAME, track);
     Create(PRIORITY_WAREHOUSE, &task_nameserver);
     Create(PRIORITY_WAREHOUSE, &task_clockserver);
     init_uart_servers();

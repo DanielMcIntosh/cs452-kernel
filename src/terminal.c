@@ -68,6 +68,8 @@ static void output_base_terminal(Terminal *t) {
     cb_write_string(cb, "SNSR_NX: \r\n");
     cb_write_string(cb, "DIST_NX: \r\n");
     cb_write_string(cb, "\n" STYLED_FLAG_STRING);
+    cb_write_string(cb, "\r\nTRACK: ");
+    cb_write(cb, GetValue(VALUE_TRACK_NAME));
 
     cursor_to_position(cb, 5, 1);
     for (i = 1; i <= 18; i++) {
