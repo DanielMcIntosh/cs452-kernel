@@ -28,3 +28,9 @@ void memswap(void *a, void *b, unsigned int sz) {
         *b2++=b;
     }
 }
+
+void *memset(void *s, int c, unsigned int n) {
+  unsigned char *p = s;
+  while(n --> 0) { *p++ = (unsigned char)c; }
+  return s;
+}

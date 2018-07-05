@@ -144,6 +144,7 @@ static inline void setup_track_state(int cmdtid, RouteMessage *rom) {
             SendCommand(cmdtid, cmd);
         }
     }
+
 }
 
 void send_wakeup(int tid, int __attribute__((unused)) arg1, bool success) {
@@ -157,7 +158,7 @@ void task_calibrate(int train, int sensor_dest) {
 
     SendTerminalRequest(terminaltid, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING | STATUS_FLAG_CALIBRATING, 0);
 
-    RouteMessage rom = {0, 0, {{0}}};
+    RouteMessage rom = {0, 0, 0, {{0}}};
     int alarm_tid;
     bool runnable_success;
     int track_state_tid = WhoIs(NAME_TRACK_STATE);
@@ -235,7 +236,7 @@ void task_commandserver(){
     int terminaltid = WhoIs(NAME_TERMINAL);
     CommandMessage cm;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
-    RouteMessage rom = {0, 0, {{0}}};
+    RouteMessage rom = {0, 0, 0, {{0}}};
     char switchQ_buf[SWITCHQ_BUF_SIZE];
     circlebuffer_t cb_switches;
     cb_init(&cb_switches, switchQ_buf, SWITCHQ_BUF_SIZE);
@@ -346,6 +347,10 @@ void task_commandserver(){
                         cb_write(cs.cb_switches, sw_num); 
                     }
                 }
+            }
+            if (rom.speed != CURRENT_SPEED) {
+                Putc(servertid, 1, rom.speed);
+                Putc(servertid, 1, train);
             }
             Runnable runnable = {&stop_wrapper, train, time_after_sensor, 3000U, TRUE};
             RunWhen(sensor_to_wake, GetActiveTrain(tstid, train), &runnable, PRIORITY_MID);

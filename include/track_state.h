@@ -84,9 +84,11 @@ typedef struct newtrain{
     const int sensor;
 } __attribute__((packed)) NewTrain; // TODO move these structs into the c file.
 
+#define CURRENT_SPEED -50
 typedef struct routemessage{ // TODO MessageType
     int end_sensor;
     int time_after_end_sensor;
+    int speed;
     Switch switches[NUM_SWITCHES+1];
 } RouteMessage;
 

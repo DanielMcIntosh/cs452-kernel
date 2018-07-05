@@ -25,6 +25,7 @@
 
 void memswap(void * a, void * b, unsigned int sz);
 void * memcpy(void * dest, const void* src, unsigned int sz);
+void *memset(void *s, int c, unsigned int n);
 
 #ifndef MAX
 #define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))

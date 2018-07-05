@@ -40,6 +40,7 @@ typedef struct trackpath{
     Visited visited;
     Switch switches[NUM_SWITCHES+1];
     Switch merges[NUM_SWITCHES+1]; // for doing reverse distance search later
+    int speed;
 } TrackPath;
 
 typedef struct tsmessage{
@@ -393,7 +394,7 @@ void task_track_state(int track) {
 
     TrackStateMessage tm;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
-    RouteMessage rom = {0, 0, {{SWITCH_UNKNOWN}}};
+    RouteMessage rom = {0, 0, 0, {{SWITCH_UNKNOWN}}};
     int tid;
 
     int predicted_velocity[NUM_SPEEDS] = 
@@ -463,7 +464,11 @@ void task_track_state(int track) {
             int tr = tm.route_request.train;
             Train *train = TRAIN(&ts, tr);
 
-            ASSERT(train->speed != 0, "Trying to find route with speed == 0!");
+            //ASSERT(train->speed != 0, "Trying to find route with speed == 0!");
+            if (train->speed == 0){
+                train->speed = 10;
+                rom.speed = train->speed;
+            } else rom.speed = CURRENT_SPEED;
 
             if (train->next_sensor < 0) {
                 int __attribute__((unused)) distance;
@@ -472,7 +477,7 @@ void task_track_state(int track) {
 
             const track_node *d = &ts.track[object], *n = &ts.track[train->next_sensor], *o = &ts.track[train->last_sensor];
 
-            TrackPath tp = {{0}, {{SWITCH_UNKNOWN}}, {{SWITCH_UNKNOWN}}}; 
+            TrackPath tp = {{0}, {{SWITCH_UNKNOWN}}, {{SWITCH_UNKNOWN}}, train->speed}; 
             int possible = find_path_between_nodes(&ts, n, d, o, &tp, 0);
             if (possible) {
                 if (stopping_distance[train->speed] > distance_past) {
@@ -502,6 +507,9 @@ void task_track_state(int track) {
                     } else {
                         rom.switches[i].state = SWITCH_UNKNOWN;
                     }
+                }
+                if (rom.speed != CURRENT_SPEED || tp.speed <= 0) {
+                    rom.speed = tp.speed;
                 }
             } else {
                 PANIC("failed to find path between %d and %d", object, train->next_sensor);
