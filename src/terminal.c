@@ -49,37 +49,67 @@ static inline void cursor_to_position(struct circlebuffer *cb, int line, int col
 }
 
 static void output_base_terminal(Terminal *t) {
+    const char track = GetValue(VALUE_TRACK_NAME);
+    //
+    //
+    char * topbar =  "           E_T:     STK_LIM:     STK_MAX:      DIST_NX:\r\n" \
+                     "IDLE: %__  E_D:     STK_AVG:     VELO_PR:      SNSR_NX:\r\n" ;
+    // E_T: 1, 16
+    // STK_MAX: 1, 42
+    // DIST_NX: 1, 56
+    // E_D: 2, 16
+    // STK_AVG: 2, 29
+    // VELO_PR: 2, 42
+    // SNSR_NX: 2, 56
+    char * trackA = 
+        "==---------[ ]--[ ]---------------------------------\\ \r\n" \
+        "==--------[ ] [ ]-----------[ ]----[ ]-----------\\   \\ \r\n" \
+        "==--------/  /               \\    /               \\   | \r\n" \
+        "            /                 \\||/                 \\  | \r\n" \
+        "           /                  [  ]                  \\ | \r\n" \
+        "          |                    ||                   [ ] \r\n" \
+        "          |                    ||                    | \r\n" \
+        "          |                    ||                   [ ] \r\n" \
+        "           \\                  [  ]                  / | \r\n" \
+        "            \\                / || \\                /  | \r\n" \
+        "==------\\    \\              /      \\              /   | \r\n" \
+        "==------[ ]  [ ]-----------[ ]------[ ]---------/    / \r\n" \
+        "==-------[ ]   \\-----------[ ]------[ ]-------------/  \r\n" \
+        "==--------[ ]---------------[ ]----[ ]--------==  \r\n" \
+        ;
+    char * trackB = 
+        "==---------[ ]--[ ]---------------------------------\\ \r\n" \
+        "==--------[ ] [ ]-----------[ ]----[ ]-----------\\   \\ \r\n" \
+        "          /  /               \\    /               \\   | \r\n" \
+        "         /  /                 \\||/                 \\  | \r\n" \
+        "        /  /                  [  ]                  \\ | \r\n" \
+        "       |  |                    ||                   [ ] \r\n" \
+        "       |  |                    ||                    | \r\n" \
+        "       |  |                    ||                   [ ] \r\n" \
+        "       |   \\                  [  ]                  / | \r\n" \
+        "       |    \\                / || \\                /  | \r\n" \
+        "        \\    \\              /      \\              /   | \r\n" \
+        "==------[ ]  [ ]-----------[ ]------[ ]---------/    / \r\n" \
+        "==-------[ ]   \\-----------[ ]------[ ]-------------/  \r\n" \
+        "==--------[ ]---------------[ ]----[ ]--------==  \r\n" \
+        ;
     circlebuffer_t * restrict cb = &t->output;
-    cb_write_string(cb, "\033[2J\033[3g\033[H\n");
-    cb_write_string(cb, "IDLE: %\r\n");
-    cb_write_string(cb, "E_T:\r\n");
-    cb_write_string(cb, "E_D:\r\n");
-    int i;
+    ASSERT(cb_write_string(cb, "\033[2J\033[3g\033[H") == 0, "Error outputting base terminal");
+    ASSERT(cb_write_string(cb, topbar) == 0, "Error outputting base terminal");
+    ASSERT(cb_write_string(cb, track == 'A' ? trackA : trackB) == 0, "Error outputting base terminal");
+
+    cb_write_string(cb, " \033["S(TERMINAL_INPUT_BASE_LINE)";"S(TERMINAL_INPUT_MAX_LINE)"r");
     cursor_to_position(cb, t->input_line, t->input_col);
     cb_write_string(cb, "\033H> ");
     t->input_col+= 2;
 
-    cursor_to_position(cb, 27, 1);
-    cb_write_string(cb, "STK_LIM: ");
-    cb_write_number(cb, STACK_SPACE_SIZE/TASK_POOL_SIZE - 4, 16);
-    cb_write_string(cb, "\r\nSTK_AVG: \r\n");
-    cb_write_string(cb, "STK_MAX: \r\n");
-    cb_write_string(cb, "VELO_PR: \r\n");
-    cb_write_string(cb, "SNSR_NX: \r\n");
-    cb_write_string(cb, "DIST_NX: \r\n");
-    cb_write_string(cb, "\n" STYLED_FLAG_STRING);
-    cb_write_string(cb, "\r\nTRACK: ");
-    cb_write(cb, GetValue(VALUE_TRACK_NAME));
+    cursor_to_position(cb, TERMINAL_INPUT_MAX_LINE + 1, 1);
+    cb_write_string(cb, "TRACK: ");
+    cb_write(cb, track);
+    cb_write_string(cb, "   " STYLED_FLAG_STRING);
 
-    cursor_to_position(cb, 5, 1);
-    for (i = 1; i <= 18; i++) {
-        cb_write_number(cb, i, 10);
-        cb_write_string(cb, (i < 10 ? "  :?\r\n" : " :?\r\n"));
-    }
-    for (i = 19; i<= 22; i++) {
-        cb_write_number(cb, 134+i, 10);
-        cb_write_string(cb, ":?\r\n");
-    }
+    cursor_to_position(cb, 1, 29);
+    cb_write_number(cb, STACK_SPACE_SIZE/TASK_POOL_SIZE - 4, 16);
     cursor_to_position(cb, t->input_line, t->input_col);
 }
 
@@ -454,7 +484,7 @@ void task_uart2_courier(int servertid) {
 
 static inline void print_status(circlebuffer_t *cb, int status) {
     cb_write_string(cb, "\033[s");
-    cursor_to_position(cb, 34, 0);
+    cursor_to_position(cb, TERMINAL_INPUT_MAX_LINE + 1, 12);
 
     //append the 'restore cursor' to save a call to cb_write_string
     char str[] = STYLED_FLAG_STRING;
@@ -471,6 +501,31 @@ static inline void print_status(circlebuffer_t *cb, int status) {
 }
 
 void task_terminal() {
+    const int trackA_switch_positions[][2] = {
+        {-1, -1},
+        {14, 10},
+        {15, 11},
+        {16, 12},
+        {4, 12},
+        {16, 37},
+        {15, 29},
+        {15, 38},
+        {10, 54},
+        {8, 54},
+        {4, 37},
+        {3, 18},
+        {3, 13},
+        {4, 30},
+        {4, 16},
+        {14, 15},
+        {14, 29},
+        {14, 38},
+        {16, 30},
+        {11, 32},
+        {11, 33},
+        {7, 33},
+        {7, 32}
+    };
     // concept: server is one of the reciever loop ones
     // Has a cb of characters to put (now there's 2 buffers)
     // alternate solution: have the 1 buffer, use puts in various places.
@@ -521,8 +576,7 @@ void task_terminal() {
             cb_write_string(&t.output, "\r\t  \n");
             t.input_line++;
             if (t.input_line >= TERMINAL_INPUT_MAX_LINE) {
-                t.input_line = TERMINAL_INPUT_BASE_LINE;
-                cursor_to_position(&t.output, t.input_line, TERMINAL_INPUT_BASE_COL+2);
+                t.input_line = TERMINAL_INPUT_MAX_LINE;
             }
             //wipe the previous command
             for (int i = TERMINAL_INPUT_BASE_COL+2; i < TERMINAL_INPUT_MAX_COL; i++) {
@@ -558,7 +612,7 @@ void task_terminal() {
         case(TERMINAL_SWITCH):
         {
             cb_write_string(&t.output, "\0337");
-            cursor_to_position(&t.output, 4+(tm.arg2 > 18 ? tm.arg2 - 134 : tm.arg2), 5);
+            cursor_to_position(&t.output, trackA_switch_positions[SWCLAMP(tm.arg2)][0], trackA_switch_positions[SWCLAMP(tm.arg2)][1]);
             cb_write(&t.output, tm.arg1);
             cb_write_string(&t.output, "\0338");
             break;
@@ -591,13 +645,13 @@ void task_terminal() {
             int avg_stack = tm.arg1, max_stack = tm.arg2;
             cb_write_string(&t.output, "\0337");
 
-            cursor_to_position(&t.output, 28, 10);
+            cursor_to_position(&t.output, 2, 29);
             cb_write_number(&t.output, avg_stack, 16);
-            cb_write_string(&t.output, "   ");
+            cb_write_string(&t.output, "  ");
 
-            cursor_to_position(&t.output, 29, 10);
+            cursor_to_position(&t.output, 1, 42);
             cb_write_number(&t.output, max_stack, 16);
-            cb_write_string(&t.output, "   ");
+            cb_write_string(&t.output, "  ");
 
             cb_write_string(&t.output, "\0338");
             break;
@@ -608,11 +662,11 @@ void task_terminal() {
             int last_error_dist = tm.arg2;
             cb_write_string(&t.output, "\0337");
 
-            cursor_to_position(&t.output, 3, 5);
+            cursor_to_position(&t.output, 1, 16);
             cb_write_number(&t.output, last_error_time, 10);
             cb_write_string(&t.output, "   ");
 
-            cursor_to_position(&t.output, 4, 5);
+            cursor_to_position(&t.output, 2, 16);
             cb_write_number(&t.output, last_error_dist, 10);
             cb_write_string(&t.output, "   ");
 
@@ -626,11 +680,11 @@ void task_terminal() {
             int next_sensor = tm.arg2;
             cb_write_string(&t.output, "\0337");
 
-            cursor_to_position(&t.output, 30, 10);
+            cursor_to_position(&t.output, 2, 42);
             cb_write_number(&t.output, current_predicted_velocity, 10);
             cb_write_string(&t.output, "   ");
 
-            cursor_to_position(&t.output, 31, 10);
+            cursor_to_position(&t.output, 2, 56);
             cb_write(&t.output, 'A' + SENSOR_GET_RADIX(next_sensor));
             cb_write_number(&t.output, SENSOR_GET_NUM(next_sensor) + 1, 10);
             cb_write_string(&t.output, "   ");
@@ -643,7 +697,7 @@ void task_terminal() {
         {
             int next_sensor_distance = tm.arg1;
             cb_write_string(&t.output, "\0337");
-            cursor_to_position(&t.output, 32, 10);
+            cursor_to_position(&t.output, 1, 56);
             cb_write_number(&t.output, next_sensor_distance, 10);
             cb_write_string(&t.output, "  ");
             cb_write_string(&t.output, "\0338");
