@@ -207,9 +207,9 @@ static inline int parse_command(Command * restrict cmd, circlebuffer_t * restric
         cmd->type = COMMAND_INV;
         return 0;
     }
-    case 'f': // find 
+    case 'n': // nav
     {
-        err = cb_read_match(cb_input, "ind ");
+        err = cb_read_match(cb_input, "av ");
         if (err != 0) {
             break;
         }
@@ -425,6 +425,29 @@ static inline int parse_command(Command * restrict cmd, circlebuffer_t * restric
             PANIC("INVALID SENSOR CHAR: %d\r\n", sensor_char)
         }
         }
+        return 0;
+    }
+    case 'f': // func
+    {
+        err = cb_read_match(cb_input, "unc ");
+        if (err != 0) {
+            break;
+        }
+
+        int train;
+        err = cb_read_number(cb_input, &train);
+        if (err)
+            break;
+
+        int fn;
+        err = cb_read_number(cb_input, &fn); // SW #
+        if (err)
+            break;
+
+        // add <train> <sensor>
+        cmd->type = COMMAND_FUNC;
+        cmd->arg1 = train;
+        cmd->arg2 = fn;
         return 0;
     }
     default:
