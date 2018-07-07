@@ -423,6 +423,14 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
             NotifyReservation(trainstate_tid, cm.command.arg1);
             break;
         }
+        case COMMAND_FUNC:
+        {
+            int train = cm.command.arg1;
+            int fn = cm.command.arg2;
+            Putc(servertid, 1, 64 + fn);
+            Putc(servertid, 1, train);
+            break;
+        }
         case COMMAND_QUIT:
         {
             Quit();
