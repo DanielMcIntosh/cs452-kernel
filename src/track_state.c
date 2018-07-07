@@ -224,7 +224,7 @@ static int find_path_between_nodes(const TrackState* ts, const track_node *origi
     rv->tp = *l;
     rv->tp.speed *= -1;
     rv->current_node = origin->reverse;
-    rv->previous_node = previous; // TODO get actual reverse?
+    rv->previous_node = previous; 
     mh_add(&mh, (int) rv, 200 * l->speed); // count reversing as 200 * speed for now
 
     bfsnodes[BFS_MH_SIZE-1].next = NULL;

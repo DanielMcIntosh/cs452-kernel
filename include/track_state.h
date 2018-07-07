@@ -19,7 +19,6 @@
 #define CAL_ITERATIONS 8
 #define BASE_STOP_DIST_ADJUSTMENT 70
 
-//TODO move these:
 #define SENSOR_TO_NODE(s) (s)
 #define SWITCH_TO_NODE(s) (80 + 2 * (s))
 #define MERGE_TO_NODE(m) (81 + 2 * (m))
@@ -67,7 +66,7 @@ typedef struct traindata {
 typedef struct routerequest{
     const TrackPosition position;
     const int train;
-} __attribute__((packed)) RouteRequest; // TODO move these structs into the c file.
+} __attribute__((packed)) RouteRequest; 
 
 typedef struct caldata{
     const int iteration : 16;
@@ -84,10 +83,10 @@ typedef struct paramdata{
 typedef struct newtrain{
     const int train;
     const int sensor;
-} __attribute__((packed)) NewTrain; // TODO move these structs into the c file.
+} __attribute__((packed)) NewTrain; 
 
 #define CURRENT_SPEED -50
-typedef struct routemessage{ // TODO MessageType
+typedef struct routemessage{ 
     int end_sensor;
     int time_after_end_sensor;
     int speed;
@@ -100,7 +99,7 @@ typedef struct shortmessage{
 } ShortMessage;
 
 typedef enum tsrequest{
-    TRAIN_SPEED, // TODO other requests
+    TRAIN_SPEED, 
     SWITCH,
     SENSOR,
     ACTIVE_TRAIN,

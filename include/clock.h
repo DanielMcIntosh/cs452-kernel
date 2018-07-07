@@ -17,7 +17,6 @@
 extern struct clock {
     volatile unsigned int load;
     volatile unsigned int value;
-    //TODO: change to a union of int and struct of (carefully aligned) bit fields
     volatile unsigned int control;
     volatile unsigned int clear;
 } *clk1, *clk2, *clk3;
@@ -33,7 +32,7 @@ void task_clockprinter(int terminaltid);
 
 int Time();
 int Delay(int ticks);
-int DelayUntil(int ticks); //FIXME: pass in tid_clk
+int DelayUntil(int ticks); 
 
 //sends to the calling task MESSAGE_TIMEOUT after a specified number of ticks
 void Timeout(unsigned int ticks);

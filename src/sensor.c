@@ -107,7 +107,6 @@ void task_sensor_server(){
                     ss.send_cm = 1;
 
                 ss.current_sensor_query = 0;
-                // TODO remember the off by 1 error from before? It never showed up, but i'm not sure what to do if it does.
             }
             ss.query_complete = 0;
             break;

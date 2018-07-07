@@ -242,7 +242,7 @@ static inline void generic_uart_send_server(int uart) {
     }
 }
 
-void task_uart1rcv() { // FIXME: is there a cleaner way to do this?
+void task_uart1rcv() { 
     RegisterAs(NAME_UART1_RCV);
     generic_uart_rcv_server(1);
 }

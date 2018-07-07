@@ -11,7 +11,7 @@
 #include <message.h>
 #include <clock.h>
 #include <sensor.h>
-#include <track_state.h> // TODO
+#include <track_state.h> 
 
 typedef struct terminalparser {
     circlebuffer_t input;
@@ -207,7 +207,7 @@ static inline int parse_command(Command * restrict cmd, circlebuffer_t * restric
         cmd->type = COMMAND_INV;
         return 0;
     }
-    case 'f': // find (TODO we need a better command parsing strategy)
+    case 'f': // find 
     {
         err = cb_read_match(cb_input, "ind ");
         if (err != 0) {
