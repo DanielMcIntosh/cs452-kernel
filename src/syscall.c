@@ -3,7 +3,6 @@
 #include <syscall.h>
 #include <debug.h>
 
-// FIXME: Optimize number of arguments for smaller syscalls
 inline static __attribute__((always_inline)) int syscall_5(const int n, const int arg1, const int arg2, const int arg3, const int arg4, const int arg5){
     int ret;
     LOGF("Expected Arguments: %d, %d, %d, %d, %d\r\n", arg1, arg2, arg3, arg4, arg5);
@@ -20,9 +19,9 @@ __asm__(
         : [n] "i" (n), [arg1] "ri" (arg1), [arg2] "ri" (arg2), [arg3] "ri" (arg3), [arg4] "ri" (arg4), [arg5] "ri" (arg5)
         : "r0", "r1", "r2", "r3", "lr", "sp");
 // Store r0 (return value)
-__asm__ volatile ( // FIXME: why does this need to be volatile? why was gcc dropping it? bc it's reloading lr and sp from fp later anyway?
+__asm__ volatile ( 
     "mov %[ret], r0\n\t"
-    "add sp, sp, #4\n\t" // FIXME: pop arg5 in activate?
+    "add sp, sp, #4\n\t" 
     "ldmia sp!, {r0-r3,lr}\n\t"
     : [ret] "=r"(ret)
     :

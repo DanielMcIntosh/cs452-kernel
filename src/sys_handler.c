@@ -95,7 +95,7 @@ static inline void handle_receive(TD *task) {
         int len = TD_arg(sender, 2);
 
         *((int *)TD_arg(task, 0)) = task_getTid(sender); //set the tid value
-        if (TD_arg(task, 2) != len) { // TODO: is this the correct behavior for when the lengths are wrong?
+        if (TD_arg(task, 2) != len) { 
             task->r0 = ERR_MSG_TRUNCATED;
         } else {
             task->r0 = len;
@@ -149,10 +149,9 @@ static inline void handle_await(TD *task, TaskQueue *task_ready_queue){
         return;
     }
     if (event == EVENT_UART_2_SEND){
-        uart2->ctrl |= TIEN_MASK; // TODO: better way? Does the interrupt need to be turned on here?
-        // TODO also maybe do this in the VIC so you don't need to ensure 55 clock cycles
+        uart2->ctrl |= TIEN_MASK; 
     } else if (event == EVENT_UART_1_SEND){
-        uart1->ctrl |= TIEN_MASK; // TODO: better way? Does the interrupt need to be turned on here?
+        uart1->ctrl |= TIEN_MASK; 
     }
 
     task_ready_queue->event_wait[event] = task;

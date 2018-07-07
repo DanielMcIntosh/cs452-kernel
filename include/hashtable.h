@@ -7,7 +7,6 @@
 #define HT_KEY_SIZE 8
 
 typedef struct ht_node{
-    //unsigned long long key; // TODO
     char key[HT_KEY_SIZE];
     int value;
 } HT_Node;

@@ -11,7 +11,7 @@ int IRQ_MAP[NUM_EVENTS] = {
     [EVENT_CLK_3] = 51,
     [EVENT_UART_1_SEND] = 52,
     [EVENT_UART_1_RCV] = 52,
-    [EVENT_UART_1_MODEM] = 52, // TODO split up these interrupts
+    [EVENT_UART_1_MODEM] = 52,
     [EVENT_UART_2_SEND] = 54,
     [EVENT_UART_2_RCV] = 54
 

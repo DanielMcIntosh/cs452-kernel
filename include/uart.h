@@ -6,7 +6,7 @@
 #define NAME_UART2_SEND "U2SND"
 #define NAME_UART2_RCV " U2RCV"
 
-#define RCVQ_BUF_SIZE 50 // TODO calculate these based on stack size
+#define RCVQ_BUF_SIZE 50 
 #define TXQ_BUF_SIZE 2000
 #define GETQ_BUF_SIZE 5 // expected that not many different tasks will want to pull from any given uart - most likely 1, no?
 

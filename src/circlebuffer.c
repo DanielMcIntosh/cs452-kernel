@@ -57,7 +57,7 @@ int cb_ch2d(char ch){
     return ch - '0';
 }
 
-// NOTE: cb_read_number reads 1 past the number; TODO: fix that?
+// NOTE: cb_read_number reads 1 past the number;
 int cb_read_number(struct circlebuffer * restrict cb, int * restrict i){
     int num, digit;
 
