@@ -4,13 +4,7 @@
 #define NAME_COMMANDSERVER "CMDS"
 // 2 arguments for each of the 22 switches + 2 extra as buffer space
 #define SWITCHQ_BUF_SIZE (2 *(22 + 2))
-
-/*
-typedef enum direction{
-    FORWARD,
-    BACKWARD
-} Direction;
-*/
+#define COMMAND_TERMINAL_BUFFER_SIZE 50
 
 typedef enum cmdtype{
     // PARSED COMMANDS
@@ -33,6 +27,7 @@ typedef enum cmdtype{
     COMMAND_NOTIFY_SOLENOID_TIMER,
     COMMAND_NOTIFY_COURIER,
     COMMAND_SENSOR_REQUEST,
+    COMMAND_NOTIFY_TERMINAL_COURIER,
     INVALID_COMMAND
 } CommandType;
 
