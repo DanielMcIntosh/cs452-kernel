@@ -1,5 +1,6 @@
 #include <kernel.h>
 #include <switch.h>
+#include <message.h>
 #include <util.h>
 #include <train_state.h>
 #include <train.h>
@@ -39,6 +40,38 @@
 
 #define TRACK_STATE_TERMINAL_BUFFER_SIZE 300
 
+#define MAX_ROUTE_COMMAND 15
+// 18 -> 126 bits which is the min dist to a power of 2 for a while I think - this is totally changeably but routes probably aren't more than 18 switches long?
+
+typedef enum action {
+    ACTION_NONE = 0, // default
+    ACTION_STRAIGHT = 1,
+    ACTION_CURVED = 2,
+    ACTION_RV = 3
+} __attribute__((packed)) Action; // packed -> use min possible type to store this enum
+
+typedef struct routecommand{
+    unsigned int swmr: 5; // 22 switches/merges -> need 5 bytes to represent, | 10 extra values
+    Action a: 2; // 4 actions -> need 2 bits to represent 
+    // note: reverse only happens after a merge - so ACTION_REVERSE implies swmr refers to a merge; otherwise swmr is a switch
+    int packing: 1; // could let the compiler do it, but i feel better this way
+}__attribute__((packed)) RouteCommand;
+
+#define SWITCH_NONE 31 
+// SWITCH_NONE is the maximum 5 bit unsigned int
+
+typedef struct route {
+    RouteCommand rcs[MAX_ROUTE_COMMAND];
+    int reverse: 1; int packing: 7;
+} Route;
+
+#define ROUTE_INIT {{{0, 0, 0}}, 0, 0}
+
+typedef struct position {
+    const int object : 16;
+    const int distance_past : 16;
+} TrackPosition;
+
 typedef struct sensordata {
     const unsigned int radix: 4;
     const unsigned int data: 16;
@@ -66,12 +99,9 @@ typedef struct paramdata{
     const int value;
 } __attribute__((packed)) ParamData;
 
-#define CURRENT_SPEED -50
-typedef struct route_result{ // TODO MessageType
-    Direction dir;
-    int end_sensor;
-    int dist_after_end_sensor;
-    Switch switches[NUM_SWITCHES+1];
+typedef struct routeresult{
+    MessageType type;
+    Route route;
 } RouteResult;
 
 typedef struct shortmessage{
@@ -100,7 +130,8 @@ int NotifySwitchStatus(int trackstatetid, SwitchData data);
 int NotifyParam(int trackstatetid, ParamData data);
 
 int GetSwitchState(int trackstatetid, int sw);
-int GetRoute(int trackstatetid, RouteRequest req, RouteResult *route_res);
+int GetActiveTrain(int trackstatetid, int train);
+int GetRoute(int trackstatetid, RouteRequest req);
 int GetShort(int trackstatetid, int distance, ShortMessage *sm);
 
 #endif

@@ -16,7 +16,7 @@
 #define SW3_COMPLEMENT(c) ((((c) - 1) ^ 1) + 1)
 
 typedef enum switchstate{
-    SWITCH_UNKNOWN,
+    SWITCH_UNKNOWN = 0,
     SWITCH_STRAIGHT,
     SWITCH_CURVED
 } SwitchState;

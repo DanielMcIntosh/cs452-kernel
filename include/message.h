@@ -22,6 +22,7 @@ typedef enum {
     MESSAGE_TRACK_STATE,
     MESSAGE_TRAIN_STATE,
     MESSAGE_TRAIN_EVENT,
+    MESSAGE_ROUTE,
     NUM_MESSAGE_TYPES
 } MessageType;
 

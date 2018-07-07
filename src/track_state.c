@@ -32,13 +32,6 @@ typedef struct visited {
 #define Visit(v, n) \
         (v).switches |= (1 << (SWCLAMP(n) - 1));
 
-typedef struct trackpath{
-    Visited visited;
-    Direction dir;
-    SwitchState switches[NUM_SWITCHES+1];
-    SwitchState merges[NUM_SWITCHES+1];
-} TrackPath;
-
 typedef struct tsmessage{
     const MessageType type;
     const TrackStateRequest request;
@@ -52,9 +45,9 @@ typedef struct tsmessage{
 } TrackStateMessage;
 
 typedef struct bfsnode {
-    TrackPath tp;
+    Route r;
+    unsigned int idx: 8;
     const track_node *current_node;
-    const track_node *previous_node;
     struct bfsnode *next;
 } BFSNode;
 
@@ -141,7 +134,8 @@ static track_node* predict_next_sensor(const SwitchState * restrict ts, const tr
 
     return n;
 }
-static int reverse_distance_from_node(const SwitchState * restrict ts, const track_node *destination, int distance, SwitchState * restrict path, int * restrict wakeup_sensor, int * restrict dist_after_sensor) {
+/*
+static int reverse_distance_from_node(const Switch * restrict ts, const track_node *destination, int distance, int velocity, const Switch * restrict path, int * restrict wakeup_sensor, int * restrict time_after_sensor) {
     ASSERT(distance > 0, "Cannot reverse find negative distance");
     const track_node * restrict next_sensor = destination->reverse;
     int tdist = 0, cdist;
@@ -171,60 +165,48 @@ static int forward_distance_from_node(const SwitchState * restrict ts, const tra
     *dist_after_sensor = cdist;
     return 0;
 }
+*/
 
-static int find_path_between_nodes(const Reservation * restrict reservations, int min_dist, int rev_penalty, const track_node *origin, const track_node *dest, const track_node *previous, TrackPath * restrict l) {
+static int find_path_between_nodes(const Reservation * restrict reservations, int min_dist, int rev_penalty, const track_node *origin, const track_node *dest, Route * restrict r) {
     entry_t mh_array[BFS_MH_SIZE];
     minheap_t mh = {mh_array, 0, BFS_MH_SIZE};
     entry_t entry;
     // IDEA: minheap contains pointers to some struct. That struct contains a TrackPath and some other data I guess? We allocate those structs in a big array on the stack here.
     // Keep a free queue of those structs so we can free them whenever we drop a node?
-    BFSNode bfsnodes[BFS_MH_SIZE];
+    BFSNode bfsnodes[BFS_MH_SIZE] = {{{{{0, 0, 0}}, 0, 0}, 0, 0, 0}};
 
     BFSNode* freeQ = &bfsnodes[0];
     BFSNode* freeQTail = &bfsnodes[BFS_MH_SIZE-1];
 
     for (int i = 0; i < BFS_MH_SIZE; i++) {
         bfsnodes[i].next = (i < BFS_MH_SIZE - 1 ? &(bfsnodes[i+1]) : NULL);
-        bfsnodes[i].tp.visited.switches = 0ll;
-        for (int i = 0; i < NUM_SWITCHES + 1; i++) {
-            bfsnodes[i].tp.switches[i] = SWITCH_UNKNOWN;
-            bfsnodes[i].tp.merges[i] = SWITCH_UNKNOWN;
-        }
     }
 
     BFSNode * fw = q_pop(&freeQ, &freeQTail);
-    fw->tp = *l;
-    fw->tp.visited.switches = 0;
+    fw->r = *r;
     fw->current_node = origin;
-    fw->previous_node = previous;
     mh_add(&mh, (int) fw, 0);
     BFSNode * rv = q_pop(&freeQ, &freeQTail);
-    fw->tp = *l;
-    rv->tp.dir = !(l->dir);
-    fw->tp.visited.switches = 0;
+    rv->r = *r;
+    rv->r.reverse = 1;
     rv->current_node = origin->reverse;
-    rv->previous_node = previous; // TODO get actual reverse?
     mh_add(&mh, (int) rv, rev_penalty);
 
     bfsnodes[BFS_MH_SIZE-1].next = NULL;
     int k = 0;
 
-    //int tid = WhoIs(NAME_TERMINAL);
-
     while (mh_remove_min(&mh, &entry) == 0){
         ASSERT(k++ <= 10000, "probably an infinite loop");
         BFSNode *bn = (BFSNode*) entry.item;
         int distance = entry.value;
-        TrackPath tp = bn->tp;
+        Route route = bn->r;
+        int idx = bn->idx;
+        ASSERT(idx < MAX_ROUTE_COMMAND, "Too many route commands in a route");
+        
         const track_node *cn = bn->current_node;
-        const track_node *pn = bn->previous_node;
         q_add(&freeQ, &freeQTail, bn);
-        ASSERT( !(tp.switches[SWCLAMP(153)] == SWITCH_CURVED && tp.switches[SWCLAMP(154)] == SWITCH_CURVED) &&
-                !(tp.switches[SWCLAMP(156)] == SWITCH_CURVED && tp.switches[SWCLAMP(155)] == SWITCH_CURVED), "CC");
-
-        ASSERT(cn != NULL && cn->type != NODE_NONE, "ERROR");
-        if (unlikely(cn == dest) && distance > ((tp.dir == l->dir) ? min_dist : min_dist + rev_penalty)) { // found shortest path > min_dist
-            *l = tp;
+        if (unlikely(cn == dest) && distance > (route.reverse ? min_dist : min_dist + rev_penalty)) { // found shortest path > min_dist
+            *r = route;
             return distance;
         } else if ((0x1ULL << (TRACK_NODE_TO_INDEX(cn) % 64)) & ((TRACK_NODE_TO_INDEX(cn) < 64) ? reservations->bits_low : reservations->bits_high)) { // TODO allow trains to use their own reserved track
             continue;
@@ -232,44 +214,38 @@ static int find_path_between_nodes(const Reservation * restrict reservations, in
         // continue the search
 
         if (cn->type == NODE_BRANCH) {
-            if (IsVisited(tp.visited, cn->num)) {
-                continue;
-            }
-            Visit(tp.visited, cn->num);
-
+            // Can go either direction on a branch
             BFSNode * straight = q_pop(&freeQ, &freeQTail);
             straight->current_node = cn->edge[DIR_STRAIGHT].dest;
-            straight->previous_node = cn;
-            tp.switches[SWCLAMP(cn->num)] = SWITCH_STRAIGHT;
-            memcpy(&straight->tp, &tp, sizeof(TrackPath));
+            memcpy(&straight->r, &route, sizeof(Route));
+            straight->r.rcs[idx].swmr = SWCLAMP(cn->num);
+            straight->r.rcs[idx].a = ACTION_STRAIGHT;
+            straight->idx++;
             mh_add(&mh, (unsigned long int) straight, distance + cn->edge[DIR_STRAIGHT].dist);
 
             BFSNode * curved = q_pop(&freeQ, &freeQTail);
             curved->current_node = cn->edge[DIR_CURVED].dest;
-            curved->previous_node = cn;
-            tp.switches[SWCLAMP(cn->num)] = SWITCH_CURVED;
-            if (cn->num >= 153){
-               tp.switches[SWCLAMP(SW3_COMPLEMENT(cn->num))] = SWITCH_STRAIGHT; 
-               Visit(tp.visited, SW3_COMPLEMENT(cn->num));
-            }
-            memcpy(&curved->tp, &tp, sizeof(TrackPath));
+            memcpy(&curved->r, &route, sizeof(Route));
+            curved->r.rcs[idx].swmr = SWCLAMP(cn->num);
+            curved->r.rcs[idx].a = ACTION_CURVED;
+            curved->idx++;
             mh_add(&mh, (unsigned long int) curved, distance + cn->edge[DIR_CURVED].dist);
         }
         if (cn->type == NODE_MERGE) {
-            // figure out which side of the branch we are:
-            const track_node *pr = pn->reverse;
-            const track_node *br = cn->reverse;
-            if (br->edge[DIR_STRAIGHT].dest == pr) {
-                tp.merges[SWCLAMP(cn->num)] = SWITCH_STRAIGHT;
-            } else {
-                tp.merges[SWCLAMP(cn->num)] = SWITCH_CURVED;
-            }
+            // Can reverse after hitting a merge:
+            BFSNode * reverse = q_pop(&freeQ, &freeQTail);
+            reverse->current_node = cn->reverse;
+            memcpy(&reverse->r, &route, sizeof(Route));
+            reverse->r.rcs[idx].swmr = SWCLAMP(cn->num);
+            reverse->r.rcs[idx].a = ACTION_RV;
+            reverse->idx++;
+            mh_add(&mh, (unsigned long int) reverse, distance + rev_penalty);
         }
         if (cn->type == NODE_MERGE || cn->type == NODE_SENSOR || cn->type == NODE_ENTER) {
+            // Can go straight on merges, sensors, and enters.
             BFSNode * ahead = q_pop(&freeQ, &freeQTail);
             ahead->current_node = cn->edge[DIR_AHEAD].dest;
-            ahead->previous_node = cn;
-            memcpy(&ahead->tp, &tp, sizeof(TrackPath));
+            memcpy(&ahead->r, &route, sizeof(Route));
             mh_add(&mh, (unsigned long int) ahead, distance + cn->edge[DIR_AHEAD].dist);
         }
     }
@@ -313,9 +289,10 @@ int GetSwitchState(int trackstatetid, int sw) {
     return sendTrackState(trackstatetid, &msg);
 }
 
-int GetRoute(int trackstatetid, RouteRequest req, RouteResult *res) {
+int GetRoute(int trackstatetid, RouteRequest req) {
+    RouteResult rom = {.type = MESSAGE_ROUTE, .route = ROUTE_INIT}; // TODO
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = ROUTE, {.route_request = req}};
-    int r = Send(trackstatetid, &msg, sizeof(msg), res, sizeof(*res));
+    int r = Send(trackstatetid, &msg, sizeof(msg), &rom, sizeof(rom));
     return (r >= 0 ? 0 : -1);
 }
 
@@ -340,7 +317,7 @@ void task_track_state(int track) {
 
     TrackStateMessage tm;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
-    RouteResult route_res = {TRUE, 0, 0, {{SWITCH_UNKNOWN, FALSE}}};
+    RouteResult route_res = {TRUE, .route = ROUTE_INIT};
     int tid;
 
     int short_speed[NUM_SHORTS] = 
@@ -374,7 +351,7 @@ void task_track_state(int track) {
         }
         case (ROUTE):
         {
-            Direction dir = tm.route_request.dir;
+            Direction dir = tm.route_request.dir; // TODO remove this from request
             int next = tm.route_request.next;
             int prev = tm.route_request.prev;
             int end = tm.route_request.end;
@@ -387,31 +364,19 @@ void task_track_state(int track) {
                 next = predict_next_sensor(ts.switches, &ts.track[prev], NULL, &distance)->num;
             }
 
-            const track_node *n = &ts.track[next], *o = &ts.track[prev], *d = &ts.track[end];
+            const track_node *d = &ts.track[end], *n = &ts.track[next];
 
-            TrackPath tp = {{0}, dir, {}, {}};
-            int distance = find_path_between_nodes(&reservations, min_dist, rev_penalty, n, d, o, &tp);
-            if (unlikely(distance < 0)) {
-                PANIC("failed to find path between %d and %d", next, end);
-            }
+            Route r = ROUTE_INIT;
+            int distance = find_path_between_nodes(&reservations, min_dist, rev_penalty, n, d, &r);
 
-            if (min_dist > 0) {
-                int err = reverse_distance_from_node(ts.switches, d, min_dist, tp.merges, &route_res.end_sensor, &route_res.dist_after_end_sensor);
-                ASSERT(err == 0, "Reverse Distance Failed");
+            if (distance >= 0) {
+                route_res.route = r;
             } else {
-                min_dist *= -1;
-                int err = forward_distance_from_node(ts.switches, d, min_dist, tp.switches, &route_res.end_sensor, &route_res.dist_after_end_sensor);
-                ASSERT(err == 0, "Forward Distance Failed");
-            }
-
-            for (int i = 1; i <= NUM_SWITCHES; i++) {
-                route_res.switches[i].state = tp.switches[i];
-                if (tp.switches[i] != ts.switches[i]) {
-                    route_res.switches[i].set_state = TRUE;
+                PANIC("failed to find path between %d and %d", next, end);
+                for (int i = 0; i <= MAX_ROUTE_COMMAND; i++) {
+                    route_res.route.rcs[i].swmr = SWITCH_NONE;
                 }
             }
-
-            route_res.dir = tp.dir;
 
             Reply(tid, &route_res, sizeof(route_res));
             break;

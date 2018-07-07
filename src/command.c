@@ -136,14 +136,15 @@ static inline void commandserver_exec_switch(CommandServer * restrict cs, int ar
     }
 }
 
-static inline void commandserver_exec_reverse(int train, int speed, int servertid, int trainstate_tid, int terminaltid) {
+static inline void commandserver_exec_reverse(int train, int speed, int servertid, int trainstate_stid, TerminalCourier *tc) {
     Putc(servertid, 1, 0);
     Putc(servertid, 1, train);
-    SendTerminalRequest(terminaltid, TERMINAL_FLAGS_SET, STATUS_FLAG_REVERSING, 0);
+    tc_send(tc, TERMINAL_FLAGS_SET, STATUS_FLAG_REVERSING, 0);
     CreateWith2Args(PRIORITY_NOTIFIER, &task_reverse_train, train, speed);
     TrainData td = {0, train};
     NotifyTrainSpeed(trainstate_tid, td); // TODO train state courier
 }
+
 //cannot be used from within the commandserver task
 static inline void setup_track_state(int cmdtid, NavigateResult *nav_res) {
     for (int i = 1; i <= NUM_SWITCHES; i++) {
@@ -172,12 +173,16 @@ void send_wakeup(int tid, int __attribute__((unused)) arg1, bool success) {
     Send(tid, &success, sizeof(success), NULL, 0);
 }
 
-void task_calibrate(int train, int sensor_dest) {
-    int cmdtid = WhoIs(NAME_COMMANDSERVER);
+void task_calibrate(int __attribute__((unused)) train, int __attribute__((unused)) sensor_dest) {
     int terminaltid = WhoIs(NAME_TERMINAL);
     int trainstate_tid = WhoIs(NAME_TRAIN_STATE);
     int my_tid = MyTid();
     SendTerminalRequest(terminaltid, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING | STATUS_FLAG_CALIBRATING, 0);
+            /*
+    int cmdtid = WhoIs(NAME_COMMANDSERVER);
+
+    int my_tid = MyTid();
+
 
     NavigateResult nav_res = {0, 0, 0, {}};
     int alarm_tid;
@@ -230,9 +235,12 @@ void task_calibrate(int train, int sensor_dest) {
             if (overshot) {
                 ++num_over;
             }
+
         }
     }
+            i*/
     SendTerminalRequest(terminaltid, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING | STATUS_FLAG_CALIBRATING, 0);
+
     Destroy();
 }
 
@@ -302,8 +310,8 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
         case COMMAND_RV:
         {
             int train = cm.command.arg1;
-            int speed = GetTrainSpeed(trainstate_tid, train);
-            commandserver_exec_reverse(train, speed, servertid, trainstate_tid, terminaltid);
+            int speed = GetTrainSpeed(tstid, train);
+            commandserver_exec_reverse(train, speed, servertid, tstid, &tc);
             break;
         }
         case COMMAND_SW:
@@ -351,34 +359,6 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
             const NavigateRequest rq = {.position = pos, .train = train};
             int err = NavigateTo(trainstate_tid, rq, &nav_res);
             ASSERT(err==0, "FAILED TO GET ROUTE");
-
-            int time_after_sensor = nav_res.time_after_end_sensor;
-            int sensor_to_wake = nav_res.end_sensor;
-            //PANIC("%d || %d || %d", sensor, sensor_to_wake, time_after_sensor); //122 | 62 | 178
-            for (int i = 1; i <= NUM_SWITCHES; i++) {
-                if (nav_res.switches[i] != SWITCH_UNKNOWN){
-                    char sw_state = STATE_TO_CHAR(nav_res.switches[i]);
-                    int sw_num = SWUNCLAMP(i);
-                    if (cs.notifier_waiting) {
-                        Reply(cs.notifier_waiting, &rm, sizeof(rm));
-                        cs.notifier_waiting = 0;
-                        commandserver_exec_switch(&cs, sw_state, sw_num, &rm, servertid, trackstate_tid);
-                    }  else {
-                        cb_write(cs.cb_switches, sw_state);
-                        cb_write(cs.cb_switches, sw_num); 
-                    }
-                }
-            }
-            if (nav_res.speed != CURRENT_SPEED) {
-                if (nav_res.speed < 0) {
-                    commandserver_exec_reverse(train, -1 * nav_res.speed, servertid, trainstate_tid, terminaltid);
-                } else {
-                    Putc(servertid, 1, nav_res.speed); 
-                    Putc(servertid, 1, train);
-                }
-            }
-            Runnable runnable = {&stop_wrapper, train, time_after_sensor, 3000U, TRUE};
-            RunWhen(sensor_to_wake, &runnable, PRIORITY_MID);
             break;
         }
         case COMMAND_MOVE:
