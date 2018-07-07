@@ -124,7 +124,7 @@ void task_clocknotifier(int clk_tid){
 
     // Initialize Timer
     clk3->load = CYCLES_PER_TEN_MILLIS;
-    clk3->control |= 0xD8; // TODO disable first? unclear
+    clk3->control |= 0xD8; 
 
     FOREVER {
         AwaitEvent(EVENT_CLK_3);
@@ -249,8 +249,7 @@ void Timeout(unsigned int ticks) {
 
 void task_clockprinter(int terminaltid){
     LOG("CLOCK PRINTER INIT");
-    int clk_tid = WhoIs(NAME_CLOCK);
-    int time = Time(clk_tid);
+    int time = Time();
     int time_since_startup_hundred_millis = 0;
     FOREVER{
         SendTerminalRequest(terminaltid, TERMINAL_TIME, time_since_startup_hundred_millis, GetValue(VALUE_IDLE));

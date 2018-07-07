@@ -15,6 +15,7 @@
 #include <train_event.h>
 #include <switch.h>
 #include <util.h>
+#include <terminalcourier.h>
 
 typedef struct commandmessage{
     MessageType type;
@@ -154,6 +155,17 @@ static inline void setup_track_state(int cmdtid, RouteMessage *rom) {
 
 }
 
+int cs_notify_terminal_buffer(int cmdtid, TerminalReq *treq) {
+    ASSERT(treq != NULL, "null TerminalRequest output");
+    Command c = {COMMAND_NOTIFY_TERMINAL_COURIER, 0, {0}};
+    CommandMessage cm = {MESSAGE_COMMAND, c};
+    TerminalCourierMessage tcm;
+    int r = Send(cmdtid, &cm, sizeof(cm), &tcm, sizeof(tcm));
+    if (r < 0) return r;
+    *treq = tcm.req;
+    return r;
+}
+
 void send_wakeup(int tid, int __attribute__((unused)) arg1, bool success) {
     Send(tid, &success, sizeof(success), NULL, 0);
 }
@@ -162,7 +174,6 @@ void task_calibrate(int train, int sensor_dest) {
     int cmdtid = WhoIs(NAME_COMMANDSERVER);
     int terminaltid = WhoIs(NAME_TERMINAL);
     int my_tid = MyTid();
-
     SendTerminalRequest(terminaltid, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING | STATUS_FLAG_CALIBRATING, 0);
 
     RouteMessage rom = {0, 0, 0, {{0}}};
@@ -240,7 +251,6 @@ void task_commandserver(){
     CommandServer cs = {0, 0, 0, -1, 0};
     RegisterAs(NAME_COMMANDSERVER);
     int servertid = WhoIs(NAME_UART1_SEND), tid;
-    int terminaltid = WhoIs(NAME_TERMINAL);
     CommandMessage cm;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
     RouteMessage rom = {0, 0, 0, {{0}}};
@@ -248,6 +258,13 @@ void task_commandserver(){
     circlebuffer_t cb_switches;
     cb_init(&cb_switches, switchQ_buf, SWITCHQ_BUF_SIZE);
     cs.cb_switches = &cb_switches;
+
+    circlebuffer_t cb_terminal;
+    char cb_terminal_buf[COMMAND_TERMINAL_BUFFER_SIZE];
+    cb_init(&cb_terminal, cb_terminal_buf, COMMAND_TERMINAL_BUFFER_SIZE);
+    TerminalCourier tc = {-1, &cb_terminal};
+    CreateWith2Args(PRIORITY_NOTIFIER, &task_terminal_courier, MyTid(), (int) &cs_notify_terminal_buffer);
+
 
     CreateWithArgument(PRIORITY_NOTIFIER, task_solenoid_notifier, MyTid());
     Putc(servertid, 1, 0x60);
@@ -261,7 +278,7 @@ void task_commandserver(){
         } else {
             rm.ret = 0;
         }
-        if (cm.command.type != COMMAND_NOTIFY_COURIER && cm.command.type != COMMAND_NOTIFY_SOLENOID_TIMER) {
+        if (cm.command.type != COMMAND_NOTIFY_COURIER && cm.command.type != COMMAND_NOTIFY_SOLENOID_TIMER && cm.command.type != COMMAND_NOTIFY_TERMINAL_COURIER) {
             Reply(tid, &rm.ret, sizeof(rm));
         }
 
@@ -324,7 +341,7 @@ void task_commandserver(){
         }
         case COMMAND_ROUTE:
         {
-            SendTerminalRequest(terminaltid, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING, 0);
+            tc_send(&tc, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING, 0);
 
             int sensor = cm.command.arg1;
             int distance_past = cm.command.smallarg1;
@@ -465,6 +482,11 @@ void task_commandserver(){
             } else {
                 cs.courier_waiting = tid;
             }
+            break;
+        }
+        case COMMAND_NOTIFY_TERMINAL_COURIER:
+        {
+            tc_update_notifier(&tc, tid);
             break;
         }
         default:
