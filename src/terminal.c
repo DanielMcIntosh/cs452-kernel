@@ -482,22 +482,19 @@ void task_uart2_courier(int servertid) {
 
 }
 
-static inline void print_status(circlebuffer_t *cb, int status) {
+static inline void print_status(circlebuffer_t * restrict cb, int status) {
     cb_write_string(cb, "\033[s");
     cursor_to_position(cb, TERMINAL_INPUT_MAX_LINE + 1, 12);
 
     //append the 'restore cursor' to save a call to cb_write_string
-    char str[] = STYLED_FLAG_STRING;
-    char *cur = &(str[2]);
-    for (int i = 1; i < STATUS_FLAG_END; i <<= 1) {
+    char str[] = STYLED_FLAG_STRING "\033[u";
+    for (int i = 1, cur = 2; i < STATUS_FLAG_END; i <<= 1, cur += 5) {
         if (status & i) {
             //attribute 1 = Bright
-            *cur = '1';
+            str[cur] = '1';
         }
-        cur += 5;
     }
     ASSERT(cb_write_string(cb, str) == 0, "TERMINAL OUTPUT CB FULL");
-    cb_write_string(cb, "\033[u");
 }
 
 void task_terminal() {

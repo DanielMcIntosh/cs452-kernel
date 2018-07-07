@@ -41,7 +41,7 @@
 
 #define BFS_MH_SIZE 80
 
-#define TRACK_STATE_TERMINAL_BUFFER_SIZE 80
+#define TRACK_STATE_TERMINAL_BUFFER_SIZE 300
 
 typedef struct position {
     const int object : 16;

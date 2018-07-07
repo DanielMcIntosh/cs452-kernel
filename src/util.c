@@ -9,11 +9,12 @@ void * memcpy(void * dest, const void* src, unsigned int sz){
     register int n = sz >> 2;
     switch (sz & 0x3) {
             do {
-    case 0:     *dp++ = *sp++;
+                *dp++ = *sp++;
     case 3:     *dp++ = *sp++;
     case 2:     *dp++ = *sp++;
     case 1:     *dp++ = *sp++;
-            } while (--n > 0);
+    case 0:     ;
+            } while (n-- > 0);
     }
     return dest;
 }

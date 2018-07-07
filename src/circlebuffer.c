@@ -18,9 +18,17 @@ inline int cb_empty(struct circlebuffer *cb){
     return (cb->rd == cb->wr) && cb->empty;
 }
 
-void cb_flush(struct circlebuffer *cb) {
-    cb->rd = cb->wr;
-    cb->empty = 1;   
+inline void cb_flush(struct circlebuffer *cb) {
+    cb->wr = cb->rd;
+    cb->empty = 1;
+}
+
+inline int cb_avail_for_read(struct circlebuffer *cb) {
+    return cb_full(cb) ? cb->size : (cb->wr - cb->rd + cb->size) % cb->size;
+}
+
+inline int cb_avail_for_write(struct circlebuffer *cb) {
+    return cb_empty(cb) ? cb->size : (cb->rd - cb->wr + cb->size) % cb->size;
 }
 
 int cb_read(struct circlebuffer * restrict cb, char * restrict c){

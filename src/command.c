@@ -89,13 +89,14 @@ int calcReverseTime(int speed){
 }
 
 void task_reverse_train(int train, int speed){
-    int tid = WhoIs(NAME_COMMANDSERVER);
+    int tid = WhoIs(NAME_COMMANDSERVER), terminaltid = WhoIs(NAME_TERMINAL);
     Delay(calcReverseTime(speed));
     Command crv = {COMMAND_NOTIFY_RV_REVERSE, train, {.arg2 = 15}};
     SendCommand(tid, crv);
     Delay(10);
     Command cra = {COMMAND_NOTIFY_RV_ACCEL, speed, {.arg2 = train}};
     SendCommand(tid, cra);
+    SendTerminalRequest(terminaltid, TERMINAL_FLAGS_UNSET, STATUS_FLAG_REVERSING, 0);
     Destroy();
 }
 
@@ -134,9 +135,10 @@ static inline void commandserver_exec_switch(CommandServer * restrict cs, int ar
     }
 }
 
-static inline void commandserver_exec_reverse(int train, int speed, int servertid, int tstid) {
+static inline void commandserver_exec_reverse(int train, int speed, int servertid, int tstid, int terminaltid) {
     Putc(servertid, 1, 0);
     Putc(servertid, 1, train);
+    SendTerminalRequest(terminaltid, TERMINAL_FLAGS_SET, STATUS_FLAG_REVERSING, 0);
     CreateWith2Args(PRIORITY_NOTIFIER, &task_reverse_train, train, speed);
     TrainData td = {0, train};
     NotifyTrainSpeed(tstid, td); // TODO track state courier
@@ -285,7 +287,7 @@ void task_commandserver(){
         {
             int train = cm.command.arg1;
             int speed = GetTrainSpeed(tstid, train);
-            commandserver_exec_reverse(train, speed, servertid, tstid);
+            commandserver_exec_reverse(train, speed, servertid, tstid, terminaltid);
             break;
         }
         case COMMAND_SW:
@@ -353,7 +355,7 @@ void task_commandserver(){
             }
             if (rom.speed != CURRENT_SPEED) {
                 if (rom.speed < 0) {
-                    commandserver_exec_reverse(train, -1 * rom.speed, servertid, tstid);
+                    commandserver_exec_reverse(train, -1 * rom.speed, servertid, tstid, terminaltid);
                 } else {
                     Putc(servertid, 1, rom.speed); 
                     Putc(servertid, 1, train);
