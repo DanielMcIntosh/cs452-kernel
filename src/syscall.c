@@ -47,8 +47,9 @@ void Pass(){
     syscall_0(SYSCALL_PASS);
 }
 
-void Exit(){
+void __attribute((noreturn)) Exit(){
     syscall_0(SYSCALL_EXIT);
+    Exit();
 }
 
 int MyTid(){
@@ -79,8 +80,9 @@ int AwaitEvent(int eventType){
     return syscall_2(SYSCALL_AWAIT, eventType, 0);
 }
 
-int Quit(){
-    return syscall_0(SYSCALL_QUIT);
+int __attribute__((noreturn)) Quit(){
+    syscall_0(SYSCALL_QUIT);
+    Quit();
 }
 
 int EnterCriticalSection(){
@@ -91,8 +93,9 @@ int ExitCriticalSection(){
     return syscall_0(SYSCALL_INTERRUPTS_ON);
 }
 
-int Destroy(){
-    return syscall_0(SYSCALL_DESTROY);
+int __attribute__((noreturn)) Destroy(){
+    syscall_0(SYSCALL_DESTROY);
+    Destroy();
 }
 
 int CreateWithArgument(Priority priority, void (*code)(int), int argument){

@@ -17,7 +17,8 @@ $(shell mkdir -p $(BINDIR) >/dev/null)
 XCC     = arm-none-eabi-gcc 
 AS	= arm-none-eabi-as
 LD      = arm-none-eabi-ld
-CFLAGS  = $(DEPFLAGS) -c -std=c11 -fPIC -Wall -Wextra -I. -I $(INCLUDEDIR) -mcpu=arm920t -msoft-float -O3
+WARNINGS = -Wall -Wextra
+CFLAGS  = $(DEPFLAGS) -c -std=c11 -fPIC $(WARNINGS) -I. -I $(INCLUDEDIR) -mcpu=arm920t -msoft-float -O3
 # -g: include hooks for gdb
 # -c: only compile
 # -mcpu=arm920t: generate code for the 920t architecture

@@ -32,6 +32,9 @@ void memswap(void *a, void *b, unsigned int sz) {
 
 void *memset(void *s, int c, unsigned int n) {
   unsigned char *p = s;
-  while(n --> 0) { *p++ = (unsigned char)c; }
+  while(n --> 0) {  
+      __asm__(""); // ensure that we don't optimize memset to memset
+      *p++ = (unsigned char)c;
+  }
   return s;
 }
