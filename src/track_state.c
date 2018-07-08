@@ -373,7 +373,7 @@ void task_track_state(int track) {
                 route_res.route = r;
             } else {
                 PANIC("failed to find path between %d and %d", next, end);
-                for (int i = 0; i <= MAX_ROUTE_COMMAND; i++) {
+                for (int i = 0; i < MAX_ROUTE_COMMAND; i++) {
                     route_res.route.rcs[i].swmr = SWITCH_NONE;
                 }
             }

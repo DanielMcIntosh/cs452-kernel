@@ -67,11 +67,6 @@ typedef struct route {
 
 #define ROUTE_INIT {{{0, 0, 0}}, 0, 0}
 
-typedef struct position {
-    const int object : 16;
-    const int distance_past : 16;
-} TrackPosition;
-
 typedef struct sensordata {
     const unsigned int radix: 4;
     const unsigned int data: 16;

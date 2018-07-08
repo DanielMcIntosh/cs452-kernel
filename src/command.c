@@ -122,7 +122,7 @@ void task_short_move(int train, int delay){
     
 
 static inline void commandserver_exec_switch(CommandServer * restrict cs, int arg1, int arg2, ReplyMessage * restrict rm, int servertid, int trackstate_tid){
-    jutc(servertid, 1, arg1 == 'C' ? 34 : 33);
+    Putc(servertid, 1, arg1 == 'C' ? 34 : 33);
     Putc(servertid, 1, arg2);
     SwitchData sd = {arg1 == 'C' ? SWITCH_CURVED : SWITCH_STRAIGHT, arg2};
     NotifySwitchStatus(trackstate_tid, sd); // TODO train state courier
@@ -310,8 +310,8 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
         case COMMAND_RV:
         {
             int train = cm.command.arg1;
-            int speed = GetTrainSpeed(tstid, train);
-            commandserver_exec_reverse(train, speed, servertid, tstid, &tc);
+            int speed = GetTrainSpeed(trainstate_tid, train);
+            commandserver_exec_reverse(train, speed, servertid, trainstate_tid, &tc);
             break;
         }
         case COMMAND_SW:

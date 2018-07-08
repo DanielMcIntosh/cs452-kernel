@@ -177,9 +177,9 @@ void task_train_state(int trackstate_tid) {
                 .min_dist = min_dist,
                 .rev_penalty = rev_penalty
             };
-            RouteResult route_res = {FORWARD, 0, 0, {}};
-            GetRoute(trackstate_tid, req, &route_res);
-
+            RouteResult route_res = {MESSAGE_ROUTE, ROUTE_INIT}; // TODO tomorrow
+            GetRoute(trackstate_tid, req);
+/*
             for (int i = 1; i <= NUM_SWITCHES; i++) {
                 if (route_res.switches[i].set_state) {
                     nav_res.switches[i] = route_res.switches[i].state; // pick up differences and unnknowns
@@ -190,6 +190,7 @@ void task_train_state(int trackstate_tid) {
             nav_res.end_sensor = route_res.end_sensor;
             nav_res.time_after_end_sensor = route_res.dist_after_end_sensor * VELOCITY_PRECISION / train->velocity[train->speed];
             nav_res.speed = (route_res.dir == train->direction) ? CURRENT_SPEED : -1 * train->speed;
+            */
 
             Reply(tid, &nav_res, sizeof(nav_res));
             break;
