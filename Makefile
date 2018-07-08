@@ -14,10 +14,10 @@ DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.Td
 
 $(shell mkdir -p $(DEPDIR) >/dev/null)
 $(shell mkdir -p $(BINDIR) >/dev/null)
-XCC     = gcc
-AS	= as
-LD      = ld
-CFLAGS  = $(DEPFLAGS) -c -std=gnu99 -fPIC -Wall -Wextra -I. -I $(INCLUDEDIR) -mcpu=arm920t -msoft-float -O3
+XCC     = arm-none-eabi-gcc 
+AS	= arm-none-eabi-as
+LD      = arm-none-eabi-ld
+CFLAGS  = $(DEPFLAGS) -c -std=gnu11 -fPIC -Wall -Wextra -I. -I $(INCLUDEDIR) -mcpu=arm920t -msoft-float -O3
 # -g: include hooks for gdb
 # -c: only compile
 # -mcpu=arm920t: generate code for the 920t architecture
@@ -27,7 +27,7 @@ CFLAGS  = $(DEPFLAGS) -c -std=gnu99 -fPIC -Wall -Wextra -I. -I $(INCLUDEDIR) -mc
 ASFLAGS	= -mcpu=arm920t -mapcs-32
 # -mapcs: always generate a complete stack frame
 
-LDFLAGS = -init main -Map $(BINDIR)/kernel.map -N -T $(TOOLSDIR)/orex.ld -L/u/wbcowan/gnuarm-4.0.2/lib/gcc/arm-elf/4.0.2 -L $(LIBDIR)
+LDFLAGS = -init main -Map $(BINDIR)/kernel.map -N -T $(TOOLSDIR)/orex.ld "-L/u7/c7zou/! cs452/toolchain/lib/gcc/arm-none-eabi/8.1.0" -L $(LIBDIR)
 
 SRCFILES = $(wildcard $(SRCDIR)/*.c)
 SRCASM = $(wildcard $(ASMDIR)/*.s)
