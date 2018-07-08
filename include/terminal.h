@@ -20,8 +20,8 @@
 
 #define NAME_TERMINAL "term"
 
-#define FLAG_STRING "IFCRM"
-#define STYLED_FLAG_STRING "\033[2mI\033[2mF\033[2mC\033[2mR\033[2mM\033[m"
+#define FLAG(s) "\033[2m"S(s)
+#define STYLED_FLAG_STRING FLAG(I)FLAG(F)FLAG(C)FLAG(R)FLAG(M)FLAG(S)"\033[m"
 
 typedef enum status_flag{
     STATUS_FLAG_INVALID         = (1 << 0),
@@ -29,8 +29,9 @@ typedef enum status_flag{
     STATUS_FLAG_CALIBRATING     = (1 << 2),
     STATUS_FLAG_REVERSING       = (1 << 3),
     STATUS_FLAG_MOVING          = (1 << 4),
+    STATUS_FLAG_SENSOR_TIMEOUT  = (1 << 5),
     //NOT A REAL FLAG - used to determine when to stop iterating through flags
-    STATUS_FLAG_END             = (1 << 5)
+    STATUS_FLAG_END             = (1 << 6)
 } StatusFlag;
 
 typedef enum terminalrequest {

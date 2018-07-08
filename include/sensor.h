@@ -5,6 +5,8 @@
 #define SENSOR_GET_RADIX(s) ((s) / 16)
 #define SENSOR_GET_NUM(s) ((s) % 16)
 
+#define SENSOR_TERMINAL_BUFFER_SIZE 21
+
 typedef enum sensorstate{
     SENSOR_OFF,
     SENSOR_ON

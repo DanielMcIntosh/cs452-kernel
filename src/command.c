@@ -122,10 +122,10 @@ void task_short_move(int train, int delay){
     
 
 static inline void commandserver_exec_switch(CommandServer * restrict cs, int arg1, int arg2, ReplyMessage * restrict rm, int servertid, int trackstate_tid){
-    Putc(servertid, 1, arg1 == 'C' ? 34 : 33);
+    jutc(servertid, 1, arg1 == 'C' ? 34 : 33);
     Putc(servertid, 1, arg2);
     SwitchData sd = {arg1 == 'C' ? SWITCH_CURVED : SWITCH_STRAIGHT, arg2};
-    NotifySwitchStatus(trackstate_tid, sd);
+    NotifySwitchStatus(trackstate_tid, sd); // TODO train state courier
     cs->solenoid_off = 0;
     if (cs->courier_waiting != 0){
         rm->ret = (arg1 << 16) | arg2;
@@ -136,7 +136,7 @@ static inline void commandserver_exec_switch(CommandServer * restrict cs, int ar
     }
 }
 
-static inline void commandserver_exec_reverse(int train, int speed, int servertid, int trainstate_stid, TerminalCourier *tc) {
+static inline void commandserver_exec_reverse(int train, int speed, int servertid, int trainstate_tid, TerminalCourier *tc) {
     Putc(servertid, 1, 0);
     Putc(servertid, 1, train);
     tc_send(tc, TERMINAL_FLAGS_SET, STATUS_FLAG_REVERSING, 0);
@@ -458,8 +458,7 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
         }
         case COMMAND_SENSOR_REQUEST:
         {
-            // individual sensor query TODO: does it make sense to do the full thing actually? since that uses less bandwidth
-            Putc(servertid, 1, 193 + cm.command.arg1);
+            Putc(servertid, 1, cm.command.arg1);
             break;
         }
         case COMMAND_NOTIFY_COURIER:
