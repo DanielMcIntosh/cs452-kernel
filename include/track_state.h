@@ -71,7 +71,10 @@ typedef struct paramdata{
 typedef struct routeresult{
     MessageType type;
     Route route;
+    int distance;
 } RouteResult;
+
+#define ROUTE_RESULT_INIT {MESSAGE_ROUTE, ROUTE_INIT, 0}
 
 typedef struct shortmessage{
     const int speed;
@@ -100,7 +103,7 @@ int NotifyParam(int trackstatetid, ParamData data);
 
 int GetSwitchState(int trackstatetid, int sw);
 int GetActiveTrain(int trackstatetid, int train);
-int GetRoute(int trackstatetid, RouteRequest req);
+int GetRoute(int trackstatetid, RouteRequest req, Route *res);
 int GetShort(int trackstatetid, int distance, ShortMessage *sm);
 
 #endif

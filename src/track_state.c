@@ -167,11 +167,13 @@ int GetSwitchState(int trackstatetid, int sw) {
     return sendTrackState(trackstatetid, &msg);
 }
 
-int GetRoute(int trackstatetid, RouteRequest req) {
-    RouteResult rom = {.type = MESSAGE_ROUTE, .route = ROUTE_INIT}; // TODO
+int GetRoute(int trackstatetid, RouteRequest req, Route *res) {
+    RouteResult rom = ROUTE_RESULT_INIT;
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = ROUTE, {.route_request = req}};
     int r = Send(trackstatetid, &msg, sizeof(msg), &rom, sizeof(rom));
-    return (r >= 0 ? 0 : -1);
+    if (r < 0) return -1;
+    *res = rom.route;
+    return rom.distance;
 }
 
 int GetShort(int trackstatetid, int distance, ShortMessage *sm) {
@@ -195,7 +197,7 @@ void task_track_state() {
 
     TrackStateMessage tm;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
-    RouteResult route_res = {TRUE, .route = ROUTE_INIT};
+    RouteResult route_res = ROUTE_RESULT_INIT;
     int tid;
 
     int short_speed[NUM_SHORTS] = 
@@ -249,6 +251,7 @@ void task_track_state() {
 
             if (distance >= 0) {
                 route_res.route = r;
+                route_res.distance = distance;
             } else {
                 PANIC("failed to find path between %d and %d", next, end);
                 for (int i = 0; i < MAX_ROUTE_COMMAND; i++) {

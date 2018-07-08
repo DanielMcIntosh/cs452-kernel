@@ -47,13 +47,6 @@ typedef struct navigaterequest{
     const int train;
 } __attribute__((packed)) NavigateRequest;
 
-typedef struct navigateresult{
-    int end_sensor;
-    int time_after_end_sensor;
-    int speed;
-    SwitchState switches[NUM_SWITCHES+1];
-} __attribute__((packed)) NavigateResult;
-
 typedef enum trnstrequest{
     TRAIN_SPEED, // TODO other requests
     ACTIVE_TRAIN,
@@ -79,6 +72,6 @@ int NotifyReservation(int trainstatetid, int data);
 
 int GetTrainSpeed(int trainstatetid, int train);
 int GetActiveTrain(int trainstatetid, int train);
-int NavigateTo(int trainstatetid, NavigateRequest nav_req, NavigateResult *res);
+int NavigateTo(int trainstatetid, NavigateRequest nav_req);
 
 #endif //_TRAIN_STATE_H_

@@ -7,14 +7,26 @@
 #include <debug.h>
 #include <terminal.h>
 #include <track.h>
+#include <command.h>
 
 #define TRAIN(ts, tr) (&((ts)->active_trains[(ts)->active_train_map[(tr)]]))
+typedef struct active_route{
+    Route route;
+    int train;
+    int remaining_distance;
+    int next_step_distance;
+    int stopped;
+} ActiveRoute;
+
+#define ACTIVE_ROUTE_INIT {ROUTE_INIT, 0, 0, 0, 0}
 
 typedef struct train_state{
     int total_trains;
     int active_train_map[NUM_TRAINS];
     Train active_trains[MAX_CONCURRENT_TRAINS];
     Reservation reservations;
+    // at the moment: 1 active route, but there can be 1 per train later
+    ActiveRoute active_routes[MAX_CONCURRENT_TRAINS];
 } TrainState;
 
 typedef struct tsmessage{
@@ -71,10 +83,11 @@ int GetActiveTrain(int trainstatetid, int train){
     return sendTrainState(trainstatetid, &msg);
 }
 
-int NavigateTo(int trainstatetid, NavigateRequest nav_req, NavigateResult *res) {
+int NavigateTo(int trainstatetid, NavigateRequest nav_req) {
     TrainStateMessage msg = {.type = MESSAGE_TRAIN_STATE, .request = NAVIGATE, {.nav_req = nav_req}};
-    int r = Send(trainstatetid, &msg, sizeof(msg), res, sizeof(*res));
-    return (r >= 0 ? 0 : -1);
+    ReplyMessage rm;
+    int r = Send(trainstatetid, &msg, sizeof(msg), &rm, sizeof(rm));
+    return (r >= 0 ? rm.ret : r);
 }
 
 void init_train_state(TrainState *ts) {
@@ -113,17 +126,59 @@ static inline int get_active_train_from_sensor(TrainState *ts, const int sensor,
     *distance = min_dist;
     return train;
 }
+static track_node* next_sensor_on_route(const Route * restrict route, const track_node *last_sensor, int * restrict distance) {
+    // basic plan for this: linked list search: follow state given by TrackState
+    // Stop when another sensor is found
+
+    track_node *n = last_sensor->edge[DIR_AHEAD].dest;
+    *distance = last_sensor->edge[DIR_AHEAD].dist;
+    track_edge *e;
+    int idx = 0;
+    while (n != NULL && n->type != NODE_SENSOR) {
+        switch (n->type) {
+        case (NODE_BRANCH):
+        {
+            RouteCommand rc = route->rcs[idx++];
+            e = &n->edge[STATE_TO_DIR(rc.a == ACTION_STRAIGHT ? SWITCH_STRAIGHT : SWITCH_CURVED)];;
+            *distance += e->dist;
+            n = e->dest;
+            break;
+        }
+        case (NODE_ENTER):
+        case (NODE_MERGE):
+        {
+             // TODO proper next sensor predicting w/ reversing
+            *distance += n->edge[DIR_AHEAD].dist;
+            n = n->edge[DIR_AHEAD].dest;
+            break;
+        }
+        case (NODE_EXIT):
+        {
+            return NULL;
+        }
+        default:
+        {
+            PANIC("in: predict_next_sensor - INVALID TRACK NODE TYPE: %d", n->type);
+        }
+        }
+    }
+    ASSERT(n == NULL || n->type == NODE_SENSOR, "While Loop broken early");
+
+    return n;
+}
+
+static ts_exec_step(Route *r, int cmdtid) {
+
+}
 
 void task_train_state(int trackstate_tid) {
     RegisterAs(NAME_TRAIN_STATE);
-    const int puttid = WhoIs(NAME_TERMINAL);
+    const int puttid = WhoIs(NAME_TERMINAL), cmdtid = WhoIs(NAME_COMMANDSERVER);
 
     TrainState ts;
-    init_train_state(&ts);
 
     TrainStateMessage tm;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
-    NavigateResult nav_res = {0, 0, 0, {}};
     int tid;
 
     int stopping_distance[NUM_SPEEDS] =
@@ -172,7 +227,7 @@ void task_train_state(int trackstate_tid) {
             }
 
             RouteRequest req = {
-                .reservations = ts.reservations,
+                .reservations = ts.reservations, // TODO let a train run over its own reservations
                 .dir = train->direction,
                 .next = train->next_sensor,
                 .prev = train->last_sensor,
@@ -180,22 +235,13 @@ void task_train_state(int trackstate_tid) {
                 .min_dist = min_dist,
                 .rev_penalty = rev_penalty
             };
-            RouteResult route_res = {MESSAGE_ROUTE, ROUTE_INIT}; // TODO tomorrow
-            GetRoute(trackstate_tid, req);
-/*
-            for (int i = 1; i <= NUM_SWITCHES; i++) {
-                if (route_res.switches[i].set_state) {
-                    nav_res.switches[i] = route_res.switches[i].state; // pick up differences and unnknowns
-                } else {
-                    nav_res.switches[i] = SWITCH_UNKNOWN;
-                }
-            }
-            nav_res.end_sensor = route_res.end_sensor;
-            nav_res.time_after_end_sensor = route_res.dist_after_end_sensor * VELOCITY_PRECISION / train->velocity[train->speed];
-            nav_res.speed = (route_res.dir == train->direction) ? CURRENT_SPEED : -1 * train->speed;
-            */
-
-            Reply(tid, &nav_res, sizeof(nav_res));
+            Route route = ROUTE_INIT; // TODO tomorrow
+            int distance = GetRoute(trackstate_tid, req, &route);
+            rm.ret = distance;
+            Reply(tid, &rm, sizeof(rm));
+            // do more things 
+            ActiveRoute ar = ACTIVE_ROUTE_INIT;
+            ts.active_routes[ts.active_train_map[tr]] = ar;
             break;
         }
         case (NOTIFY_SENSOR_EVENT):
@@ -212,6 +258,7 @@ void task_train_state(int trackstate_tid) {
             ASSERT(tr >= 0, "Could not find which train hit sensor");
 
             Train *train = &(ts.active_trains[tr]);
+            ActiveRoute *ar = &(ts.active_routes[tr]);
 
             //we haven't reset our calculations && we actually hit the sensor we expected to (and not the one after?)
             if (train->last_sensor >= 0) {
@@ -229,6 +276,20 @@ void task_train_state(int trackstate_tid) {
             SendTerminalRequest(puttid, TERMINAL_VELOCITY_DEBUG, train->velocity[train->speed], distance);
             train->last_sensor = sensor;
             train->last_sensor_time = event_time;
+
+            // Perform any actions we need to do:
+            if (ar->remaining_distance <= stopping_distance[train->speed] && !ar->stopped) {
+                Command stop = {COMMAND_TR, 0, .arg2 = tr}; 
+                SendCommand(cmdtid, stop);
+                ar->stopped = 1;
+            }
+            
+            ar->remaining_distance -= distance;
+            while (ar->next_step_distance <= distance) {
+
+
+            }
+            
             break;
         }
         case (NOTIFY_TRAIN_SPEED):

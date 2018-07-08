@@ -145,19 +145,6 @@ static inline void commandserver_exec_reverse(int train, int speed, int serverti
     NotifyTrainSpeed(trainstate_tid, td); // TODO train state courier
 }
 
-//cannot be used from within the commandserver task
-static inline void setup_track_state(int cmdtid, NavigateResult *nav_res) {
-    for (int i = 1; i <= NUM_SWITCHES; i++) {
-        if (nav_res->switches[i] != SWITCH_UNKNOWN){
-            char sw_state = STATE_TO_CHAR(nav_res->switches[i]);
-            int sw_num = SWUNCLAMP(i);
-            Command cmd = {COMMAND_SW, sw_state, {.arg2 = sw_num}};
-            SendCommand(cmdtid, cmd);
-        }
-    }
-
-}
-
 int cs_notify_terminal_buffer(int cmdtid, TerminalReq *treq) {
     ASSERT(treq != NULL, "null TerminalRequest output");
     Command c = {COMMAND_NOTIFY_TERMINAL_COURIER, 0, {0}};
@@ -244,26 +231,12 @@ void task_calibrate(int __attribute__((unused)) train, int __attribute__((unused
     Destroy();
 }
 
-void stop_wrapper(int train, int wait, bool __attribute__((unused)) success) {
-    int cmdtid = WhoIs(NAME_COMMANDSERVER);
-    int terminaltid = WhoIs(NAME_TERMINAL);
-
-    if (success) {
-        Delay(wait);
-        Command stop_cmd = {COMMAND_TR, 0, {.arg2 = train}};
-        SendCommand(cmdtid, stop_cmd);
-    }
-
-    SendTerminalRequest(terminaltid, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING, 0);
-}
-
 void task_commandserver(int trackstate_tid, int trainstate_tid){
     CommandServer cs = {0, 0, 0, -1, 0};
     RegisterAs(NAME_COMMANDSERVER);
     int servertid = WhoIs(NAME_UART1_SEND), tid;
     CommandMessage cm;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
-    NavigateResult nav_res = {0, 0, 0, {}};
     char switchQ_buf[SWITCHQ_BUF_SIZE];
     circlebuffer_t cb_switches;
     cb_init(&cb_switches, switchQ_buf, SWITCHQ_BUF_SIZE);
@@ -357,8 +330,8 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
             int train = cm.command.smallarg2;
             const TrackPosition pos = {.object = SENSOR_TO_NODE(sensor), .distance_past = distance_past};
             const NavigateRequest rq = {.position = pos, .train = train};
-            int err = NavigateTo(trainstate_tid, rq, &nav_res);
-            ASSERT(err==0, "FAILED TO GET ROUTE");
+            int err = NavigateTo(trainstate_tid, rq);
+            ASSERT(err>=0, "FAILED TO GET ROUTE");
             break;
         }
         case COMMAND_MOVE:
