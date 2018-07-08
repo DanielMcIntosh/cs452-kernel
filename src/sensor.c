@@ -92,7 +92,7 @@ void task_sensor_server(int trackstatetid){
     CreateWith2Args(PRIORITY_NOTIFIER, &task_terminal_courier, MyTid(), (int) &ss_notify_terminal_buffer);
 
     int mytid = MyTid(), tid;
-    int timeout_on = 0;
+    //int timeout_on = 0;
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_read_notifier, mytid);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_timeout_notifier, mytid);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_courier, mytid);
@@ -121,7 +121,7 @@ void task_sensor_server(int trackstatetid){
 
             if (!ss.query_complete){
                 tc_send(&tc, TERMINAL_FLAGS_SET, STATUS_FLAG_SENSOR_TIMEOUT, 0);
-                timeout_on = 1;
+                //timeout_on = 1;
                 if (ss.courier_tid != 0){
                     cm.c.arg1 = 0x85;
                     Reply(ss.courier_tid, &cm, sizeof(cm));
