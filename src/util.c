@@ -9,10 +9,10 @@ void * memcpy(void * dest, const void* src, unsigned int sz){
     register int n = sz >> 2;
     switch (sz & 0x3) {
             do {
-                *dp++ = *sp++;
-    case 3:     *dp++ = *sp++;
-    case 2:     *dp++ = *sp++;
-    case 1:     *dp++ = *sp++;
+                {*dp++ = *sp++;  __attribute__ ((fallthrough));}
+    case 3:     {*dp++ = *sp++;  __attribute__ ((fallthrough));}
+    case 2:     {*dp++ = *sp++;  __attribute__ ((fallthrough));}
+    case 1:     {*dp++ = *sp++;  __attribute__ ((fallthrough));}
     case 0:     ;
             } while (n-- > 0);
     }

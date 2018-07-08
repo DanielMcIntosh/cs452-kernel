@@ -440,7 +440,7 @@ static inline int parse_command(Command * restrict cmd, circlebuffer_t * restric
 void task_terminal_command_parser(int terminaltid){
     int rcv_tid = WhoIs(NAME_UART2_RCV);
     int command_tid = WhoIs(NAME_COMMANDSERVER);
-    int err = 0; char c;
+    char c;
 
     char cb_input_buf[CB_INPUT_BUF_SIZE];
     circlebuffer_t cb_input;
@@ -451,7 +451,7 @@ void task_terminal_command_parser(int terminaltid){
     FOREVER {
         c = Getc(rcv_tid, 2);
         if (c == '\15'){
-            err = parse_command(&t.cmd, &t.input);
+            parse_command(&t.cmd, &t.input);
             cb_flush(&t.input);
             SendTerminalRequest(terminaltid, TERMINAL_NEWLINE, 0, 0);
             if (t.cmd.type != INVALID_COMMAND) {

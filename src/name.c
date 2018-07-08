@@ -56,6 +56,7 @@ void task_nameserver(){
                 break;
             case MESSAGE_NAME_LOOKUP:
                 ht_rev_lookup(&ns.ht, msg.tid, msg.name);
+                break;
             default:
                 LOGF("NameServer received invalid argument %d\r\n ", msg.id);
                 msg.tid = ERR_INVALID_ARGUMENT;

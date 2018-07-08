@@ -17,7 +17,7 @@ $(shell mkdir -p $(BINDIR) >/dev/null)
 XCC     = arm-none-eabi-gcc 
 AS	= arm-none-eabi-as
 LD      = arm-none-eabi-ld
-CFLAGS  = $(DEPFLAGS) -c -std=gnu11 -fPIC -Wall -Wextra -I. -I $(INCLUDEDIR) -mcpu=arm920t -msoft-float -O3
+CFLAGS  = $(DEPFLAGS) -c -std=c11 -fPIC -Wall -Wextra -I. -I $(INCLUDEDIR) -mcpu=arm920t -msoft-float -O3
 # -g: include hooks for gdb
 # -c: only compile
 # -mcpu=arm920t: generate code for the 920t architecture
@@ -50,7 +50,7 @@ $(BINDIR)/%.s: $(SRCDIR)/%.c $(DEPDIR)/%.d $(INCLUDEDIR)/%.h
 $(BINDIR)/%.o: $(ASMDIR)/%.s
 	$(AS) $(ASFLAGS) -o $@ $<
 
-$(BINDIR)/%.o: $(SRCDIR)/%.s
+$(BINDIR)/%.o: $(BINDIR)/%.s
 	$(AS) $(ASFLAGS) -o $@ $<
 
 $(BINDIR)/kernel.elf: $(OBJFILES) $(HANDASM) $(ASMFILES)
@@ -63,7 +63,7 @@ $(DOCSDIR)/%.pdf: $(DOCSDIR)/%.tex
 	pdflatex -output-directory $(DOCSDIR) $<
 
 clean:
-	-rm -f $(BINDIR)/* $(DEPDIR)/* $(DOCSDIR)/*.aux $(DOCSDIR)/*.log $(DOCSDIR)/*.out
+	-rm -f $(filter-out $(BINDIR)/track_data.o $(BINDIR)/track_data.s,$(wildcard $(BINDIR)/*)) $(DEPDIR)/* $(DOCSDIR)/*.aux $(DOCSDIR)/*.log $(DOCSDIR)/*.out
 cleand:
 	-rm -f $(DOCSDIR)/*.pdf $(DOCSDIR)/*.aux $(DOCSDIR)/*.log $(DOCSDIR)/*.out
 
