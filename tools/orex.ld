@@ -20,6 +20,7 @@ bss : /* Uninitialized data. */
 {
 _BssStart = . ;
 *(.bss)
+*(COMMON)
 _BssEnd = . ;
 } >ram
 

@@ -17,6 +17,7 @@
 #include <command.h>
 #include <track_state.h>
 #include <train_state.h>
+#include <track_data.h>
 
 extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
@@ -102,20 +103,25 @@ void fut(){
     // get any important values here
      // get track:
      *((int *) 0x8001004c) &= ~(7); // reading the current track off the MAC address (which apparently works? - thnx jennifer)
-     const char track = (*((unsigned char *) 0x80010055) == 0xc5) ? 'A' : 'B';
+    if (*((unsigned char *) 0x80010055) == 0xc5) {
+        init_tracka(track);
+        StoreValue(VALUE_TRACK_NAME, 'A');
+    } else {
+        init_trackb(track);
+        StoreValue(VALUE_TRACK_NAME, 'B');
+    }
 
     StoreValue(VALUE_IDLE, 0); // init idle value
     StoreValue(VALUE_STACK_AVG, 0); // init avg task stack size
     StoreValue(VALUE_STACK_MAX, 0); // init max task stack size
-    StoreValue(VALUE_TRACK_NAME, track);
     Create(PRIORITY_WAREHOUSE, &task_nameserver);
     Create(PRIORITY_WAREHOUSE, &task_clockserver);
     init_uart_servers();
     Create(PRIORITY_IDLE, &task_idle);
-    int trackstate_tid = CreateWithArgument(PRIORITY_HIGH+1, &task_track_state, CHAR_TO_TRACK(track));
-    int trainstate_tid = CreateWithArgument(PRIORITY_HIGH+1, &task_train_state, trackstate_tid);
-    int cmdtid = CreateWith2Args(PRIORITY_HIGH, &task_commandserver, trackstate_tid, trainstate_tid);
-    int term_tid = CreateWithArgument(PRIORITY_HIGH, &task_terminal, trackstate_tid);
+    int trackstate_tid  =   Create(             PRIORITY_HIGH+1,    &task_track_state);
+    int trainstate_tid  =   CreateWithArgument( PRIORITY_HIGH+1,    &task_train_state,      trackstate_tid);
+    int cmdtid          =   CreateWith2Args(    PRIORITY_HIGH,      &task_commandserver,    trackstate_tid, trainstate_tid);
+    int term_tid        =   CreateWithArgument( PRIORITY_HIGH,      &task_terminal,         trackstate_tid);
     CreateWith2Args(PRIORITY_NOTIFIER, &task_switch_courier, cmdtid, term_tid); // This is here because it must be created after both the command server and the terminal server, but with a higher priority compared to both.
 }
 

@@ -17,10 +17,8 @@
 #include <circlebuffer.h>
 
 typedef struct track{
-    int track_number;
     SwitchState switches[NUM_SWITCHES+1];
     Sensor sensors[NUM_SENSORS];
-    track_node track[TRACK_MAX];
 } TrackState;
 
 typedef struct visited {
@@ -73,8 +71,7 @@ static void q_add(BFSNode** freeQ, BFSNode** freeQTail, BFSNode *node){
     *freeQTail = node;
 }
 
-void init_track_state(TrackState *ts, int track) {
-    ts->track_number = track;
+void init_track_state(TrackState *ts) {
     Sensor init_sensor = {SENSOR_OFF};
 
    for (int i = 0; i < NUM_SENSORS; i++) {
@@ -83,10 +80,6 @@ void init_track_state(TrackState *ts, int track) {
     for (int i = 0; i < NUM_SWITCHES; i++) {
         ts->switches[i] = SWITCH_STRAIGHT;
     }
-    if (track == TRACK_A)
-        init_tracka(ts->track);
-    else
-        init_trackb(ts->track);
 }
 
 static track_node* predict_next_sensor(const SwitchState * restrict ts, const track_node *last_sensor, SwitchState * restrict path, int * restrict distance) {
@@ -302,12 +295,12 @@ int GetShort(int trackstatetid, int distance, ShortMessage *sm) {
     return (r >= 0 ? 0 : -1);
 }
 
-void task_track_state(int track) {
+void task_track_state() {
     RegisterAs(NAME_TRACK_STATE);
     const int train_evt_courier_tid = Create(PRIORITY_MID, &task_train_event_courier);
 
     TrackState ts;
-    init_track_state(&ts, track);
+    init_track_state(&ts);
 
     circlebuffer_t cb_terminal;
     char cb_terminal_buf[TRACK_STATE_TERMINAL_BUFFER_SIZE];
@@ -361,10 +354,10 @@ void task_track_state(int track) {
 
             if (next < 0) {
                 int __attribute__((unused)) distance;
-                next = predict_next_sensor(ts.switches, &ts.track[prev], NULL, &distance)->num;
+                next = predict_next_sensor(ts.switches, &track[prev], NULL, &distance)->num;
             }
 
-            const track_node *d = &ts.track[end], *n = &ts.track[next];
+            const track_node *d = &track[end], *n = &track[next];
 
             Route r = ROUTE_INIT;
             int distance = find_path_between_nodes(&reservations, min_dist, rev_penalty, n, d, &r);
@@ -439,3 +432,4 @@ void task_track_state(int track) {
         }
     }
 }
+

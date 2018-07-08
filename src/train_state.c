@@ -100,7 +100,7 @@ static inline int get_active_train_from_sensor(TrainState *ts, const int sensor)
             int next_sensor = ts->active_trains[cur].next_sensor;
             /*
             for (int i = 0; unlikely(i < skipped); ++i) {
-                next_sensor = predict_next_sensor(ts->switches, &(ts->track[next_sensor]), NULL, &distance)->num;
+                next_sensor = predict_next_sensor(ts->switches, &(track[next_sensor]), NULL, &distance)->num;
             }
             //*/
             if (next_sensor == sensor) {
@@ -223,7 +223,7 @@ void task_train_state(int trackstate_tid) {
 
             /*
             int distance;
-            const track_node *c = &(ts.track[SENSOR_TO_NODE(sensor)]); // last known train position
+            const track_node *c = &(track[SENSOR_TO_NODE(sensor)]); // last known train position
             const track_node *n = predict_next_sensor(ts.switches, c, NULL, &distance); // next predicted train position
 
             train->next_sensor_predict_time = event_time + distance * VELOCITY_PRECISION / train->velocity[train->speed];
@@ -293,7 +293,7 @@ void task_train_state(int trackstate_tid) {
         }
         default:
         {
-            PANIC("Track State Server: Unhandled request type: %d", tm.request);
+            PANIC("Train State Server: Unhandled request type: %d", tm.request);
         }
         }
     }
