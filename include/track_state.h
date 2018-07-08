@@ -1,13 +1,13 @@
 #include <kernel.h>
 #include <switch.h>
 #include <util.h>
+#include <train_state.h>
+#include <train.h>
 
 #ifndef TRACK_STATE_H
 #define TRACK_STATE_H
 
-#define NUM_SPEEDS 15
-
-#define NAME_TRACK_STATE "state"
+#define NAME_TRACK_STATE "trk_st"
 #define TRACK_A 1
 #define TRACK_B 0
 
@@ -15,9 +15,6 @@
 #define PARAM_DELAY 'D'
 
 #define CHAR_TO_TRACK(c) ((c) == 'A' ? TRACK_A : TRACK_B)
-#define VELOCITY_PRECISION 10000
-#define CAL_ITERATIONS 8
-#define BASE_STOP_DIST_ADJUSTMENT 70
 
 //TODO move these:
 #define SENSOR_TO_NODE(s) (s)
@@ -43,11 +40,6 @@
 
 #define TRACK_STATE_TERMINAL_BUFFER_SIZE 300
 
-typedef struct position {
-    const int object : 16;
-    const int distance_past : 16;
-} TrackPosition;
-
 typedef struct sensordata {
     const unsigned int radix: 4;
     const unsigned int data: 16;
@@ -55,25 +47,19 @@ typedef struct sensordata {
 } __attribute__((packed)) SensorData;
 
 typedef struct switchdata{
-    const unsigned int state: 4;
-    const unsigned int sw: 32;
+    const SwitchState state;
+    const unsigned int sw;
 } __attribute__((packed)) SwitchData;
 
-typedef struct traindata {
-    const unsigned int speed;
-    const unsigned int train;
-} __attribute__((packed)) TrainData;
-
 typedef struct routerequest{
-    const TrackPosition position;
-    const int train;
+    const Reservation reservations;
+    const Direction dir : 8;
+    const unsigned int next : 8;
+    const unsigned int prev : 8;
+    const unsigned int end : 8;
+    const int min_dist : 16;
+    const int rev_penalty : 16;
 } __attribute__((packed)) RouteRequest; // TODO move these structs into the c file.
-
-typedef struct caldata{
-    const int iteration : 16;
-    const int speed : 16;
-    const bool triggered;
-} __attribute__((packed)) CalData;
 
 typedef struct paramdata{
     const int key: 16;
@@ -81,40 +67,28 @@ typedef struct paramdata{
     const int value;
 } __attribute__((packed)) ParamData;
 
-typedef struct newtrain{
-    const int train;
-    const int sensor;
-} __attribute__((packed)) NewTrain; // TODO move these structs into the c file.
-
 #define CURRENT_SPEED -50
-typedef struct routemessage{ // TODO MessageType
+typedef struct route_result{ // TODO MessageType
+    Direction dir;
     int end_sensor;
-    int time_after_end_sensor;
-    int speed;
+    int dist_after_end_sensor;
     Switch switches[NUM_SWITCHES+1];
-} RouteMessage;
+} RouteResult;
 
 typedef struct shortmessage{
     const int speed;
     const int delay;
 } ShortMessage;
 
-typedef enum tsrequest{
-    TRAIN_SPEED, // TODO other requests
+typedef enum trkstrequest{
     SWITCH,
     SENSOR,
-    ACTIVE_TRAIN,
     ROUTE,
     SHORT,
 
     NOTIFY_SENSOR_DATA,
-    NOTIFY_TRAIN_SPEED,
-    NOTIFY_TRAIN_DIRECTION,
     NOTIFY_SWITCH,
-    NOTIFY_CAL,
     NOTIFY_PARAM,
-    NOTIFY_NEW_TRAIN,
-    NOTIFY_RESERVATION,
     NOTIFY_TERMINAL_COURIER,
 
     NUM_TRACK_STATE_REQUESTS
@@ -124,16 +98,10 @@ void task_track_state();
 
 int NotifySensorData(int trackstatetid, SensorData data);
 int NotifySwitchStatus(int trackstatetid, SwitchData data);
-int NotifyTrainSpeed(int trackstatetid, TrainData data);
-int NotifyCalibrationResult(int trackstatetid, CalData data);
 int NotifyParam(int trackstatetid, ParamData data);
-int NotifyNewTrain(int trackstatetid, NewTrain data);
-int NotifyReservation(int trackstatetid, int data);
 
-int GetTrainSpeed(int trackstatetid, int train);
 int GetSwitchState(int trackstatetid, int sw);
-int GetActiveTrain(int trackstatetid, int train);
-int GetRoute(int trackstatetid, RouteRequest req, RouteMessage *rom);
+int GetRoute(int trackstatetid, RouteRequest req, RouteResult *route_res);
 int GetShort(int trackstatetid, int distance, ShortMessage *sm);
 
 #endif

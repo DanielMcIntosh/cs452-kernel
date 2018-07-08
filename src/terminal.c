@@ -497,7 +497,7 @@ static inline void print_status(circlebuffer_t * restrict cb, int status) {
     ASSERT(cb_write_string(cb, str) == 0, "TERMINAL OUTPUT CB FULL");
 }
 
-void task_terminal() {
+void task_terminal(int trackstate_tid) {
     const int trackA_switch_positions[][2] = {
         {-1, -1},
         {14, 10},
@@ -532,7 +532,7 @@ void task_terminal() {
     CreateWithArgument(PRIORITY_HIGH, &task_terminal_command_parser, mytid);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_uart2_courier, mytid);
     CreateWithArgument(PRIORITY_LOW, &task_clockprinter, mytid);
-    Create(PRIORITY_HIGH, &task_sensor_server);
+    CreateWithArgument(PRIORITY_HIGH, &task_sensor_server, trackstate_tid);
     CreateWithArgument(PRIORITY_LOW, &task_stack_metric_printer, mytid);
 
     char cb_terminal_buf[CB_TERMINAL_BUF_SIZE];

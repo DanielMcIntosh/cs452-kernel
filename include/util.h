@@ -49,6 +49,11 @@ void *memset(void *s, int c, unsigned int n);
 
 #define likely(x)       __builtin_expect((x),1)
 #define unlikely(x)     __builtin_expect((x),0)
+
+#define array_dim(x) (sizeof(x) / sizeof(x[0]))
+#define sizeof_field(type, field) (sizeof(((type *)0)->field))
+#define field_dim(type, member) (sizeof_field(type, member) / sizeof_field(type, member[0]))
+
 #define FOREVER for(;;)
 
 #endif

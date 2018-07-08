@@ -1,5 +1,9 @@
+#include "util.h"
+
 #ifndef SWITCH_H
 #define SWITCH_H
+
+#define NUM_SWITCHES 22
 
 #define STATE_TO_CHAR(s) ((s) == SWITCH_UNKNOWN ? '?' : ((s) == SWITCH_STRAIGHT ? 'S' : 'C'))
 #define INV_STATE_TO_CHAR(s) ((s) == SWITCH_UNKNOWN ? '?' : ((s) == SWITCH_STRAIGHT ? 'C' : 'S'))
@@ -18,6 +22,7 @@ typedef enum switchstate{
 } SwitchState;
 
 typedef struct swtch{
+    bool set_state : 16;
     SwitchState state;
 } Switch;
 

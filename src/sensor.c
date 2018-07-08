@@ -66,7 +66,7 @@ void task_sensor_courier(int servertid){
     }
 }
 
-void task_sensor_server(){
+void task_sensor_server(int trackstatetid){
     // concept: 2 notifiers - a timeout notifier, and a read notifier
     // server waits for bytes to be sent from com1; if it times out, we send it again
     SensorServer ss = {{0}, 0, 0, 0, 0, 1};
@@ -74,7 +74,7 @@ void task_sensor_server(){
     ReplyMessage rm = {MESSAGE_REPLY, 0};
     CourierMessage cm = {MESSAGE_SENSOR_COURIER, {COMMAND_SENSOR_REQUEST, 0, {.arg2 = 0}}};
 
-    int mytid = MyTid(), trackstatetid = WhoIs(NAME_TRACK_STATE), tid;
+    int mytid = MyTid(), tid;
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_read_notifier, mytid);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_timeout_notifier, mytid);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_courier, mytid);

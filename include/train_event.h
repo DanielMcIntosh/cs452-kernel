@@ -14,9 +14,9 @@ typedef struct {
 } Runnable;
 
 void task_train_event_courier();
-void TrainEvent_Notify(int train_evt_courrier_tid, int sensor, int active_train);
+void TrainEvent_Notify(int train_evt_courrier_tid, int sensor);
 
 //if timeout == 0, never timeout
-void RunWhen(int sensor, int active_train, Runnable *to_run, Priority priority);
+void RunWhen(int sensor, Runnable *to_run, Priority priority);
 
 #endif //_TRAIN_EVENT_H_

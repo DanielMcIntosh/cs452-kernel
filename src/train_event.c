@@ -17,7 +17,6 @@ typedef enum te_request{
 typedef struct te_message{
     RequestType rq;
     int sensor;
-    int active_train;
 } TrainEventMessage;
 
 void task_train_event_courier() {
@@ -26,7 +25,7 @@ void task_train_event_courier() {
     TrainEventMessage tm;
     int tid;
 
-    int waiting_tid[NUM_SENSORS][MAX_CONCURRENT_TRAINS] = {{0}};
+    int waiting_tid[NUM_SENSORS] = {0};
 
     FOREVER{
         Receive(&tid, &tm, sizeof(tm));
@@ -36,35 +35,32 @@ void task_train_event_courier() {
             {
                 //set waiting task for sensor
                 //ASSERT(waiting_tid[tm.sensor] == 0, "task already queued");
-                if (waiting_tid[tm.sensor][tm.active_train] != 0){
+                if (waiting_tid[tm.sensor] != 0){
                     PANIC("\r\ntask not currently queued: %d --> %d\r\n", tm.sensor, waiting_tid[tm.sensor]);
                 }
                 ASSERT(0 <= tm.sensor && tm.sensor < NUM_SENSORS, "invalid sensor to wait on");
-                ASSERT(0 <= tm.active_train && tm.active_train < MAX_CONCURRENT_TRAINS, "invalid train to wait on");
-                waiting_tid[tm.sensor][tm.active_train] = tid;
+                waiting_tid[tm.sensor] = tid;
                 break;
             }
             case UNQUEUE:
             {
                 //unset waiting task for sensor
                 //ASSERT(waiting_tid[tm.sensor] == tid, "task not queued");
-                if (waiting_tid[tm.sensor][tm.active_train] != tid){
+                if (waiting_tid[tm.sensor] != tid){
                     PANIC("\r\ntask already queued: %d --> %d\r\n", tm.sensor, waiting_tid[tm.sensor]);
                 }
                 ASSERT(0 <= tm.sensor && tm.sensor < NUM_SENSORS, "invalid sensor to wait on");
-                ASSERT(0 <= tm.active_train && tm.active_train < MAX_CONCURRENT_TRAINS, "invalid train to wait on");
-                waiting_tid[tm.sensor][tm.active_train] = 0;
+                waiting_tid[tm.sensor] = 0;
                 break;
             }
             case NOTIFY:
             {
                 ASSERT(0 <= tm.sensor && tm.sensor < NUM_SENSORS, "invalid sensor to notify on");
-                ASSERT(0 <= tm.active_train && tm.active_train < MAX_CONCURRENT_TRAINS, "invalid train to notify on");
-                if (waiting_tid[tm.sensor][tm.active_train] != 0) {
+                if (waiting_tid[tm.sensor] != 0) {
                     //send to the task waiting on sensor
                     MessageType wakeup = MESSAGE_WAKEUP;
-                    Send(waiting_tid[tm.sensor][tm.active_train], &wakeup, sizeof(wakeup), NULL, 0);
-                    waiting_tid[tm.sensor][tm.active_train] = 0;
+                    Send(waiting_tid[tm.sensor], &wakeup, sizeof(wakeup), NULL, 0);
+                    waiting_tid[tm.sensor] = 0;
                 }
                 break;
             }
@@ -72,12 +68,12 @@ void task_train_event_courier() {
     }
 }
 
-void TrainEvent_Notify(int courier_tid, int sensor, int active_train) {
-    TrainEventMessage msg = {NOTIFY, sensor, active_train};
+void TrainEvent_Notify(int courier_tid, int sensor) {
+    TrainEventMessage msg = {NOTIFY, sensor};
     Send(courier_tid, &msg, sizeof(msg), NULL, 0);
 }
 
-void task_runner(int sensor, int active_train) {
+void task_runner(int sensor) {
     int caller_tid;
     Runnable to_run;
     Receive(&caller_tid, &to_run, sizeof(to_run));
@@ -86,7 +82,7 @@ void task_runner(int sensor, int active_train) {
     int train_evt_courier_tid = WhoIs(NAME_TRAIN_EVENT_COURIER);
     
     //queue up to receive alert
-    TrainEventMessage tm = {QUEUE, sensor, active_train};
+    TrainEventMessage tm = {QUEUE, sensor};
     Send(train_evt_courier_tid, &tm, sizeof(tm), NULL, 0);
 
     int tid;
@@ -113,8 +109,8 @@ void task_runner(int sensor, int active_train) {
 
 
 //if timeout == 0, never timeout
-void RunWhen(int sensor, int active_train, Runnable *to_run, Priority priority) {
-    int runner_tid = CreateWith2Args(priority, &task_runner, sensor, active_train);
+void RunWhen(int sensor, Runnable *to_run, Priority priority) {
+    int runner_tid = CreateWithArgument(priority, &task_runner, sensor);
     Send(runner_tid, to_run, sizeof(*to_run), NULL, 0);
 }
 
