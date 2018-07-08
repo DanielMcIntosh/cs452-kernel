@@ -81,7 +81,7 @@ int ht_lookup(Hashtable *ht, char key[static HT_KEY_SIZE]){
         if (hsh >= HT_SIZE){
             hsh = 0;
         }
-        ASSERT (n <= HT_SIZE, "HT LOOKUP FAILED: NOT FOUND");
+        ASSERT (n <= HT_SIZE, "HT LOOKUP FAILED: %s NOT FOUND", key);
     }
     LOGF("Hash: %d |-> Value: %d\r\n", hsh, (*ht)[hsh].value);
     return (*ht)[hsh].value;

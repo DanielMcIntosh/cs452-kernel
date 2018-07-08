@@ -15,9 +15,9 @@
 
 #define IS(x) #x
 #define S(x) IS(x) 
-#define ASSERT(x, y) \
+#define ASSERT(x, y,vargs...) \
 if (unlikely(!(x))) {\
-    PANIC("ASSERT FAILED: " S(x) "\r\nFUNCTION: " S(__func__) "\r\nFILE: "S(__FILE__) "\r\nLINE: " S(__LINE__) "\r\n" S(y) "\r\n")\
+    PANIC("ASSERT FAILED: " S(x) "\r\nFUNCTION: " S(__func__) "\r\nFILE: "S(__FILE__) "\r\nLINE: " S(__LINE__) "\r\n" S(y) "\r\n", ##vargs)\
 }
 
 #if DEBUG

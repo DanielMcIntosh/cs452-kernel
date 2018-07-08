@@ -112,8 +112,8 @@ void fut(){
     Create(PRIORITY_WAREHOUSE, &task_clockserver);
     init_uart_servers();
     Create(PRIORITY_IDLE, &task_idle);
-    int trackstate_tid = CreateWithArgument(PRIORITY_HIGH, &task_track_state, CHAR_TO_TRACK(track));
-    int trainstate_tid = CreateWithArgument(PRIORITY_HIGH, &task_train_state, trackstate_tid);
+    int trackstate_tid = CreateWithArgument(PRIORITY_HIGH+1, &task_track_state, CHAR_TO_TRACK(track));
+    int trainstate_tid = CreateWithArgument(PRIORITY_HIGH+1, &task_train_state, trackstate_tid);
     int cmdtid = CreateWith2Args(PRIORITY_HIGH, &task_commandserver, trackstate_tid, trainstate_tid);
     int term_tid = CreateWithArgument(PRIORITY_HIGH, &task_terminal, trackstate_tid);
     CreateWith2Args(PRIORITY_NOTIFIER, &task_switch_courier, cmdtid, term_tid); // This is here because it must be created after both the command server and the terminal server, but with a higher priority compared to both.
