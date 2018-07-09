@@ -40,8 +40,8 @@ typedef struct timeoutmessage{
     unsigned int ticks;
 } TimeoutMessage;
 
-void task_timeout(int clock_tid);
-void task_clocknotifier(int clk_tid);
+static void task_timeout(int clock_tid);
+static void task_clocknotifier(int clk_tid);
 
 void task_clockserver(){
     LOG("ClockServer init\r\n");
@@ -115,7 +115,7 @@ void task_clockserver(){
     }
 }
 
-void task_clocknotifier(int clk_tid){
+static void task_clocknotifier(int clk_tid){
     ReplyMessage rm = {0, 0};
     LOG("ClockNotifier init\r\n");
     ClockMessage cm;
@@ -176,7 +176,7 @@ void task_timeout_courier(int timeout_srv_tid, int clock_tid) {
     }
 }
 
-void task_timeout(int clock_tid) {
+static void task_timeout(int clock_tid) {
     RegisterAs(NAME_TIMEOUT);
     int mytid = MyTid();
     int rcv_courier = CreateWith2Args(PRIORITY_HIGHER, &task_timeout_courier, mytid, clock_tid);

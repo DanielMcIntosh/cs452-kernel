@@ -6,7 +6,7 @@
 #include <name.h>
 #include <debug.h>
 #include <terminal.h>
-#include <track_data.h>
+#include <track.h>
 
 #define TRAIN(ts, tr) (&((ts)->active_trains[(ts)->active_train_map[(tr)]]))
 
@@ -94,21 +94,23 @@ void init_train_state(TrainState *ts) {
 }
 
 static inline int get_active_train_from_sensor(TrainState *ts, const int sensor) {
-    int distance;
-    for (int skipped = 0; skipped < 4; ++skipped) { // TODO instead of this - build auxiliary sensor array?
-        for (int cur = 0; cur < ts->total_trains; ++cur) {
-            int next_sensor = ts->active_trains[cur].next_sensor;
-            /*
-            for (int i = 0; unlikely(i < skipped); ++i) {
-                next_sensor = predict_next_sensor(ts->switches, &(track[next_sensor]), NULL, &distance)->num;
-            }
-            //*/
-            if (next_sensor == sensor) {
-                return cur;
-            }
+    int min_dist = INT_MAX;
+    int train = 0;
+    const track_node *d = &track[SENSOR_TO_NODE(sensor)];
+    Reservation resrv = {0, 0};
+    for (int i = 0; i < ts->total_trains; ++i) {
+        const track_node *n = &track[ts->active_trains[i].last_sensor];
+
+        Route r = ROUTE_INIT;
+        int distance = find_path_between_nodes(&resrv, 1, 99999, n, d, &r);
+        //TODO notify track_state of any switches we would have to have taken, incase a switch wasn't in the expected state
+        if (distance < min_dist) {
+            min_dist = distance;
+            train = i;
         }
     }
-    return -1;
+    
+    return train;
 }
 
 void task_train_state(int trackstate_tid) {
@@ -277,7 +279,7 @@ void task_train_state(int trackstate_tid) {
             NewTrain data = tm.new_train;
 
             ts.active_train_map[data.train] = ts.total_trains;
-            ts.active_trains[ts.total_trains].next_sensor = data.sensor;
+            ts.active_trains[ts.total_trains].last_sensor = data.sensor;
             ++ts.total_trains;
             break;
         }

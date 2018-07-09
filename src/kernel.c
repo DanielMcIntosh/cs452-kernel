@@ -17,7 +17,7 @@
 #include <command.h>
 #include <track_state.h>
 #include <train_state.h>
-#include <track_data.h>
+#include <track.h>
 
 extern int activate(int task);
 extern void KERNEL_ENTRY_POINT(void);
@@ -101,15 +101,7 @@ void update_stack_size_metric(TD * restrict task, ValueStore * restrict value_st
 void fut(){
     LOG("First User Task: Start\r\n");
     // get any important values here
-     // get track:
-     *((int *) 0x8001004c) &= ~(7); // reading the current track off the MAC address (which apparently works? - thnx jennifer)
-    if (*((unsigned char *) 0x80010055) == 0xc5) {
-        init_tracka(track);
-        StoreValue(VALUE_TRACK_NAME, 'A');
-    } else {
-        init_trackb(track);
-        StoreValue(VALUE_TRACK_NAME, 'B');
-    }
+    init_track();
 
     StoreValue(VALUE_IDLE, 0); // init idle value
     StoreValue(VALUE_STACK_AVG, 0); // init avg task stack size

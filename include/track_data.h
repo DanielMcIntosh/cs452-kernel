@@ -1,4 +1,6 @@
 /* THIS FILE IS GENERATED CODE -- DO NOT EDIT */
+#ifndef _TRACK_DATA_H_
+#define _TRACK_DATA_H_
 
 #include "track_node.h"
 
@@ -8,5 +10,5 @@
 void init_tracka(track_node *track);
 void init_trackb(track_node *track);
 
-extern track_node track[TRACK_MAX];   
+#endif //_TRACK_DATA_H_
 
