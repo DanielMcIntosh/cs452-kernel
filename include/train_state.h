@@ -10,7 +10,7 @@
 #define CAL_ITERATIONS 8
 #define BASE_STOP_DIST_ADJUSTMENT 70
 
-#define TRAIN_STATE_TERMINAL_BUFFER_SIZE 500
+#define TRAIN_STATE_TERMINAL_BUFFER_SIZE 1000
 
 typedef struct position {
     const int object : 16;

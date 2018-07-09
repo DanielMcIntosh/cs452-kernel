@@ -365,6 +365,10 @@ void task_train_state(int trackstate_tid) {
             ar.next_step_distance = distance_to_on_route(&ar, &track[SENSOR_TO_NODE(train->next_sensor)], rc_to_track_node(route.rcs[0])); // TODO
             ar.stopped = 0;
             ts.active_routes[ts.active_train_map[tr]] = ar;
+            for (int i = 0; i < MAX_ROUTE_COMMAND && ar.route.rcs[i].a != ACTION_NONE; i++){
+                tc_send(&tc, TERMINAL_ROUTE_DBG, ar.route.rcs[i].swmr, ar.route.rcs[i].a);
+            }
+            tc_send(&tc, TERMINAL_ROUTE_DBG2, ar.remaining_distance, ar.next_step_distance);
             break;
         }
         case (NOTIFY_SENSOR_EVENT):
@@ -374,6 +378,7 @@ void task_train_state(int trackstate_tid) {
             int event_time = tm.sensor_event.time;
 
             if (unlikely(ts.total_trains <= 0)) {
+                tc_send(&tc, TERMINAL_ROUTE_DBG2, -1, ts.total_trains);
                 continue;
             }
             int distance;
@@ -401,7 +406,10 @@ void task_train_state(int trackstate_tid) {
             train->last_sensor = sensor;
             train->last_sensor_time = event_time;
 
+            tc_send(&tc, TERMINAL_ROUTE_DBG2, ar->remaining_distance, ar->next_step_distance);
+            tc_send(&tc, TERMINAL_ROUTE_DBG2, ar->remaining_distance, ar->next_step_distance);
             if (!ar->stopped) {
+                tc_send(&tc, TERMINAL_ROUTE_DBG2, ar->remaining_distance, ar->next_step_distance);
                 // Perform any actions we need to do:
                 if (ar->remaining_distance <= stopping_distance[train->speed]) {
                     Command stop = {COMMAND_TR, 0, .arg2 = tr}; 
@@ -410,7 +418,7 @@ void task_train_state(int trackstate_tid) {
                 }
                 
                 ar->remaining_distance -= distance;
-                while (ar->next_step_distance <= distance) {
+                while (ar->next_step_distance <= 1000) { // TODO (distance to next sensor)
                     ts_exec_step(ar, cmdtid);
                 }
             }
@@ -457,6 +465,7 @@ void task_train_state(int trackstate_tid) {
             ts.active_train_map[data.train] = ts.total_trains;
             ts.active_trains[ts.total_trains].last_sensor = data.sensor;
             ++ts.total_trains;
+            tc_send(&tc, TERMINAL_ECHO, '0' + ts.total_trains, 0);
             break;
         }
         case (NOTIFY_RESERVATION):
