@@ -135,10 +135,10 @@ static inline void commandserver_exec_switch(CommandServer * restrict cs, int ar
     }
 }
 
-static inline void commandserver_exec_reverse(int train, int speed, int servertid, int trainstate_tid, int terminal_tid, TerminalSndFn tc_send) {
+static inline void commandserver_exec_reverse(int train, int speed, int servertid, int trainstate_tid, TerminalSndFn tc_send) {
     Putc(servertid, 1, 0);
     Putc(servertid, 1, train);
-    tc_send(terminal_tid, TERMINAL_FLAGS_SET, STATUS_FLAG_REVERSING, 0);
+    tc_send(TERMINAL_FLAGS_SET, STATUS_FLAG_REVERSING, 0);
     CreateWith2Args(PRIORITY_NOTIFIER, &task_reverse_train, train, speed);
     TrainData td = {0, train};
     NotifyTrainSpeed(trainstate_tid, td); // TODO train state courier
@@ -236,11 +236,9 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
 
     int terminal_tid = WhoIs(NAME_TERMINAL);
 
+    ASSERT(terminal_tid > 0, "failed to find terminaltid");
+
     //READ: https://gcc.gnu.org/onlinedocs/gcc/Nested-Functions.html
-    auto void body(TerminalSndFn);
-
-    forever_w_term_courier(&tid, &cm, sizeof(cm), terminal_tid, &body);
-
     void body(TerminalSndFn tc_send) {
         if (cm.command.type >= INVALID_COMMAND){
             rm.ret = ERR_INVALID_COMMAND;
@@ -271,7 +269,7 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
         {
             int train = cm.command.arg1;
             int speed = GetTrainSpeed(trainstate_tid, train);
-            commandserver_exec_reverse(train, speed, servertid, trainstate_tid, terminal_tid, tc_send);
+            commandserver_exec_reverse(train, speed, servertid, trainstate_tid, tc_send);
             break;
         }
         case COMMAND_SW:
@@ -310,7 +308,7 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
         }
         case COMMAND_ROUTE:
         {
-            tc_send(terminal_tid, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING, 0);
+            tc_send(TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING, 0);
 
             int sensor = cm.command.arg1;
             int distance_past = cm.command.smallarg1;
@@ -438,4 +436,6 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
         }
         }
     }
+
+    forever_w_term_courier(&tid, &cm, sizeof(cm), terminal_tid, &body);
 }

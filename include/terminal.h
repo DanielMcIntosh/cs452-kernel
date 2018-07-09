@@ -56,8 +56,8 @@ typedef enum terminalrequest {
 
 int SendTerminalRequest(int terminaltid, TerminalRequest rq, int arg1, int arg2);
 
-typedef int (*TerminalSndFn)(int, TerminalRequest, int, int);
-void __attribute__((noreturn)) forever_w_term_courier(int *tid, void *in_msg, int in_msg_size, int terminaltid, void (*body)(TerminalSndFn));
+typedef void (*TerminalSndFn)(TerminalRequest, int, int);
+void __attribute__((noreturn)) forever_w_term_courier(int *tid, void *in_msg, unsigned int in_msg_size, int terminaltid, void (*body)(TerminalSndFn));
 
 void task_terminal();
 #endif
