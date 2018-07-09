@@ -106,6 +106,7 @@ void init_train_state(TrainState *ts) {
 
     for (int i = 0; i < MAX_CONCURRENT_TRAINS; i++) {
         ts->active_trains[i] = init_train;
+        ts->active_routes[i].stopped = 1;
     }
 
     ts->reservations = init_reservation;
@@ -269,7 +270,7 @@ static void ts_exec_step(ActiveRoute * restrict ar, int cmdtid) {
         ar->next_step_distance += distance_to_on_route(ar, cnode, rc_to_track_node(nc));
         ar->idx++;
     } else
-        ar->next_step_distance = 2147483647;
+        ar->next_step_distance = 99999;
 }
 
 static int ts_notify_terminal_buffer(int tstid, TerminalReq *treq) {
@@ -287,12 +288,13 @@ void task_train_state(int trackstate_tid) {
     int cmdtid = WhoIs(NAME_COMMANDSERVER);
 
     circlebuffer_t cb_terminal;
-    char cb_terminal_buf[COMMAND_TERMINAL_BUFFER_SIZE];
+    char cb_terminal_buf[TRAIN_STATE_TERMINAL_BUFFER_SIZE];
     cb_init(&cb_terminal, cb_terminal_buf, TRAIN_STATE_TERMINAL_BUFFER_SIZE);
     TerminalCourier tc = {-1, &cb_terminal};
     CreateWith2Args(PRIORITY_NOTIFIER, &task_terminal_courier, MyTid(), (int) &ts_notify_terminal_buffer);
 
     TrainState ts = TRAIN_STATE_INIT;
+    init_train_state(&ts);
 
     TrainStateMessage tm;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
@@ -343,7 +345,7 @@ void task_train_state(int trackstate_tid) {
                 rev_penalty = 2*stopping_distance[train->speed];
             }
 
-            ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor: %d", train->last_sensor);
+            ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor for train %d: %d", tr, train->last_sensor);
             RouteRequest req = {
                 .reservations = ts.reservations, // TODO let a train run over its own reservations
                 .dir = train->direction,
@@ -364,6 +366,7 @@ void task_train_state(int trackstate_tid) {
             ar.remaining_distance = distance;
             ar.next_step_distance = distance_to_on_route(&ar, &track[SENSOR_TO_NODE(train->next_sensor)], rc_to_track_node(route.rcs[0])); // TODO
             ar.stopped = 0;
+            ASSERT(ts.active_train_map[tr] >= 0 && ts.active_train_map[tr] < MAX_CONCURRENT_TRAINS, "Invalid active train: %d", ts.active_train_map[tr]);
             ts.active_routes[ts.active_train_map[tr]] = ar;
             for (int i = 0; i < MAX_ROUTE_COMMAND && ar.route.rcs[i].a != ACTION_NONE; i++){
                 tc_send(&tc, TERMINAL_ROUTE_DBG, ar.route.rcs[i].swmr, ar.route.rcs[i].a);
@@ -384,18 +387,19 @@ void task_train_state(int trackstate_tid) {
             int distance;
             int tr = get_active_train_from_sensor(&ts, sensor, &distance);
             ASSERT(tr >= 0, "Could not find which train hit sensor");
-            tc_send(&tc, TERMINAL_ECHO, tr, 0);
+            tc_send(&tc, TERMINAL_ROUTE_DBG2, 202, '0'+tr);
 
             Train *train = &(ts.active_trains[tr]);
             ActiveRoute *ar = &(ts.active_routes[tr]);
 
             //we haven't reset our calculations && we actually hit the sensor we expected to (and not the one after?)
             if (train->last_sensor >= 0) {
-                int predicted_time = train->last_sensor_time + distance * VELOCITY_PRECISION / train->velocity[train->speed];
-                int error_time = (predicted_time - event_time);
-                int error_dist = error_time * train->velocity[train->speed] / VELOCITY_PRECISION;
-                tc_send(&tc, TERMINAL_SENSOR_PREDICT, error_time, error_dist);
-
+                if (train->velocity[train->speed] != 0) {
+                    int predicted_time = train->last_sensor_time + distance * VELOCITY_PRECISION / train->velocity[train->speed];
+                    int error_time = (predicted_time - event_time);
+                    int error_dist = error_time * train->velocity[train->speed] / VELOCITY_PRECISION;
+                    tc_send(&tc, TERMINAL_SENSOR_PREDICT, error_time, error_dist);
+                }
                 // Time is in clock-ticks, velocity is in mm/(clock-tick) -> error is in units of mm
                 int dt = event_time - train->last_sensor_time;
                 int new_velocity = distance * VELOCITY_PRECISION / dt;
@@ -405,11 +409,12 @@ void task_train_state(int trackstate_tid) {
             tc_send(&tc, TERMINAL_VELOCITY_DEBUG, train->velocity[train->speed], distance);
             train->last_sensor = sensor;
             train->last_sensor_time = event_time;
+            ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor for train %d: %d", tr, train->last_sensor);
 
             tc_send(&tc, TERMINAL_ROUTE_DBG2, ar->remaining_distance, ar->next_step_distance);
-            tc_send(&tc, TERMINAL_ROUTE_DBG2, ar->remaining_distance, ar->next_step_distance);
+            tc_send(&tc, TERMINAL_ROUTE_DBG2, 203, ts.total_trains);
             if (!ar->stopped) {
-                tc_send(&tc, TERMINAL_ROUTE_DBG2, ar->remaining_distance, ar->next_step_distance);
+                tc_send(&tc, TERMINAL_ROUTE_DBG2, 10, 20);
                 // Perform any actions we need to do:
                 if (ar->remaining_distance <= stopping_distance[train->speed]) {
                     Command stop = {COMMAND_TR, 0, .arg2 = tr}; 
@@ -461,6 +466,7 @@ void task_train_state(int trackstate_tid) {
         {
             Reply(tid, &rm, sizeof(rm));
             NewTrain data = tm.new_train;
+            ASSERT(ts.total_trains >= 0, "Invalid total trains: %d", ts.total_trains);
 
             ts.active_train_map[data.train] = ts.total_trains;
             ts.active_trains[ts.total_trains].last_sensor = data.sensor;
