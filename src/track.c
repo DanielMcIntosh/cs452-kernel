@@ -84,13 +84,16 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
         int distance = entry.value;
         Route route = bn->r;
         int idx = bn->idx;
-        ASSERT(idx < MAX_ROUTE_COMMAND, "Too many route commands in a route");
+        ASSERT(idx < MAX_ROUTE_COMMAND, "Too many route commands in a route from %d to %d (%d, %d)", origin->num, dest->num, k, rev_penalty);
+        //if (idx >= MAX_ROUTE_COMMAND) continue;
         
         const track_node *cn = bn->current_node;
         q_add(&freeQ, &freeQTail, bn);
-        if (unlikely(cn == dest) && distance > (route.reverse ? min_dist : min_dist + rev_penalty)) { // found shortest path > min_dist
+        if (unlikely(cn == dest) && distance > (!route.reverse ? min_dist : (min_dist + rev_penalty))) { // found shortest path > min_dist
             *r = route;
             return distance;
+        } else if (cn == dest) {
+            PANIC("YIKES %d | %d | %d | %d | %d | %d", distance, route.reverse, min_dist, rev_penalty, k, (!route.reverse ? min_dist : min_dist + rev_penalty));
         } else if ((0x1ULL << (TRACK_NODE_TO_INDEX(cn) % 64)) & ((TRACK_NODE_TO_INDEX(cn) < 64) ? reservations->bits_low : reservations->bits_high)) { // TODO allow trains to use their own reserved track
             continue;
         } 
@@ -113,8 +116,10 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
             curved->r.rcs[idx].a = ACTION_CURVED;
             curved->idx++;
             mh_add(&mh, (unsigned long int) curved, distance + cn->edge[DIR_CURVED].dist);
+
+            ASSERT(distance + cn->edge[DIR_CURVED].dist > 0, "fuck");
         }
-        if (cn->type == NODE_MERGE) {
+        if (cn->type == NODE_MERGE && FALSE) {
             // Can reverse after hitting a merge:
             BFSNode * reverse = q_pop(&freeQ, &freeQTail);
             reverse->current_node = cn->reverse;
@@ -130,6 +135,7 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
             ahead->current_node = cn->edge[DIR_AHEAD].dest;
             memcpy(&ahead->r, &route, sizeof(Route));
             mh_add(&mh, (unsigned long int) ahead, distance + cn->edge[DIR_AHEAD].dist);
+            ASSERT(distance + cn->edge[DIR_AHEAD].dist > 0, "fuck");
         }
     }
 

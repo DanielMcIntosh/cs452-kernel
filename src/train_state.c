@@ -343,10 +343,11 @@ void task_train_state(int trackstate_tid) {
                 rev_penalty = 2*stopping_distance[train->speed];
             }
 
+            ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor: %d", train->last_sensor);
             RouteRequest req = {
                 .reservations = ts.reservations, // TODO let a train run over its own reservations
                 .dir = train->direction,
-                .next = train->next_sensor,
+                .next = train->last_sensor, //train->next_sensor,
                 .prev = train->last_sensor,
                 .end = object,
                 .min_dist = min_dist,
@@ -378,6 +379,7 @@ void task_train_state(int trackstate_tid) {
             int distance;
             int tr = get_active_train_from_sensor(&ts, sensor, &distance);
             ASSERT(tr >= 0, "Could not find which train hit sensor");
+            tc_send(&tc, TERMINAL_ECHO, tr, 0);
 
             Train *train = &(ts.active_trains[tr]);
             ActiveRoute *ar = &(ts.active_routes[tr]);
@@ -399,16 +401,18 @@ void task_train_state(int trackstate_tid) {
             train->last_sensor = sensor;
             train->last_sensor_time = event_time;
 
-            // Perform any actions we need to do:
-            if (ar->remaining_distance <= stopping_distance[train->speed] && !ar->stopped) {
-                Command stop = {COMMAND_TR, 0, .arg2 = tr}; 
-                SendCommand(cmdtid, stop);
-                ar->stopped = 1;
-            }
-            
-            ar->remaining_distance -= distance;
-            while (ar->next_step_distance <= distance) {
-                ts_exec_step(ar, cmdtid);
+            if (!ar->stopped) {
+                // Perform any actions we need to do:
+                if (ar->remaining_distance <= stopping_distance[train->speed]) {
+                    Command stop = {COMMAND_TR, 0, .arg2 = tr}; 
+                    SendCommand(cmdtid, stop);
+                    ar->stopped = 1;
+                }
+                
+                ar->remaining_distance -= distance;
+                while (ar->next_step_distance <= distance) {
+                    ts_exec_step(ar, cmdtid);
+                }
             }
             
             break;
@@ -418,7 +422,6 @@ void task_train_state(int trackstate_tid) {
             Reply(tid, &rm, sizeof(rm));
             TrainData data = tm.train_data;
             TRAIN(&ts, (int) data.train)->speed = data.speed;
-            TRAIN(&ts, (int) data.train)->last_sensor = -1; // reset prediction;
             break;
         }
         case (NOTIFY_TRAIN_DIRECTION):

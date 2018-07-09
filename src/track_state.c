@@ -284,6 +284,8 @@ void task_track_state() {
                     tc_send(&tc, TERMINAL_SENSOR, sensor, f.time);
 
                     TrainEvent_Notify(train_evt_courier_tid, sensor);
+                    SensorEvent sse = {.sensor = sensor, .time = f.time};
+                    NotifySensorEvent(WhoIs(NAME_TRAIN_STATE), sse);
                 }
             }
             break;
