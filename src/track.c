@@ -137,6 +137,7 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
             // Can go straight on merges, sensors, and enters.
             BFSNode * ahead = q_pop(&freeQ, &freeQTail);
             ahead->current_node = cn->edge[DIR_AHEAD].dest;
+            ahead->idx = idx;
             memcpy(&ahead->r, &route, sizeof(Route));
             mh_add(&mh, (unsigned long int) ahead, distance + cn->edge[DIR_AHEAD].dist);
             ASSERT(distance + cn->edge[DIR_AHEAD].dist > 0, "fuck");
