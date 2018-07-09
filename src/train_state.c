@@ -93,7 +93,7 @@ void init_train_state(TrainState *ts) {
     ts->reservations = init_reservation;
 }
 
-static inline int get_active_train_from_sensor(TrainState *ts, const int sensor) {
+static inline int get_active_train_from_sensor(TrainState *ts, const int sensor, int *distance) {
     int min_dist = INT_MAX;
     int train = 0;
     const track_node *d = &track[SENSOR_TO_NODE(sensor)];
@@ -110,6 +110,7 @@ static inline int get_active_train_from_sensor(TrainState *ts, const int sensor)
         }
     }
     
+    *distance = min_dist;
     return train;
 }
 
@@ -206,36 +207,26 @@ void task_train_state(int trackstate_tid) {
             if (unlikely(ts.total_trains <= 0)) {
                 continue;
             }
-            int tr = get_active_train_from_sensor(&ts, sensor);
+            int distance;
+            int tr = get_active_train_from_sensor(&ts, sensor, &distance);
             ASSERT(tr >= 0, "Could not find which train hit sensor");
 
             Train *train = &(ts.active_trains[tr]);
 
             //we haven't reset our calculations && we actually hit the sensor we expected to (and not the one after?)
-            if (train->last_sensor >= 0 && sensor == train->next_sensor) {
-                int last_error_time = (train->next_sensor_predict_time - event_time);
-                int last_error_dist = last_error_time * train->velocity[train->speed] / VELOCITY_PRECISION;
-                SendTerminalRequest(puttid, TERMINAL_SENSOR_PREDICT, last_error_time, last_error_dist);
+            if (train->last_sensor >= 0) {
+                int predicted_time = train->last_sensor_time + distance * VELOCITY_PRECISION / train->velocity[train->speed];
+                int error_time = (predicted_time - event_time);
+                int error_dist = error_time * train->velocity[train->speed] / VELOCITY_PRECISION;
+                SendTerminalRequest(puttid, TERMINAL_SENSOR_PREDICT, error_time, error_dist);
 
                 // Time is in clock-ticks, velocity is in mm/(clock-tick) -> error is in units of mm
                 int dt = event_time - train->last_sensor_time;
-                int new_velocity = train->last_sensor_dist * VELOCITY_PRECISION / dt;
+                int new_velocity = distance * VELOCITY_PRECISION / dt;
                 train->velocity[train->speed] = MOVING_AVERAGE(new_velocity, train->velocity[train->speed], 15);
             }
 
-            /*
-            int distance;
-            const track_node *c = &(track[SENSOR_TO_NODE(sensor)]); // last known train position
-            const track_node *n = predict_next_sensor(ts.switches, c, NULL, &distance); // next predicted train position
-
-            train->next_sensor_predict_time = event_time + distance * VELOCITY_PRECISION / train->velocity[train->speed];
-            SendTerminalRequest(puttid, TERMINAL_VELOCITY_DEBUG, train->velocity[train->speed], n->num);
-            SendTerminalRequest(puttid, TERMINAL_DISTANCE_DEBUG, distance, 0);
-
-
-            train->next_sensor = n->num;
-            train->last_sensor_dist = distance;
-            //*/
+            SendTerminalRequest(puttid, TERMINAL_VELOCITY_DEBUG, train->velocity[train->speed], distance);
             train->last_sensor = sensor;
             train->last_sensor_time = event_time;
             break;
