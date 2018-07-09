@@ -33,7 +33,7 @@ typedef struct route {
 
 #define ROUTE_INIT {{{0, 0, 0}}, 0, 0}
 
-int init_track();
+void init_track();
 int find_path_between_nodes(const Reservation * restrict reservations, int min_dist, int rev_penalty, const track_node *origin, const track_node *dest, Route * restrict r);
 
 #endif //_TRACK_H_
