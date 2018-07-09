@@ -103,6 +103,15 @@ int cb_read_int(struct circlebuffer *cb, int *i){ // reads 4-char int
     return 0;
 }
 
+int cb_read_struct(struct circlebuffer * restrict cb, void * restrict s, int size) {
+    int err;
+    for (int i = 0; i < size; ++i) {
+        err = cb_read(cb, (char *)s++);
+        if (err) return err;
+    }
+    return 0;
+}
+
 int cb_write(struct circlebuffer *cb, char c){
     if (cb_full(cb)) {
         return 1;
@@ -130,6 +139,16 @@ int cb_write_string(struct circlebuffer * restrict cb, char * restrict s) {
     }
 
     return (*s != '\0');
+}
+
+int cb_write_struct(struct circlebuffer * restrict cb, void * restrict s, int size) {
+    int err;
+    for (int i = 0; i < size; ++i) {
+        err = cb_write(cb, *(char *)s++);
+        if (err) return err;
+    }
+
+    return 0;
 }
 
 int cb_write_int(struct circlebuffer *cb, int i) {

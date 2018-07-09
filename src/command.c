@@ -15,7 +15,6 @@
 #include <train_event.h>
 #include <switch.h>
 #include <util.h>
-#include <terminalcourier.h>
 
 typedef struct commandmessage{
     MessageType type;
@@ -136,24 +135,13 @@ static inline void commandserver_exec_switch(CommandServer * restrict cs, int ar
     }
 }
 
-static inline void commandserver_exec_reverse(int train, int speed, int servertid, int trainstate_tid, TerminalCourier *tc) {
+static inline void commandserver_exec_reverse(int train, int speed, int servertid, int trainstate_tid, int terminal_tid, TerminalSndFn tc_send) {
     Putc(servertid, 1, 0);
     Putc(servertid, 1, train);
-    tc_send(tc, TERMINAL_FLAGS_SET, STATUS_FLAG_REVERSING, 0);
+    tc_send(terminal_tid, TERMINAL_FLAGS_SET, STATUS_FLAG_REVERSING, 0);
     CreateWith2Args(PRIORITY_NOTIFIER, &task_reverse_train, train, speed);
     TrainData td = {0, train};
     NotifyTrainSpeed(trainstate_tid, td); // TODO train state courier
-}
-
-int cs_notify_terminal_buffer(int cmdtid, TerminalReq *treq) {
-    ASSERT(treq != NULL, "null TerminalRequest output");
-    Command c = {COMMAND_NOTIFY_TERMINAL_COURIER, 0, {0}};
-    CommandMessage cm = {MESSAGE_COMMAND, c};
-    TerminalCourierMessage tcm;
-    int r = Send(cmdtid, &cm, sizeof(cm), &tcm, sizeof(tcm));
-    if (r < 0) return r;
-    *treq = tcm.req;
-    return r;
 }
 
 void send_wakeup(int tid, int __attribute__((unused)) arg1, bool success) {
@@ -242,19 +230,18 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
     cb_init(&cb_switches, switchQ_buf, SWITCHQ_BUF_SIZE);
     cs.cb_switches = &cb_switches;
 
-    circlebuffer_t cb_terminal;
-    char cb_terminal_buf[COMMAND_TERMINAL_BUFFER_SIZE];
-    cb_init(&cb_terminal, cb_terminal_buf, COMMAND_TERMINAL_BUFFER_SIZE);
-    TerminalCourier tc = {-1, &cb_terminal};
-    CreateWith2Args(PRIORITY_NOTIFIER, &task_terminal_courier, MyTid(), (int) &cs_notify_terminal_buffer);
-
-
     CreateWithArgument(PRIORITY_NOTIFIER, task_solenoid_notifier, MyTid());
     Putc(servertid, 1, 0x60);
     init_switches(&cs);
 
-    FOREVER {
-        Receive(&tid, &cm, sizeof(cm));
+    int terminal_tid = WhoIs(NAME_TERMINAL);
+
+    //READ: https://gcc.gnu.org/onlinedocs/gcc/Nested-Functions.html
+    auto void body(TerminalSndFn);
+
+    forever_w_term_courier(&tid, &cm, sizeof(cm), terminal_tid, &body);
+
+    void body(TerminalSndFn tc_send) {
         if (cm.command.type >= INVALID_COMMAND){
             rm.ret = ERR_INVALID_COMMAND;
         } else {
@@ -284,7 +271,7 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
         {
             int train = cm.command.arg1;
             int speed = GetTrainSpeed(trainstate_tid, train);
-            commandserver_exec_reverse(train, speed, servertid, trainstate_tid, &tc);
+            commandserver_exec_reverse(train, speed, servertid, trainstate_tid, terminal_tid, tc_send);
             break;
         }
         case COMMAND_SW:
@@ -323,7 +310,7 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
         }
         case COMMAND_ROUTE:
         {
-            tc_send(&tc, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING, 0);
+            tc_send(terminal_tid, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING, 0);
 
             int sensor = cm.command.arg1;
             int distance_past = cm.command.smallarg1;
@@ -443,11 +430,6 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
             } else {
                 cs.courier_waiting = tid;
             }
-            break;
-        }
-        case COMMAND_NOTIFY_TERMINAL_COURIER:
-        {
-            tc_update_notifier(&tc, tid);
             break;
         }
         default:

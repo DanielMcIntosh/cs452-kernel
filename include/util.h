@@ -54,6 +54,10 @@ void *memset(void *s, int c, unsigned int n);
 #define sizeof_field(type, field) (sizeof(((type *)0)->field))
 #define field_dim(type, member) (sizeof_field(type, member) / sizeof_field(type, member[0]))
 
+#ifndef alloca
+#define alloca(size)   __builtin_alloca(size)
+#endif
+
 #define FOREVER for(;;)
 
 #endif

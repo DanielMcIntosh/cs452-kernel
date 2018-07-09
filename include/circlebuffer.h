@@ -21,10 +21,12 @@ int cb_peek(struct circlebuffer *cb, char *c);
 int cb_read_number(struct circlebuffer *cb, int *i); // NOTE: reads 1 past the number rn
 int cb_read_match(circlebuffer_t *cb, char *str);
 int cb_read_int(struct circlebuffer *cb, int *i); // reads 4-char int
+int cb_read_struct(struct circlebuffer *cb, void *s, int size);
 
 int cb_write(struct circlebuffer *cb, char c);
 int cb_backspace(struct circlebuffer *cb);
 int cb_write_string(struct circlebuffer *cb, char *s);
+int cb_write_struct(struct circlebuffer *cb, void *s, int size);
 int cb_write_int(struct circlebuffer *cb, int i);
 
 //d = base^(num_digits_to_print). This function will pad with 0's if necessary.

@@ -12,6 +12,7 @@
 #include <clock.h>
 #include <sensor.h>
 #include <track_state.h> 
+#include <courier.h>
 
 typedef struct terminalparser {
     circlebuffer_t input;
@@ -40,6 +41,25 @@ inline int SendTerminalRequest(int terminaltid, TerminalRequest rq, int arg1, in
     int r = Send(terminaltid, &tm, sizeof(tm), &rm, sizeof(rm));
     return ( r >= 0 ? rm.ret : r);
 }
+
+void forever_w_term_courier(int *tid, void *in_msg, int in_msg_size, int terminaltid, void (*body)(TerminalSndFn)) {
+    //READ: https://gcc.gnu.org/onlinedocs/gcc/Nested-Functions.html
+    TerminalMessage tm = {MESSAGE_TERMINAL, 0, 0, 0};
+    void wrapper(CourierSendFn send_fn) {
+        int snd_fn_wrapper(int terminaltid, TerminalRequest rq, int arg1, int arg2) {
+            tm.rq = rq;
+            tm.arg1 = arg1;
+            tm.arg2 = arg2;
+            send_fn(&tm);
+        }
+
+        body(snd_fn_wrapper);
+    }
+
+    forever_w_courier(tid, in_msg, in_msg_size, terminaltid, 128, sizeof(TerminalMessage), sizeof(ReplyMessage), wrapper);
+}
+
+
 
 static inline void cursor_to_position(struct circlebuffer *cb, int line, int col) {
     cb_write_string(cb, "\033[");
