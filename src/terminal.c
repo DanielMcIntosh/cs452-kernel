@@ -697,7 +697,7 @@ void task_terminal(int trackstate_tid) {
         case (TERMINAL_VELOCITY_DEBUG):
         {
             int current_predicted_velocity = tm.arg1;
-            int next_sensor = tm.arg2;
+            int prev_dist = tm.arg2;
             cb_write_string(&t.output, "\0337");
 
             cursor_to_position(&t.output, 2, 42);
@@ -705,22 +705,11 @@ void task_terminal(int trackstate_tid) {
             cb_write_string(&t.output, "   ");
 
             cursor_to_position(&t.output, 2, 56);
-            cb_write(&t.output, 'A' + SENSOR_GET_RADIX(next_sensor));
-            cb_write_number(&t.output, SENSOR_GET_NUM(next_sensor) + 1, 10);
+            cb_write_number(&t.output, prev_dist, 10);
             cb_write_string(&t.output, "   ");
 
             cb_write_string(&t.output, "\0338");
 
-            break;
-        }
-        case (TERMINAL_DISTANCE_DEBUG):
-        {
-            int next_sensor_distance = tm.arg1;
-            cb_write_string(&t.output, "\0337");
-            cursor_to_position(&t.output, 1, 56);
-            cb_write_number(&t.output, next_sensor_distance, 10);
-            cb_write_string(&t.output, "  ");
-            cb_write_string(&t.output, "\0338");
             break;
         }
         //*
