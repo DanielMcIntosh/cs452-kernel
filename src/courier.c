@@ -30,7 +30,7 @@ void task_courier_rp_rpmsg(int other_tid, int size) {
     }
 }
 
-void forever_w_courier(int *tid, void *in_msg, int in_msg_size, int other_tid, int cb_size, int out_msg_size, int rp_size, void (*body)(CourierSendFn)) {
+void forever_w_courier(int * restrict tid, void * restrict in_msg, int in_msg_size, int other_tid, int cb_size, int out_msg_size, int rp_size, void (*body)(CourierSendFn)) {
     circlebuffer_t cb_courier;
     char cb_courier_buf[cb_size];
     cb_init(&cb_courier, cb_courier_buf, sizeof(cb_courier_buf));
