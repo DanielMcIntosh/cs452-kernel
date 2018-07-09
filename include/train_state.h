@@ -10,6 +10,8 @@
 #define CAL_ITERATIONS 8
 #define BASE_STOP_DIST_ADJUSTMENT 70
 
+#define TRAIN_STATE_TERMINAL_BUFFER_SIZE 500
+
 typedef struct position {
     const int object : 16;
     const int distance_past : 16;
@@ -20,6 +22,8 @@ typedef struct reservation {
     long long bits_low : 64;
     long long bits_high : 64;    
 } __attribute__((packed)) Reservation;
+
+#define RESERVATION_INIT {0, 0}
 
 typedef struct traindata {
     const unsigned int speed;
@@ -48,7 +52,7 @@ typedef struct navigaterequest{
 } __attribute__((packed)) NavigateRequest;
 
 typedef enum trnstrequest{
-    TRAIN_SPEED, // TODO other requests
+    TRAIN_SPEED, 
     ACTIVE_TRAIN,
     NAVIGATE,
 
@@ -58,6 +62,7 @@ typedef enum trnstrequest{
     NOTIFY_CAL,
     NOTIFY_NEW_TRAIN,
     NOTIFY_RESERVATION,
+    TRAIN_STATE_NOTIFY_TERMINAL_COURIER,
 
     NUM_TRAIN_STATE_REQUESTS
 } TrainStateRequest;

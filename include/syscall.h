@@ -53,7 +53,7 @@ int Create(Priority priority, void (*code)());
 int MyTid();
 int MyParentTID();
 void Pass();
-void Exit();
+void __attribute__((noreturn)) Exit();
 
 // ==== K2 ====
 int Send(int tid, const void *msg, int msglen, void *reply, int rplen);
@@ -64,10 +64,10 @@ int Reply(int tid, const void *reply, int rplen);
 int AwaitEvent(int eventType);
 
 // ==== K4 ====
-int Quit();
+int __attribute__((noreturn)) Quit();
 int EnterCriticalSection();
 int ExitCriticalSection();
-int Destroy();
+int __attribute__((noreturn)) Destroy();
 
 int CreateWithArgument(Priority priority, void (*code)(int), int argument);
 int CreateWith2Args(Priority priority, void (*code)(int, int), int arg0, int arg1);

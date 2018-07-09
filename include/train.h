@@ -27,4 +27,6 @@ typedef struct train{
     int last_sensor_dist;
 } Train;
 
+#define TRAIN_INIT {0, 0, {0}, 0, 0, 0, 0, 0}
+
 #endif
