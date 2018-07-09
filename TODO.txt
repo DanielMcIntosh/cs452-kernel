@@ -1,0 +1,12 @@
+TODO:
+Clean up parameter order - mostly in track_state and train_state
+
+change sensor attribution to use bfs with starting nodes of _all the trains_ last sensors
+
+when we change speed, find a way to put off adjusting velocity calibration
+
+change CURRENT_SPEED to 0? and stop double-inverting train->speed
+
+actually set train->direction
+
+find instances of RunWhen
