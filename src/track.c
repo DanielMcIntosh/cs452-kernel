@@ -150,11 +150,11 @@ const track_node* rc_to_track_node(RouteCommand rc) {
         case (ACTION_CURVED):
         case (ACTION_STRAIGHT):
         {
-            return &track[SWITCH_TO_NODE(rc.swmr-1)];
+            return &track[SWITCH_TO_NODE(rc.swmr)];
         }
         case (ACTION_RV):
         {
-            return &track[MERGE_TO_NODE(rc.swmr-1)];
+            return &track[MERGE_TO_NODE(rc.swmr)];
         }
         case (ACTION_NONE):
         {
@@ -173,7 +173,7 @@ inline const track_edge *next_edge_on_route(const track_node * restrict n, const
     switch (n->type) {
     case (NODE_BRANCH):
     {
-        ASSERT(route->rcs[*idx].swmr == SWCLAMP(n->num), "Incorredt switch in path: %s, should be %s.", track[SWITCH_TO_NODE(route->rcs[*idx].swmr)].name, track[SWCLAMP(n->num)].name);
+        ASSERT(route->rcs[*idx].swmr == SWCLAMP(n->num), "Incorrect switch in path: %d(%s), should be %d(%s).", route->rcs[*idx].swmr, track[SWITCH_TO_NODE(route->rcs[*idx].swmr)].name, SWCLAMP(n->num), n->name);
         ASSERT(route->rcs[*idx].a != ACTION_NONE, "Action None on route (idx: %d, node: %s)", *idx, n->name);
         RouteCommand rc = route->rcs[(*idx)++];
         return &(n->edge[STATE_TO_DIR(rc.a == ACTION_STRAIGHT ? SWITCH_STRAIGHT : SWITCH_CURVED)]);
@@ -209,20 +209,20 @@ static inline const track_node *next_on_route(const Route * restrict route, int 
         *distance += e->dist;
         n = e->dest;
     }
-    ASSERT(n->type == NODE_SENSOR, "While Loop broken early");
+    ASSERT(n->type == type, "While Loop broken early");
 
     return n;
 }
 
-inline const track_node *next_sensor_on_route(const Route * restrict route, int *idx, const track_node *prev, int * restrict distance) {
+inline const track_node *next_sensor_on_route(const Route * restrict route, int *idx, const track_node * restrict prev, int * restrict distance) {
     return next_on_route(route, idx, prev, distance, NODE_SENSOR);
 }
-inline const track_node *next_switch_on_route(const Route * restrict route, int *idx, const track_node *prev, int * restrict distance) {
+inline const track_node *next_switch_on_route(const Route * restrict route, int *idx, const track_node * restrict prev, int * restrict distance) {
     return next_on_route(route, idx, prev, distance, NODE_BRANCH);
 }
 
-const track_node *nth_sensor_on_route(int n, const Route * restrict route, int *idx, const track_node *prev, int * restrict distance) {
-    for (int i = 0; i < n && prev != NULL; ++i) {
+const track_node *nth_sensor_on_route(int n, const Route * restrict route, int *idx, const track_node * restrict prev, int * restrict distance) {
+    for (int i = 0; i < n && likely(prev != NULL); ++i) {
         prev = next_sensor_on_route(route, idx, prev, distance);
     }
     return prev;

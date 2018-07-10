@@ -143,20 +143,20 @@ static void ts_exec_step(TerminalCourier * restrict tc, ActiveRoute * restrict a
         {
             Command cmd = {COMMAND_SW, STATE_TO_CHAR(SWITCH_STRAIGHT), .arg2 = SWUNCLAMP(rc.swmr)};
             SendCommand(cmdtid, cmd);
-            cnode = &track[SWITCH_TO_NODE(rc.swmr-1)];
+            cnode = &track[SWITCH_TO_NODE(rc.swmr)];
             break;
         }
         case (ACTION_CURVED):
         {
             Command cmd = {COMMAND_SW, STATE_TO_CHAR(SWITCH_CURVED), .arg2 = SWUNCLAMP(rc.swmr)};
             SendCommand(cmdtid, cmd);
-            cnode = &track[SWITCH_TO_NODE(rc.swmr-1)];
+            cnode = &track[SWITCH_TO_NODE(rc.swmr)];
             break;
         }
         case (ACTION_RV):
         {
             //TODO
-            cnode = &track[MERGE_TO_NODE(rc.swmr-1)];
+            cnode = &track[MERGE_TO_NODE(rc.swmr)];
             break;
         }
         default:
@@ -326,30 +326,34 @@ void task_train_state(int trackstate_tid) {
                 int idx = ar->idx, tmp = 0;
                 const track_node *resrv_end = &track[SENSOR_TO_NODE(sensor)];
                 //nth-sensor + stopping_dist + next_switch
-                resrv_end = nth_sensor_on_route(2, &ar->route, &idx, resrv_end, &tmp);
+                resrv_end = nth_sensor_on_route(2,  &ar->route, &idx, resrv_end, &tmp);
                 tmp = stopping_distance[train->speed];
-                resrv_end = forward_dist_on_route(  &ar->route, &idx, resrv_end, &tmp);
-                resrv_end = next_switch_on_route(   &ar->route, &idx, resrv_end, &tmp);
+                //resrv_end = forward_dist_on_route(&ar->route, &idx, resrv_end, &tmp);
+                //resrv_end = next_switch_on_route( &ar->route, &idx, resrv_end, &tmp);
 
                 //todo will fail after first sensor right now because we've already reserved some of this
-                bool resrv_successful = reserve_track(&ar->route, ar->idx, &track[SENSOR_TO_NODE(sensor)], resrv_end, &ts.reservations);
+                //Therefore, we currently ignore whether we actually could reserve track
+                //bool resrv_successful = reserve_track(&ar->route, ar->idx, &track[SENSOR_TO_NODE(sensor)], resrv_end, &ts.reservations);
 
                 // Perform any actions we need to do:
                 ar->remaining_distance -= distance;
                 ar->next_step_distance -= distance;
 
-                if (!resrv_successful || (ar->remaining_distance <= stopping_distance[train->speed] && !ar->stopped)) {
+                if (ar->remaining_distance <= stopping_distance[train->speed] && !ar->stopped) {
                     Command stop = {COMMAND_TR, 0, .arg2 = train->num}; 
                     SendCommand(cmdtid, stop);
                     ar->stopped = 1;
                     tc_send(&tc, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING, 0);
                 }
-
-                if (resrv_successful) {
-                    while (ar->next_step_distance <= 1000) { // TODO (distance to next sensor)
-                        tc_send(&tc, TERMINAL_ROUTE_DBG2, 206, ar->next_step_distance);
-                        ts_exec_step(&tc, ar, cmdtid);
-                    }
+                
+                //TODO execute steps up to reserved length
+                int dist_to_next_snsr = 0;
+                idx = ar->idx;
+                next_sensor_on_route(&ar->route, &idx, resrv_end, &dist_to_next_snsr);
+                //TODO pass dist, new idx, etc. since it's already being calculated for reservations
+                while (ar->next_step_distance <= dist_to_next_snsr) {
+                    tc_send(&tc, TERMINAL_ROUTE_DBG2, 206, ar->next_step_distance);
+                    ts_exec_step(&tc, ar, cmdtid);
                 }
             }
             

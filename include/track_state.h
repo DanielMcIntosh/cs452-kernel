@@ -19,8 +19,8 @@
 #define CHAR_TO_TRACK(c) ((c) == 'A' ? TRACK_A : TRACK_B)
 
 #define SENSOR_TO_NODE(s) (s)
-#define SWITCH_TO_NODE(s) (80 + 2 * (s))
-#define MERGE_TO_NODE(m) (81 + 2 * (m))
+#define SWITCH_TO_NODE(s) (80 + 2 * (s - 1))
+#define MERGE_TO_NODE(m) (81 + 2 * (m - 1))
 #define ENTER_TO_NODE(n) (124 + 2 * (n))
 #define EXIT_TO_NODE(n) (125 + 2 * (n))
 

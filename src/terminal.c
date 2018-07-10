@@ -236,12 +236,12 @@ static inline int parse_command(Command * restrict cmd, circlebuffer_t * restric
         switch(sensor_char) {
         case ('S'):
         {
-            cmd->arg1 = SWITCH_TO_NODE(SWCLAMP(sensor_num)- 1);
+            cmd->arg1 = SWITCH_TO_NODE(SWCLAMP(sensor_num));
             break;
         }
         case ('M'):
         {
-            cmd->arg1 = MERGE_TO_NODE(SWCLAMP(sensor_num) - 1);
+            cmd->arg1 = MERGE_TO_NODE(SWCLAMP(sensor_num));
             break;
         }
         case ('N'):
@@ -394,12 +394,12 @@ static inline int parse_command(Command * restrict cmd, circlebuffer_t * restric
         switch(sensor_char) {
         case ('S'):
         {
-            cmd->arg1 = SWITCH_TO_NODE(SWCLAMP(sensor_num)- 1);
+            cmd->arg1 = SWITCH_TO_NODE(SWCLAMP(sensor_num));
             break;
         }
         case ('M'):
         {
-            cmd->arg1 = MERGE_TO_NODE(SWCLAMP(sensor_num) - 1);
+            cmd->arg1 = MERGE_TO_NODE(SWCLAMP(sensor_num));
             break;
         }
         case ('N'):
