@@ -232,22 +232,19 @@ void task_track_state() {
         case (ROUTE):
         {
             Direction dir = tm.route_request.dir; // TODO remove this from request
-            int next = tm.route_request.next;
             int prev = tm.route_request.prev;
             int end = tm.route_request.end;
             int min_dist = tm.route_request.min_dist;
             int rev_penalty = tm.route_request.rev_penalty;
             Reservation reservations = tm.route_request.reservations;
 
-            if (next < 0) {
-                int __attribute__((unused)) distance;
-                next = predict_next_sensor(ts.switches, &track[prev], NULL, &distance)->num;
-            }
-
+            int __attribute__((unused)) distance;
+            int next = predict_next_sensor(ts.switches, &track[prev], NULL, &distance)->num;
+            tc_send(&tc, TERMINAL_ROUTE_DBG2, 208, next);
             const track_node *d = &track[end], *n = &track[next];
 
             Route r = ROUTE_INIT;
-            int distance = find_path_between_nodes(&reservations, min_dist, rev_penalty, n, d, &r);
+            distance = find_path_between_nodes(&reservations, min_dist, rev_penalty, n, d, &r);
 
             if (distance >= 0) {
                 route_res.route = r;

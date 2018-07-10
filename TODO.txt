@@ -10,3 +10,5 @@ change CURRENT_SPEED to 0? and stop double-inverting train->speed
 actually set train->direction
 
 find instances of RunWhen
+
+send route directly from terminal to train_state, so command.c never talks to train state

@@ -323,8 +323,6 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
         }
         case COMMAND_ROUTE:
         {
-            tc_send(&tc, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING, 0);
-
             int sensor = cm.command.arg1;
             int distance_past = cm.command.smallarg1;
             int train = cm.command.smallarg2;

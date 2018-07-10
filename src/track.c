@@ -98,8 +98,6 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
             }
             *r = route;
             return distance;
-        } else if (cn == dest) {
-            PANIC("YIKES %d | %d | %d | %d | %d | %d", distance, route.reverse, min_dist, rev_penalty, k, (!route.reverse ? min_dist : min_dist + rev_penalty));
         } else if ((0x1ULL << (TRACK_NODE_TO_INDEX(cn) % 64)) & ((TRACK_NODE_TO_INDEX(cn) < 64) ? reservations->bits_low : reservations->bits_high)) { // TODO allow trains to use their own reserved track
             continue;
         } 

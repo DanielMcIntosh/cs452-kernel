@@ -22,6 +22,7 @@ typedef struct active_route{
 } ActiveRoute;
 
 #define ACTIVE_ROUTE_INIT {ROUTE_INIT, 0, 0, 0, 0, 1}
+#define ACTIVE_ROUTE_COMPLETE(ar) (ar->route.rcs[ar->idx].a == ACTION_NONE && ar->stopped)
 
 typedef struct train_state{
     int total_trains;
@@ -97,7 +98,7 @@ int NavigateTo(int trainstatetid, NavigateRequest nav_req) {
 
 void init_train_state(TrainState *ts) {
     ts->total_trains = 0;
-    Train init_train = {0, FORWARD, {0}, -1, 0, -1, 0, 0};
+    Train init_train = {0, 0, FORWARD, {0}, -1, 0, -1, 0, 0};
     Reservation init_reservation = {0, 0};
 
     for (int i = 0; i < NUM_TRAINS; ++i) {
@@ -177,9 +178,9 @@ static int distance_to_on_route(const ActiveRoute * restrict ar, const track_nod
     ASSERT(from != NULL && to != NULL, "Invalid from/to: %d, %d", from, to);
     ASSERT(to >= track && to <= track+TRACK_MAX, "INVALID to: %d, [%d -> %d]", to, track, track+TRACK_MAX);
     ASSERT(from >= track && from <= track+TRACK_MAX, "INVALID from: %d, [%d -> %d]", from, track, track+TRACK_MAX);
-    track_node *n = from;
+    const track_node *n = from;
     int distance = 0;
-    track_edge *e;
+    const track_edge *e;
     int idx = ar->idx;
     ASSERT(n >= track && n <= track+TRACK_MAX, "INVALID n: %d, [%d -> %d]", n, track, track+TRACK_MAX);
     while (n != to && n != NULL) { // TODO unduplicate this code later
@@ -187,7 +188,7 @@ static int distance_to_on_route(const ActiveRoute * restrict ar, const track_nod
         switch (n->type) {
         case (NODE_BRANCH):
         {
-            ASSERT(ar->route.rcs[idx].swmr == SWCLAMP(n->num), "Incorredt switch in path. ");
+            ASSERT(ar->route.rcs[idx].swmr == SWCLAMP(n->num), "Incorrect switch in path: %s, should be %s.", track[SWITCH_TO_NODE(ar->route.rcs[idx].swmr)].name, track[SWCLAMP(n->num)].name);
             ASSERT(ar->route.rcs[idx].a != ACTION_NONE, "Action None on route (idx: %d, node: %s, to: %s, from: %s)", idx, n->name, to->name, from->name);
             RouteCommand rc = ar->route.rcs[idx++];
             e = &n->edge[STATE_TO_DIR(rc.a == ACTION_STRAIGHT ? SWITCH_STRAIGHT : SWITCH_CURVED)];;
@@ -370,7 +371,10 @@ void task_train_state(int trackstate_tid) {
             int distance = GetRoute(trackstate_tid, req, &route);
             rm.ret = distance;
             Reply(tid, &rm, sizeof(rm));
-            // do more things 
+            if (route.reverse) {
+                Command c = {COMMAND_RV, tr, .arg2 = 0};
+                SendCommand(cmdtid, c);
+            }
             ActiveRoute ar = ACTIVE_ROUTE_INIT;
             //for (int i = 0; i < MAX_ROUTE_COMMAND && ar.idx
             ar.route = route;
@@ -383,6 +387,7 @@ void task_train_state(int trackstate_tid) {
                 tc_send(&tc, TERMINAL_ROUTE_DBG, ar.route.rcs[i].swmr, ar.route.rcs[i].a);
             }
             tc_send(&tc, TERMINAL_ROUTE_DBG2, ar.remaining_distance, ar.next_step_distance);
+            tc_send(&tc, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING, 0);
             break;
         }
         case (NOTIFY_SENSOR_EVENT):
@@ -424,20 +429,21 @@ void task_train_state(int trackstate_tid) {
 
             //tc_send(&tc, TERMINAL_ROUTE_DBG2, ar->remaining_distance, ar->next_step_distance);
             //tc_send(&tc, TERMINAL_ROUTE_DBG2, 203, ts.total_trains);
-            if (!ar->stopped) {
-                tc_send(&tc, TERMINAL_ROUTE_DBG2, 10, 20);
+            if (!ACTIVE_ROUTE_COMPLETE(ar)){
+                tc_send(&tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
                 // Perform any actions we need to do:
-                if (ar->remaining_distance <= stopping_distance[train->speed]) {
-                    Command stop = {COMMAND_TR, 0, .arg2 = tr}; 
-                    SendCommand(cmdtid, stop);
-                    //ar->stopped = 1;
-
-                }
-                
                 ar->remaining_distance -= distance;
                 ar->next_step_distance -= distance;
+
+                if (ar->remaining_distance <= stopping_distance[train->speed] && !ar->stopped) {
+                    Command stop = {COMMAND_TR, 0, .arg2 = train->num}; 
+                    SendCommand(cmdtid, stop);
+                    ar->stopped = 1;
+                    tc_send(&tc, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING, 0);
+                }
+
                 while (ar->next_step_distance <= 1000) { // TODO (distance to next sensor)
-                    tc_send(&tc, TERMINAL_ROUTE_DBG2, 206, ar->remaining_distance);
+                    tc_send(&tc, TERMINAL_ROUTE_DBG2, 206, ar->next_step_distance);
                     ts_exec_step(&tc, ar, cmdtid);
                 }
             }
@@ -484,6 +490,7 @@ void task_train_state(int trackstate_tid) {
 
             ts.active_train_map[data.train] = ts.total_trains;
             ts.active_trains[ts.total_trains].last_sensor = data.sensor;
+            ts.active_trains[ts.total_trains].num = data.train;
             ++ts.total_trains;
             tc_send(&tc, TERMINAL_ECHO, '0' + ts.total_trains, 0);
             break;
