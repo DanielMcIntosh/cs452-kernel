@@ -223,7 +223,6 @@ static track_node* rc_to_track_node(RouteCommand rc) {
         case (ACTION_CURVED):
         case (ACTION_STRAIGHT):
         {
-            ASSERT(SWITCH_TO_NODE(rc.swmr) <= TRACK_MAX, "invalid node: %d (%d)", rc.swmr, SWITCH_TO_NODE(rc.swmr));
             return &track[SWITCH_TO_NODE(rc.swmr-1)];
         }
         case (ACTION_RV):
@@ -237,7 +236,7 @@ static track_node* rc_to_track_node(RouteCommand rc) {
         }
         default:
         {
-            PANIC("Unhandled action type in ts_exec_step: %d", rc.a);
+            PANIC("Unhandled action type in rc_to_track_node: %d", rc.a);
         }
     }
 }
@@ -251,20 +250,20 @@ static void ts_exec_step(TerminalCourier *tc, ActiveRoute * restrict ar, int cmd
         {
             Command cmd = {COMMAND_SW, STATE_TO_CHAR(SWITCH_STRAIGHT), .arg2 = rc.swmr};
             SendCommand(cmdtid, cmd);
-            cnode = &track[SWITCH_TO_NODE(rc.swmr)];
+            cnode = &track[SWITCH_TO_NODE(rc.swmr-1)];
             break;
         }
         case (ACTION_CURVED):
         {
             Command cmd = {COMMAND_SW, STATE_TO_CHAR(SWITCH_CURVED), .arg2 = rc.swmr};
             SendCommand(cmdtid, cmd);
-            cnode = &track[SWITCH_TO_NODE(rc.swmr)];
+            cnode = &track[SWITCH_TO_NODE(rc.swmr-1)];
             break;
         }
         case (ACTION_RV):
         {
             //TODO
-            cnode = &track[MERGE_TO_NODE(rc.swmr)];
+            cnode = &track[MERGE_TO_NODE(rc.swmr-1)];
             break;
         }
         default:
@@ -275,11 +274,12 @@ static void ts_exec_step(TerminalCourier *tc, ActiveRoute * restrict ar, int cmd
     // If the route is over, set next step distance to intmax
     if (ar->idx < MAX_ROUTE_COMMAND && ar->route.rcs[ar->idx+1].a != ACTION_NONE) {
         RouteCommand nc = ar->route.rcs[ar->idx+1];
+        tc_send(tc, TERMINAL_ROUTE_DBG2, 204, nc.swmr);
         ar->next_step_distance += distance_to_on_route(ar, cnode, rc_to_track_node(nc));
         ar->idx++;
     } else{
         ar->next_step_distance = 99999;
-        tc_send(&tc, TERMINAL_ROUTE_DBG2, 204, 0);
+        tc_send(tc, TERMINAL_ROUTE_DBG2, 204, 0);
     }
 }
 
@@ -397,7 +397,7 @@ void task_train_state(int trackstate_tid) {
             int distance;
             int tr = get_active_train_from_sensor(&ts, sensor, &distance);
             ASSERT(tr >= 0, "Could not find which train hit sensor");
-            tc_send(&tc, TERMINAL_ROUTE_DBG2, 202, tr);
+            //tc_send(&tc, TERMINAL_ROUTE_DBG2, 202, tr);
 
             Train *train = &(ts.active_trains[tr]);
             ActiveRoute *ar = &(ts.active_routes[tr]);
@@ -421,19 +421,22 @@ void task_train_state(int trackstate_tid) {
             train->last_sensor_time = event_time;
             ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor for train %d: %d", tr, train->last_sensor);
 
-            tc_send(&tc, TERMINAL_ROUTE_DBG2, ar->remaining_distance, ar->next_step_distance);
-            tc_send(&tc, TERMINAL_ROUTE_DBG2, 203, ts.total_trains);
+            //tc_send(&tc, TERMINAL_ROUTE_DBG2, ar->remaining_distance, ar->next_step_distance);
+            //tc_send(&tc, TERMINAL_ROUTE_DBG2, 203, ts.total_trains);
             if (!ar->stopped) {
                 tc_send(&tc, TERMINAL_ROUTE_DBG2, 10, 20);
                 // Perform any actions we need to do:
                 if (ar->remaining_distance <= stopping_distance[train->speed]) {
                     Command stop = {COMMAND_TR, 0, .arg2 = tr}; 
                     SendCommand(cmdtid, stop);
-                    ar->stopped = 1;
+                    //ar->stopped = 1;
+
                 }
                 
                 ar->remaining_distance -= distance;
+                ar->next_step_distance -= distance;
                 while (ar->next_step_distance <= 1000) { // TODO (distance to next sensor)
+                    tc_send(&tc, TERMINAL_ROUTE_DBG2, 206, ar->remaining_distance);
                     ts_exec_step(&tc, ar, cmdtid);
                 }
             }
