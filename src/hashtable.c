@@ -42,16 +42,16 @@ static unsigned long long c2ull(char * key){
 //*/
 
 static int streq(char * a, char * b){
-    while (*a != NULL && *b != NULL){
+    for (int i = 0; i < HT_KEY_SIZE && *a != '\0' && *b != '\0'; ++i){
         if (*a++ != *b++)
             return 0;
     }
-    return *a == *b;
+    return (*a != '\0' && *b != '\0') || (*a == *b);
 }
 
 void ht_init(Hashtable *ht){
     for (int i = 0; i < HT_SIZE; i++){
-        *((*ht)[i].key) = NULL;
+        memset((*ht)[i].key, '\0', HT_KEY_SIZE);
         (*ht)[i].value = -1;
     }
 }
