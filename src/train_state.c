@@ -133,117 +133,8 @@ static inline int get_active_train_from_sensor(TrainState *ts, const int sensor,
     *distance = min_dist;
     return train;
 }
-static track_node* next_sensor_on_route(const ActiveRoute * restrict ar, const track_node *last_sensor, int * restrict distance) {
-    // basic plan for this: linked list search: follow state given by TrackState
-    // Stop when another sensor is found
 
-    track_node *n = last_sensor->edge[DIR_AHEAD].dest;
-    *distance = last_sensor->edge[DIR_AHEAD].dist;
-    track_edge *e;
-    int idx = ar->idx;
-    while (n != NULL && n->type != NODE_SENSOR) {
-        switch (n->type) {
-        case (NODE_BRANCH):
-        {
-            RouteCommand rc = ar->route.rcs[idx++];
-            e = &n->edge[STATE_TO_DIR(rc.a == ACTION_STRAIGHT ? SWITCH_STRAIGHT : SWITCH_CURVED)];;
-            *distance += e->dist;
-            n = e->dest;
-            break;
-        }
-        case (NODE_ENTER):
-        case (NODE_MERGE):
-        {
-             // TODO proper next sensor predicting w/ reversing
-            *distance += n->edge[DIR_AHEAD].dist;
-            n = n->edge[DIR_AHEAD].dest;
-            break;
-        }
-        case (NODE_EXIT):
-        {
-            return NULL;
-        }
-        default:
-        {
-            PANIC("in: predict_next_sensor - INVALID TRACK NODE TYPE: %d", n->type);
-        }
-        }
-    }
-    ASSERT(n == NULL || n->type == NODE_SENSOR, "While Loop broken early");
-
-    return n;
-}
-
-static int distance_to_on_route(const ActiveRoute * restrict ar, const track_node *from, const track_node *to) {
-    ASSERT(from != NULL && to != NULL, "Invalid from/to: %d, %d", from, to);
-    ASSERT(to >= track && to <= track+TRACK_MAX, "INVALID to: %d, [%d -> %d]", to, track, track+TRACK_MAX);
-    ASSERT(from >= track && from <= track+TRACK_MAX, "INVALID from: %d, [%d -> %d]", from, track, track+TRACK_MAX);
-    const track_node *n = from;
-    int distance = 0;
-    const track_edge *e;
-    int idx = ar->idx;
-    ASSERT(n >= track && n <= track+TRACK_MAX, "INVALID n: %d, [%d -> %d]", n, track, track+TRACK_MAX);
-    while (n != to && n != NULL) { // TODO unduplicate this code later
-        ASSERT(n >= track && n <= track+TRACK_MAX, "invalid n: %d, [%d -> %d]", n, track, track+TRACK_MAX);
-        switch (n->type) {
-        case (NODE_BRANCH):
-        {
-            ASSERT(ar->route.rcs[idx].swmr == SWCLAMP(n->num), "Incorrect switch in path: %s, should be %s.", track[SWITCH_TO_NODE(ar->route.rcs[idx].swmr)].name, track[SWCLAMP(n->num)].name);
-            ASSERT(ar->route.rcs[idx].a != ACTION_NONE, "Action None on route (idx: %d, node: %s, to: %s, from: %s)", idx, n->name, to->name, from->name);
-            RouteCommand rc = ar->route.rcs[idx++];
-            e = &n->edge[STATE_TO_DIR(rc.a == ACTION_STRAIGHT ? SWITCH_STRAIGHT : SWITCH_CURVED)];;
-            distance += e->dist;
-            n = e->dest;
-            break;
-        }
-        case (NODE_ENTER):
-        case (NODE_MERGE):
-        case (NODE_SENSOR):
-        {
-             // TODO proper next sensor predicting w/ reversing
-            distance += n->edge[DIR_AHEAD].dist;
-            n = n->edge[DIR_AHEAD].dest;
-            break;
-        }
-        case (NODE_EXIT):
-        {
-            return NULL;
-        }
-        default:
-        {
-            PANIC("in: distance_to_on_route - INVALID TRACK NODE TYPE: %d", n->type);
-        }
-        }
-    }
-    ASSERT(n == NULL || n == to, "While Loop broken early");
-
-    return distance;
-}
-
-static track_node* rc_to_track_node(RouteCommand rc) {
-    switch (rc.a) {
-        case (ACTION_CURVED):
-        case (ACTION_STRAIGHT):
-        {
-            return &track[SWITCH_TO_NODE(rc.swmr-1)];
-        }
-        case (ACTION_RV):
-        {
-            return &track[MERGE_TO_NODE(rc.swmr-1)];
-        }
-        case (ACTION_NONE):
-        {
-            PANIC("NO");
-            return NULL;
-        }
-        default:
-        {
-            PANIC("Unhandled action type in rc_to_track_node: %d", rc.a);
-        }
-    }
-}
-
-static void ts_exec_step(TerminalCourier *tc, ActiveRoute * restrict ar, int cmdtid) {
+static void ts_exec_step(TerminalCourier * restrict tc, ActiveRoute * restrict ar, int cmdtid) {
     // do current step:
     RouteCommand rc = ar->route.rcs[ar->idx];
     track_node *cnode = NULL;
@@ -277,7 +168,7 @@ static void ts_exec_step(TerminalCourier *tc, ActiveRoute * restrict ar, int cmd
     if (ar->idx < MAX_ROUTE_COMMAND && ar->route.rcs[ar->idx+1].a != ACTION_NONE) {
         RouteCommand nc = ar->route.rcs[ar->idx+1];
         tc_send(tc, TERMINAL_ROUTE_DBG2, 204, nc.swmr);
-        ar->next_step_distance += distance_to_on_route(ar, cnode, rc_to_track_node(nc));
+        ar->next_step_distance += distance_to_on_route(&ar->route, ar->idx, cnode, rc_to_track_node(nc));
         ar->idx++;
     } else {
         ar->next_step_distance = 99999;
@@ -379,7 +270,7 @@ void task_train_state(int trackstate_tid) {
             //for (int i = 0; i < MAX_ROUTE_COMMAND && ar.idx
             ar.route = route;
             ar.remaining_distance = distance;
-            ar.next_step_distance = distance_to_on_route(&ar, &track[SENSOR_TO_NODE(train->last_sensor)], rc_to_track_node(route.rcs[0])); // TODO
+            ar.next_step_distance = distance_to_on_route(&ar.route, ar.idx, &track[SENSOR_TO_NODE(train->last_sensor)], rc_to_track_node(route.rcs[0])); // TODO
             ar.stopped = 0;
             ASSERT(ts.active_train_map[tr] >= 0 && ts.active_train_map[tr] < MAX_CONCURRENT_TRAINS, "Invalid active train: %d", ts.active_train_map[tr]);
             ts.active_routes[ts.active_train_map[tr]] = ar;
@@ -431,20 +322,34 @@ void task_train_state(int trackstate_tid) {
             //tc_send(&tc, TERMINAL_ROUTE_DBG2, 203, ts.total_trains);
             if (!ACTIVE_ROUTE_COMPLETE(ar)){
                 tc_send(&tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
+
+                int idx = ar->idx, tmp = 0;
+                const track_node *resrv_end = &track[SENSOR_TO_NODE(sensor)];
+                //nth-sensor + stopping_dist + next_switch
+                resrv_end = nth_sensor_on_route(2, &ar->route, &idx, resrv_end, &tmp);
+                tmp = stopping_distance[train->speed];
+                resrv_end = forward_dist_on_route(  &ar->route, &idx, resrv_end, &tmp);
+                resrv_end = next_switch_on_route(   &ar->route, &idx, resrv_end, &tmp);
+
+                //todo will fail after first sensor right now because we've already reserved some of this
+                bool resrv_successful = reserve_track(&ar->route, ar->idx, &track[SENSOR_TO_NODE(sensor)], resrv_end, &ts.reservations);
+
                 // Perform any actions we need to do:
                 ar->remaining_distance -= distance;
                 ar->next_step_distance -= distance;
 
-                if (ar->remaining_distance <= stopping_distance[train->speed] && !ar->stopped) {
+                if (!resrv_successful || (ar->remaining_distance <= stopping_distance[train->speed] && !ar->stopped)) {
                     Command stop = {COMMAND_TR, 0, .arg2 = train->num}; 
                     SendCommand(cmdtid, stop);
                     ar->stopped = 1;
                     tc_send(&tc, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING, 0);
                 }
 
-                while (ar->next_step_distance <= 1000) { // TODO (distance to next sensor)
-                    tc_send(&tc, TERMINAL_ROUTE_DBG2, 206, ar->next_step_distance);
-                    ts_exec_step(&tc, ar, cmdtid);
+                if (resrv_successful) {
+                    while (ar->next_step_distance <= 1000) { // TODO (distance to next sensor)
+                        tc_send(&tc, TERMINAL_ROUTE_DBG2, 206, ar->next_step_distance);
+                        ts_exec_step(&tc, ar, cmdtid);
+                    }
                 }
             }
             

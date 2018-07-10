@@ -36,5 +36,17 @@ typedef struct route {
 void init_track();
 int find_path_between_nodes(const Reservation * restrict reservations, int min_dist, int rev_penalty, const track_node *origin, const track_node *dest, Route * restrict r);
 
+const track_node *rc_to_track_node(RouteCommand rc);
+const track_edge *next_edge_on_route(const track_node * restrict n, const Route * restrict route, int * restrict ind);
+
+const track_node *next_sensor_on_route(const Route * restrict route, int *idx, const track_node *prev, int * restrict distance);
+const track_node *next_switch_on_route(const Route * restrict route, int *idx, const track_node *prev, int * restrict distance);
+const track_node *nth_sensor_on_route(int n, const Route * restrict route, int *idx, const track_node *prev, int * restrict distance);
+
+const track_node *forward_dist_on_route(const Route * restrict route, int *idx, const track_node *prev, int * restrict distance);
+
+int distance_to_on_route(const Route * restrict route, int idx, const track_node *from, const track_node *to);
+bool reserve_track(const Route * restrict route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations);
+
 #endif //_TRACK_H_
 

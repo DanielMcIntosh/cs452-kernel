@@ -1,14 +1,36 @@
 TODO:
-Clean up parameter order - mostly in track_state and train_state
 
-change sensor attribution to use bfs with starting nodes of _all the trains_ last sensors
+IMPORTANT:
+    route from next sensor, not last sensor
 
-when we change speed, find a way to put off adjusting velocity calibration
+    reversing routes
+        allow re-reservation if the train already owns it
+        allow travel if the train already owns it
+        unreserve track
+        wake up when track free's up
 
-change CURRENT_SPEED to 0? and stop double-inverting train->speed
+    individual stopping distances for trains
 
-actually set train->direction
+    add timeouts for if a train doesn't hit a sensor in time
 
-find instances of RunWhen
+    notify track_state of switches taken by train after sensor attribution
 
-send route directly from terminal to train_state, so command.c never talks to train state
+UNKOWN IMPORTANCE:
+    send route directly from terminal to train_state, so command.c never talks to train state ?? please explain?
+
+
+NOT THAT IMPORTANT:
+    rename track.c and track.h to routing.c and routing.h
+
+    Clean up parameter order - mostly in track_state and train_state
+
+    change sensor attribution to use bfs with starting nodes of _all the trains_ last sensors
+
+    when we change speed, find a way to put off adjusting velocity calibration
+
+    change CURRENT_SPEED to 0? and stop double-inverting train->speed
+
+    actually set train->direction
+
+    find instances of RunWhen
+

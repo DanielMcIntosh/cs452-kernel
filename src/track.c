@@ -145,4 +145,153 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
     return -1;
 }
 
+const track_node* rc_to_track_node(RouteCommand rc) {
+    switch (rc.a) {
+        case (ACTION_CURVED):
+        case (ACTION_STRAIGHT):
+        {
+            return &track[SWITCH_TO_NODE(rc.swmr-1)];
+        }
+        case (ACTION_RV):
+        {
+            return &track[MERGE_TO_NODE(rc.swmr-1)];
+        }
+        case (ACTION_NONE):
+        {
+            PANIC("NO");
+            return NULL;
+        }
+        default:
+        {
+            PANIC("Unhandled action type in rc_to_track_node: %d", rc.a);
+        }
+    }
+}
+
+inline const track_edge *next_edge_on_route(const track_node * restrict n, const Route * restrict route, int * restrict idx) {
+    ASSERT(n >= track && n <= track+TRACK_MAX, "invalid n: %d, [%d -> %d]", n, track, track+TRACK_MAX);
+    switch (n->type) {
+    case (NODE_BRANCH):
+    {
+        ASSERT(route->rcs[*idx].swmr == SWCLAMP(n->num), "Incorredt switch in path: %s, should be %s.", track[SWITCH_TO_NODE(route->rcs[*idx].swmr)].name, track[SWCLAMP(n->num)].name);
+        ASSERT(route->rcs[*idx].a != ACTION_NONE, "Action None on route (idx: %d, node: %s)", *idx, n->name);
+        RouteCommand rc = route->rcs[(*idx)++];
+        return &(n->edge[STATE_TO_DIR(rc.a == ACTION_STRAIGHT ? SWITCH_STRAIGHT : SWITCH_CURVED)]);
+        break;
+    }
+    case (NODE_ENTER):
+    case (NODE_MERGE):
+    case (NODE_SENSOR):
+    {
+         // TODO proper next sensor predicting w/ reversing
+        return &(n->edge[DIR_AHEAD]);
+    }
+    case (NODE_EXIT):
+    {
+        return NULL;
+    }
+    default:
+    {
+        PANIC("in: distance_to_on_route - INVALID TRACK NODE TYPE: %d", n->type);
+    }
+    }
+}
+
+static inline const track_node *next_on_route(const Route * restrict route, int *idx, const track_node *prev, int * restrict distance, node_type type) {
+    const track_node *n = prev->edge[DIR_AHEAD].dest;
+    *distance = prev->edge[DIR_AHEAD].dist;
+    const track_edge *e;
+    while (n != NULL && n->type != type) {
+        e = next_edge_on_route(n, route, idx);
+        if (unlikely(e == NULL)) {
+            return NULL;
+        }
+        *distance += e->dist;
+        n = e->dest;
+    }
+    ASSERT(n->type == NODE_SENSOR, "While Loop broken early");
+
+    return n;
+}
+
+inline const track_node *next_sensor_on_route(const Route * restrict route, int *idx, const track_node *prev, int * restrict distance) {
+    return next_on_route(route, idx, prev, distance, NODE_SENSOR);
+}
+inline const track_node *next_switch_on_route(const Route * restrict route, int *idx, const track_node *prev, int * restrict distance) {
+    return next_on_route(route, idx, prev, distance, NODE_BRANCH);
+}
+
+const track_node *nth_sensor_on_route(int n, const Route * restrict route, int *idx, const track_node *prev, int * restrict distance) {
+    for (int i = 0; i < n && prev != NULL; ++i) {
+        prev = next_sensor_on_route(route, idx, prev, distance);
+    }
+    return prev;
+}
+
+const track_node *forward_dist_on_route(const Route * restrict route, int *idx, const track_node *prev, int * restrict distance) {
+    int cur_dist = 0;
+    const track_edge *e;
+    ASSERT(prev >= track && prev <= track+TRACK_MAX, "INVALID prev: %d, [%d -> %d]", prev, track, track+TRACK_MAX);
+    while (cur_dist < *distance && prev != NULL) {
+        e = next_edge_on_route(prev, route, idx);
+        if (unlikely(e == NULL)) {
+            return NULL;
+        }
+        distance += e->dist;
+        prev = e->dest;
+    }
+    *distance = cur_dist;
+    return prev;
+}
+
+int distance_to_on_route(const Route * restrict route, int idx, const track_node *from, const track_node *to) {
+    ASSERT(from != NULL && to != NULL, "Invalid from/to: %d, %d", from, to);
+    ASSERT(to >= track && to <= track+TRACK_MAX, "INVALID to: %d, [%d -> %d]", to, track, track+TRACK_MAX);
+    ASSERT(from >= track && from <= track+TRACK_MAX, "INVALID from: %d, [%d -> %d]", from, track, track+TRACK_MAX);
+    const track_node *n = from;
+    int distance = 0;
+    const track_edge *e;
+    ASSERT(n >= track && n <= track+TRACK_MAX, "INVALID n: %d, [%d -> %d]", n, track, track+TRACK_MAX);
+    while (n != to && n != NULL) {
+        e = next_edge_on_route(n, route, &idx);
+        if (unlikely(e == NULL)) {
+            return -1;
+        }
+        distance += e->dist;
+        n = e->dest;
+    }
+    ASSERT(n == NULL || n == to, "While Loop broken early");
+
+    return distance;
+}
+
+bool reserve_track(const Route * restrict route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations) {
+    Reservation mask = RESERVATION_INIT;
+    const track_edge *e;
+    const track_node *n = start;
+    ASSERT(n >= track && n <= track+TRACK_MAX, "INVALID n: %d, [%d -> %d]", n, track, track+TRACK_MAX);
+    while (n != end && n != NULL) {
+        int ind = TRACK_NODE_TO_INDEX(n);
+        if (ind < 64) {
+            mask.bits_low |= 0x1ULL << ind;
+        }
+        else {
+            mask.bits_high |= 0x1ULL << ind;
+        }
+
+        e = next_edge_on_route(n, route, &idx);
+        ASSERT(e != NULL, "hit an exit!");
+        n = e->dest;
+    }
+    ASSERT(n == end, "While Loop broken early");
+
+    if ((reservations->bits_low & mask.bits_low) || (reservations->bits_low & mask.bits_low)) {
+        return FALSE;
+    }
+
+    reservations->bits_low |= mask.bits_low;
+    reservations->bits_high |= mask.bits_high;
+
+    return TRUE;
+}
 
