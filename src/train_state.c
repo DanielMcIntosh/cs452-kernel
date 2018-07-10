@@ -177,8 +177,8 @@ static int distance_to_on_route(const ActiveRoute * restrict ar, const track_nod
     ASSERT(from != NULL && to != NULL, "Invalid from/to: %d, %d", from, to);
     ASSERT(to >= track && to <= track+TRACK_MAX, "INVALID to: %d, [%d -> %d]", to, track, track+TRACK_MAX);
     ASSERT(from >= track && from <= track+TRACK_MAX, "INVALID from: %d, [%d -> %d]", from, track, track+TRACK_MAX);
-    track_node *n = from->edge[DIR_AHEAD].dest;
-    int distance = from->edge[DIR_AHEAD].dist;
+    track_node *n = from;
+    int distance = 0;
     track_edge *e;
     int idx = ar->idx;
     ASSERT(n >= track && n <= track+TRACK_MAX, "INVALID n: %d, [%d -> %d]", n, track, track+TRACK_MAX);
@@ -187,6 +187,7 @@ static int distance_to_on_route(const ActiveRoute * restrict ar, const track_nod
         switch (n->type) {
         case (NODE_BRANCH):
         {
+            ASSERT(ar->route.rcs[idx].swmr == SWCLAMP(n->num), "Incorredt switch in path. ");
             ASSERT(ar->route.rcs[idx].a != ACTION_NONE, "Action None on route (idx: %d, node: %s, to: %s, from: %s)", idx, n->name, to->name, from->name);
             RouteCommand rc = ar->route.rcs[idx++];
             e = &n->edge[STATE_TO_DIR(rc.a == ACTION_STRAIGHT ? SWITCH_STRAIGHT : SWITCH_CURVED)];;
@@ -248,14 +249,14 @@ static void ts_exec_step(TerminalCourier *tc, ActiveRoute * restrict ar, int cmd
     switch (rc.a) {
         case (ACTION_STRAIGHT):
         {
-            Command cmd = {COMMAND_SW, STATE_TO_CHAR(SWITCH_STRAIGHT), .arg2 = rc.swmr};
+            Command cmd = {COMMAND_SW, STATE_TO_CHAR(SWITCH_STRAIGHT), .arg2 = SWUNCLAMP(rc.swmr)};
             SendCommand(cmdtid, cmd);
             cnode = &track[SWITCH_TO_NODE(rc.swmr-1)];
             break;
         }
         case (ACTION_CURVED):
         {
-            Command cmd = {COMMAND_SW, STATE_TO_CHAR(SWITCH_CURVED), .arg2 = rc.swmr};
+            Command cmd = {COMMAND_SW, STATE_TO_CHAR(SWITCH_CURVED), .arg2 = SWUNCLAMP(rc.swmr)};
             SendCommand(cmdtid, cmd);
             cnode = &track[SWITCH_TO_NODE(rc.swmr-1)];
             break;
@@ -277,7 +278,7 @@ static void ts_exec_step(TerminalCourier *tc, ActiveRoute * restrict ar, int cmd
         tc_send(tc, TERMINAL_ROUTE_DBG2, 204, nc.swmr);
         ar->next_step_distance += distance_to_on_route(ar, cnode, rc_to_track_node(nc));
         ar->idx++;
-    } else{
+    } else {
         ar->next_step_distance = 99999;
         tc_send(tc, TERMINAL_ROUTE_DBG2, 204, 0);
     }
