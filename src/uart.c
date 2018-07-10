@@ -299,7 +299,10 @@ int Getc(int servertid, int __attribute__((unused)) channel) {
     return (r >= 0 ? rm.ret : r);
 }
 
+#define DEBUG_NULL_CHARS FALSE
+
 int Putc(int servertid, int __attribute__((unused)) channel, char ch) {
+    if (!DEBUG_NULL_CHARS && ch == 0) return 0; 
     #if DEBUG_COM2
     if (channel == 1){
         bwputc(COM1, ch);
