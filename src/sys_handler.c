@@ -49,6 +49,13 @@ static inline void handle_send(TD *task, TaskQueue *task_ready_queue){
         return;
     }
 
+    if (receiver->state == STATE_BLK_RECEIVE || receiver->state == STATE_BLK_REPLY) {
+        TD * sndr = task->rcv_queue;
+       while (sndr != NULL) {
+           ASSERT(sndr->tid != receiver->tid, "DEADLOCK: %d is sending to %d, but %d is currently sending to %d (in state: %d)", task->tid, receiver->tid, receiver->tid, task->tid, receiver->state);
+       }
+   }
+
 
     //reciever is already waiting for a message
     if (receiver->state == STATE_BLK_SEND)

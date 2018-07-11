@@ -276,14 +276,16 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
             int train = cm.command.arg2;
             Putc(servertid, 1, speed);
             Putc(servertid, 1, train);
-            TrainData td = {speed, train};
+            tc_send(&tc, TERMINAL_ROUTE_DBG2, 299, train);
+            tc_send(&tc, TERMINAL_ROUTE_DBG2, 300, speed);
+            //TrainData td = {speed, train};
             //NotifyTrainSpeed(trainstate_tid, td);
             break;
         }
         case COMMAND_RV:
         {
             int train = cm.command.arg1;
-            int speed = GetTrainSpeed(trainstate_tid, train);
+            int speed = 10;//GetTrainSpeed(trainstate_tid, train);
             commandserver_exec_reverse(train, speed, servertid, trainstate_tid, &tc);
             break;
         }

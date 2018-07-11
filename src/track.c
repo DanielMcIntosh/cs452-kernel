@@ -50,7 +50,7 @@ static void q_add(BFSNode** freeQ, BFSNode** freeQTail, BFSNode *node){
     *freeQTail = node;
 }
 
-#define ALLOW_REVERSE FALSE
+#define ALLOW_REVERSE TRUE
 
 int find_path_between_nodes(const Reservation * restrict reservations, int min_dist, int rev_penalty, const track_node *origin, const track_node *dest, Route * restrict r) {
     entry_t mh_array[BFS_MH_SIZE];
@@ -181,13 +181,19 @@ inline const track_edge *next_edge_on_route(const Route *route, int * restrict i
         return &(n->edge[(rc.a == ACTION_STRAIGHT) ? DIR_STRAIGHT : DIR_CURVED]);
         break;
     }
-    case (NODE_ENTER):
     case (NODE_MERGE):
+    {
+        if (route->rcs[*idx].swmr == SWCLAMP(n->num) && route->rcs[*idx].a == ACTION_RV) {
+            *idx+=1;
+            return n->edge[DIR_AHEAD].reverse;
+        }
+        __attribute__((fallthrough));
+    }
+    case (NODE_ENTER):
     case (NODE_SENSOR):
     //return a pointer to an edge with all 0 values in the case of exit
     case (NODE_EXIT):
     {
-         // TODO proper next sensor predicting w/ reversing
         return &(n->edge[DIR_AHEAD]);
     }
     default:

@@ -28,7 +28,7 @@ typedef struct routecommand{
 
 typedef struct route {
     RouteCommand rcs[MAX_ROUTE_COMMAND];
-    int reverse: 1; int packing: 7;
+    unsigned int reverse: 1; int packing: 7;
 } Route;
 
 #define ROUTE_INIT {{{0, 0, 0}}, 0, 0}
