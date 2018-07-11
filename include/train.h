@@ -6,6 +6,9 @@
 #define MAX_CONCURRENT_TRAINS 5
 #define NUM_TRAINS 80
 
+//train body is ~62cm long, round up to 65 just in case
+#define TRAIN_LENGTH 650
+
 typedef enum direction{
     FORWARD,
     BACKWARD

@@ -3,11 +3,13 @@ TODO:
 IMPORTANT:
     route from next sensor, not last sensor
 
-    reversing routes
+    revserving routes
         allow re-reservation if the train already owns it
         allow travel if the train already owns it
         unreserve track
         wake up when track free's up
+
+    reversing routes
 
     individual stopping distances for trains
 
