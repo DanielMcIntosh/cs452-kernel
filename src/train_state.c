@@ -169,7 +169,7 @@ static void ts_exec_step(TerminalCourier * restrict tc, ActiveRoute * restrict a
     if (ar->idx < MAX_ROUTE_COMMAND && ar->route.rcs[++ar->idx].a != ACTION_NONE) {
         RouteCommand nc = ar->route.rcs[ar->idx];
         tc_send(tc, TERMINAL_ROUTE_DBG2, 204, nc.swmr);
-        ar->next_step_distance += distance_to_on_route(&ar->route, ar->idx, cnode, rc_to_track_node(nc));
+        ar->next_step_distance += distance_to_on_route(&ar->route, ar->idx - 1, cnode, rc_to_track_node(nc));
     } else {
         ar->next_step_distance = INT_MAX;
         tc_send(tc, TERMINAL_ROUTE_DBG2, 204, 0);
@@ -320,14 +320,15 @@ void task_train_state(int trackstate_tid) {
             //tc_send(&tc, TERMINAL_ROUTE_DBG2, ar->remaining_distance, ar->next_step_distance);
             //tc_send(&tc, TERMINAL_ROUTE_DBG2, 203, ts.total_trains);
             if (!ACTIVE_ROUTE_COMPLETE(ar)){
+                ASSERT(distance != 0, "distance between last sensor pair shouldn't be 0");
                 //have to delay initialization of next step distance until we hit the next sensor, since that's where the route actually starts
                 if (ar->idx == 0) {
                     ar->next_step_distance = distance_to_on_route(&ar->route, ar->idx, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[0])); // TODO
                 }
                 else {
-                    ar->remaining_distance -= distance;
                     ar->next_step_distance -= distance;
                 }
+                ar->remaining_distance -= distance;
                 tc_send(&tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
 
                 int idx = ar->idx, tmp = 0;
@@ -353,7 +354,10 @@ void task_train_state(int trackstate_tid) {
                 else {
                     //TODO execute steps up to reserved length
                     idx = ar->idx;
+                    tc_send(&tc, TERMINAL_ROUTE_DBG2, 210, ar->idx);
                     next_sensor_on_route(&ar->route, &idx, &track[SENSOR_TO_NODE(sensor)], &dist_to_next_snsr);
+                    tc_send(&tc, TERMINAL_ROUTE_DBG2, 209, ar->idx);
+
                 }
                 
                 //*

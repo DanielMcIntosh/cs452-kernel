@@ -734,12 +734,12 @@ void task_terminal(int trackstate_tid) {
             cb_write_string(&t.output, "\0337");
             cursor_to_position(&t.output, TERMINAL_INPUT_MAX_LINE+3, t.dbg_col);
             t.dbg_col += cb_write_number(&t.output, n, 10);
-            cb_write_string(&t.output, " ");
+            cb_write_string(&t.output, ":");
             t.dbg_col += cb_write_number(&t.output, n2, 10);
-            cb_write_string(&t.output, "  ");
+            cb_write_string(&t.output, " ");
             cb_write_string(&t.output, "\0338");
             t.dbg_col += 3;
-            if (t.dbg_col > 61) t.dbg_col -= 61;
+            if (t.dbg_col > 97) t.dbg_col -= 97;
             break;
         }
         //*

@@ -223,9 +223,11 @@ inline const track_node *next_switch_on_route(const Route * restrict route, int 
 
 //TODO distance is overwritten by successive calls to next_sensor_on_route, so it isn't actually the resulting distance
 const track_node *nth_sensor_on_route(int n, const Route * restrict route, int * restrict idx, const track_node * restrict prev, int * restrict distance) {
+    int cur_dist = 0;
     for (int i = 0; i < n && likely(prev != NULL); ++i) {
-        prev = next_sensor_on_route(route, idx, prev, distance);
+        prev = next_sensor_on_route(route, idx, prev, &cur_dist);
     }
+    *distance = cur_dist;
     return prev;
 }
 
