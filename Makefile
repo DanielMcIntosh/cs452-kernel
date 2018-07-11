@@ -17,7 +17,7 @@ $(shell mkdir -p $(BINDIR) >/dev/null)
 XCC     = arm-none-eabi-gcc 
 AS	= arm-none-eabi-as
 LD      = arm-none-eabi-ld
-WARNINGS = -Wall -Wextra
+WARNINGS = -Wall -Wextra -Wformat
 CFLAGS  = $(DEPFLAGS) -c -std=c11 -fPIC $(WARNINGS) -I. -I $(INCLUDEDIR) -mcpu=arm920t -msoft-float -O3
 # -g: include hooks for gdb
 # -c: only compile

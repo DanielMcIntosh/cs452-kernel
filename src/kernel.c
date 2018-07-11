@@ -137,7 +137,7 @@ int main(){
     TD task_pool[TASK_POOL_SIZE]; // fun fact: every time we run the program, addresses move back by 80!
 
 //    bwprintf(COM2, "%d -> %d, %d -> %d\r\n", stack_space, stack_space + STACK_SPACE_SIZE, task_pool, task_pool + TASK_POOL_SIZE);
-
+    
     TaskQueue task_ready_queue;
     task_ready_queue.task_pool = task_pool;
     ValueStore value_store = {{0}};
