@@ -60,7 +60,7 @@ static inline int sendTrainState(int trainstatetid, const TrainStateMessage *msg
 }
 
 int calc_reverse_time(TrainState *ts, int activetrain){
-    return 350 / (15 - ts->active_trains[activetrain].speed) + 75; // BIG TODO
+    return 450 / (15 - ts->active_trains[activetrain].speed) + 75; // BIG TODO
 }
 
 int notify_rv_timeout(int, int);
@@ -308,7 +308,7 @@ void task_train_state(int trackstate_tid) {
             int min_dist, rev_penalty;
             if (train->speed == 0){
                 min_dist = 0;
-                rev_penalty = 0;
+                rev_penalty = 400;
                 train->speed = 10;
             } else {
                 min_dist = stopping_distance[train->speed] - distance_past;
@@ -336,6 +336,7 @@ void task_train_state(int trackstate_tid) {
                 trainserver_begin_reverse(&ts, ts.active_train_map[tr], &tc, cmdtid);
                 ar.reversing = 1;
             } else {
+                CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, 12, train->num); // TODO number
                 ar.reversing = 0;
             }
             ar.route = route;
@@ -478,7 +479,6 @@ void task_train_state(int trackstate_tid) {
             ts.active_trains[ts.total_trains].last_sensor = data.sensor;
             ts.active_trains[ts.total_trains].num = data.train;
             ++ts.total_trains;
-            tc_send(&tc, TERMINAL_ECHO, '0' + ts.total_trains, 0);
             break;
         }
         case (NOTIFY_RESERVATION):
