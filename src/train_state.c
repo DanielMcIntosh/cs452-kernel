@@ -11,28 +11,30 @@
 #include <terminalcourier.h>
 #include <command.h>
 #include <circlebuffer.h>
+#include <clock.h>
 
 #define TRAIN(ts, tr) (&((ts)->active_trains[(ts)->active_train_map[(tr)]]))
 typedef struct active_route{
     Route route;
+    int end_node;
     int train;
     int remaining_distance;
     int next_step_distance;
     int idx_resrv;
     int cur_pos_idx;
     int stopped;
+    int reversing;
 } ActiveRoute;
 
 #define ACTIVE_ROUTE_DONE_ACTIONS(ar) (ar->route.rcs[ar->idx_resrv].a == ACTION_NONE)
 #define ACTIVE_ROUTE_COMPLETE(ar) (ACTIVE_ROUTE_DONE_ACTIONS(ar) && ar->stopped)
-#define ACTIVE_ROUTE_INIT {ROUTE_INIT, 0, 0, 0, 0, 0, 1}
+#define ACTIVE_ROUTE_INIT {ROUTE_INIT, 0, 0, 0, 0, 0, 0, 0, 0}
 
 typedef struct train_state{
     int total_trains;
     int active_train_map[NUM_TRAINS];
     Train active_trains[MAX_CONCURRENT_TRAINS];
     Reservation reservations;
-    // at the moment: 1 active route, but there can be 1 per train later
     ActiveRoute active_routes[MAX_CONCURRENT_TRAINS];
 } TrainState;
 
@@ -55,6 +57,38 @@ static inline int sendTrainState(int trainstatetid, const TrainStateMessage *msg
     ReplyMessage rm;
     int r = Send(trainstatetid, msg, sizeof(*msg), &rm, sizeof(rm));
     return (r >= 0 ? rm.ret : r);
+}
+
+int calc_reverse_time(TrainState *ts, int activetrain){
+    return 350 / (15 - ts->active_trains[activetrain].speed) + 75; // BIG TODO
+}
+
+int notify_rv_timeout(int, int);
+void task_notify_rv_timeout(int delay, int activetrain){
+    int tid = WhoIs(NAME_TRAIN_STATE);
+    Delay(delay);
+    notify_rv_timeout(tid, activetrain);
+    Destroy();
+}
+
+void task_delay_reaccel(int speed, int train){
+    int tid = WhoIs(NAME_COMMANDSERVER);
+    Delay(13);
+    Command c = {COMMAND_TR, speed, .arg2=train};
+    SendCommand(tid, c);
+    Destroy();
+}
+
+static inline void trainserver_begin_reverse(TrainState *ts, int activetrain, TerminalCourier *tc) {
+    tc_send(tc, TERMINAL_FLAGS_SET, STATUS_FLAG_REVERSING, 0);
+    CreateWith2Args(PRIORITY_NOTIFIER, &task_notify_rv_timeout, calc_reverse_time(ts, activetrain), activetrain);
+    ts->active_trains[activetrain].speed = 0;
+    ts->active_routes[activetrain].reversing = 1;
+}
+
+int notify_rv_timeout(int trainstatetid, int activetrain) {
+    TrainStateMessage msg = {.type = MESSAGE_TRAIN_STATE, .request = NOTIFY_RV_TIMEOUT, .data = activetrain};
+    return sendTrainState(trainstatetid, &msg);
 }
 
 int NotifyTrainSpeed(int trainstatetid, TrainData data) {
@@ -298,6 +332,7 @@ void task_train_state(int trackstate_tid) {
             ActiveRoute ar = ACTIVE_ROUTE_INIT;
             //for (int i = 0; i < MAX_ROUTE_COMMAND && ar.idx
             ar.route = route;
+            ar.end_node = object;
             ar.remaining_distance = distance;
             ar.stopped = 0;
             ASSERT(ts.active_train_map[tr] >= 0 && ts.active_train_map[tr] < MAX_CONCURRENT_TRAINS, "Invalid active train: %d", ts.active_train_map[tr]);
@@ -350,19 +385,9 @@ void task_train_state(int trackstate_tid) {
             //tc_send(&tc, TERMINAL_ROUTE_DBG2, 203, ts.total_trains);
             if (!ACTIVE_ROUTE_COMPLETE(ar)){
                 ASSERT(distance != 0, "distance between last sensor pair shouldn't be 0");
-                //have to delay initialization of next step distance until we hit the next sensor, since that's where the route actually starts
-                if (ar->idx_resrv == 0) {
-                    ar->next_step_distance = distance_to_on_route(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[0], "ar init next step"), "ar init next step"); // TODO
-                    /*
-                    if (!reserve_track(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[0]), &ts.reservations)) {
-                        //TODO!!!!!
-                    }
-                    */
-                }
-                else {
-                    ar->next_step_distance -= distance;
-                }
-                ar->remaining_distance -= distance;
+                // recalculate next step distance and remaining distance every time
+                ar->next_step_distance = distance_to_on_route(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[ar->idx_resrv], "distance recalculate"), "distance recaculate");
+                ar->remaining_distance = distance_to_on_route(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], &track[ar->end_node], "distance recalculate");
                 tc_send(&tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
 
                 bool resrv_successful;
