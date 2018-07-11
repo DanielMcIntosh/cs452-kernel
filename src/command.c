@@ -142,7 +142,7 @@ static inline void commandserver_exec_reverse(int train, int speed, int serverti
     tc_send(tc, TERMINAL_FLAGS_SET, STATUS_FLAG_REVERSING, 0);
     CreateWith2Args(PRIORITY_NOTIFIER, &task_reverse_train, train, speed);
     TrainData td = {0, train};
-    NotifyTrainSpeed(trainstate_tid, td); // TODO train state courier
+    //NotifyTrainSpeed(trainstate_tid, td); // TODO train state courier
 }
 
 int cs_notify_terminal_buffer(int cmdtid, TerminalReq *treq) {
@@ -277,7 +277,7 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
             Putc(servertid, 1, speed);
             Putc(servertid, 1, train);
             TrainData td = {speed, train};
-            NotifyTrainSpeed(trainstate_tid, td);
+            //NotifyTrainSpeed(trainstate_tid, td);
             break;
         }
         case COMMAND_RV:
@@ -343,7 +343,7 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
             Putc(servertid, 1, sm.speed);
             Putc(servertid, 1, train);
             TrainData td = {train, sm.speed};
-            NotifyTrainSpeed(trainstate_tid, td);
+            //NotifyTrainSpeed(trainstate_tid, td);
             CreateWith2Args(PRIORITY_LOW, &task_short_move, train, sm.delay);
 
             break;
@@ -397,7 +397,7 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
             Putc(servertid, 1, speed);
             Putc(servertid, 1, train);
             TrainData td = {speed, train};
-            NotifyTrainSpeed(trainstate_tid, td);
+            //NotifyTrainSpeed(trainstate_tid, td);
             break;
         }
         case COMMAND_NOTIFY_RV_REVERSE:
