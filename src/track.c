@@ -209,7 +209,6 @@ static inline const track_node *next_on_route(const Route *route, int * restrict
     const track_edge *e;
     do {
         e = next_edge_on_route(route, idx, n, sig);
-
         *distance += e->dist;
         n = e->dest;
     } while (n != NULL && n->type != type);
@@ -259,7 +258,6 @@ int distance_to_on_route(const Route *route, int idx, const track_node *from, co
     const track_edge *e;
     while (n != to && n != NULL) {
         e = next_edge_on_route(route, &idx, n, sig);
-
         ASSERT(e != NULL, "Null edge on route: from %s, to %s, idx: %d @ %s", from->name, to->name, idx, sig);
         distance += e->dist;
         n = e->dest;

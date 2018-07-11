@@ -178,6 +178,8 @@ static void ts_exec_step(TrainState * restrict ts, TerminalCourier * restrict tc
     // do current step:
     RouteCommand rc = ar->route.rcs[ar->idx_resrv];
     const track_node *cnode = rc_to_track_node(rc, "ts_exec_step");
+#define RV_PENALTY 10000
+    int rv_penalty = 0;
     switch (rc.a) {
         case (ACTION_STRAIGHT):
         {
@@ -196,6 +198,7 @@ static void ts_exec_step(TrainState * restrict ts, TerminalCourier * restrict tc
             trainserver_begin_reverse(ts, activetrain, tc, cmdtid);
             cnode = &track[MERGE_TO_NODE(rc.swmr)];
             ar->reversing = 1;
+            rv_penalty = RV_PENALTY;
             break;
         }
         default:
@@ -207,10 +210,7 @@ static void ts_exec_step(TrainState * restrict ts, TerminalCourier * restrict tc
     if (ar->idx_resrv < MAX_ROUTE_COMMAND && ar->route.rcs[++ar->idx_resrv].a != ACTION_NONE) {
         RouteCommand nc = ar->route.rcs[ar->idx_resrv];
         const track_node *nnode = rc_to_track_node(nc, "ts_exec_step");
-        tc_send(tc, TERMINAL_ROUTE_DBG2, 208, cnode->num + 100*rc.swmr);
-        tc_send(tc, TERMINAL_ROUTE_DBG2, 204, nnode->num + 100*nc.swmr);
-        Delay(20);
-        ar->next_step_distance += distance_to_on_route(&ar->route, ar->idx_resrv - 1, cnode, nnode, "ts_exec_step");
+        ar->next_step_distance += distance_to_on_route(&ar->route, ar->idx_resrv - 1, cnode, nnode, "ts_exec_step") + rv_penalty;
     } else {
         ar->next_step_distance = INT_MAX - 10000;
         tc_send(tc, TERMINAL_ROUTE_DBG2, 204, 0);
@@ -335,6 +335,8 @@ void task_train_state(int trackstate_tid) {
                 tc_send(&tc, TERMINAL_ROUTE_DBG2, 215, ts.active_train_map[tr]);
                 trainserver_begin_reverse(&ts, ts.active_train_map[tr], &tc, cmdtid);
                 ar.reversing = 1;
+            } else {
+                ar.reversing = 0;
             }
             ar.route = route;
             ar.end_node = object;
@@ -346,6 +348,7 @@ void task_train_state(int trackstate_tid) {
                 tc_send(&tc, TERMINAL_ROUTE_DBG, ar.route.rcs[i].swmr, ar.route.rcs[i].a);
             }
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 211, route.reverse);
+            tc_send(&tc, TERMINAL_ROUTE_DBG2, 214, ar.reversing);
             tc_send(&tc, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING, 0);
             break;
         }
@@ -387,12 +390,16 @@ void task_train_state(int trackstate_tid) {
             ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor for train %d: %d", tr, train->last_sensor);
 
             //tc_send(&tc, TERMINAL_ROUTE_DBG2, ar->remaining_distance, ar->next_step_distance);
-            //tc_send(&tc, TERMINAL_ROUTE_DBG2, 203, ts.total_trains);
+            tc_send(&tc, TERMINAL_ROUTE_DBG2, 213, !ACTIVE_ROUTE_COMPLETE(ar) && !ar->reversing);
             if (!ACTIVE_ROUTE_COMPLETE(ar) && !ar->reversing){
                 ASSERT(distance != 0, "distance between last sensor pair shouldn't be 0");
                 // recalculate next step distance and remaining distance every time
-                ar->next_step_distance = distance_to_on_route(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[ar->idx_resrv], "distance recalculate"), "distance recaculate");
-                ar->remaining_distance = distance_to_on_route(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], &track[ar->end_node], "distance recalculate");
+                if (ACTIVE_ROUTE_DONE_ACTIONS(ar)) {
+                    ar->next_step_distance = 0;
+                } else {
+                    ar->next_step_distance = distance_to_on_route(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[ar->idx_resrv], "ar next step recalculate rc2tn"), "ar next step recalculate");
+                }
+                ar->remaining_distance = distance_to_on_route(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], &track[ar->end_node], "ar distance recalculate");
                 tc_send(&tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
 
                 bool resrv_successful;
@@ -418,10 +425,8 @@ void task_train_state(int trackstate_tid) {
                 //*
                 // Perform any actions we need to do:
                 //TODO pass dist, new idx, etc. since it's already being calculated for reservations
-                while (ar->next_step_distance <= resrv_dist) {
-                    ASSERT(!ACTIVE_ROUTE_DONE_ACTIONS(ar), "executing steps after finished");
-                    tc_send(&tc, TERMINAL_ROUTE_DBG2, 209, resrv_dist);
-                    tc_send(&tc, TERMINAL_ROUTE_DBG2, 206, ar->next_step_distance);
+                while (ar->next_step_distance <= resrv_dist && !ACTIVE_ROUTE_DONE_ACTIONS(ar)) {
+                    tc_send(&tc, TERMINAL_ROUTE_DBG2, 206, ar->route.rcs[ar->idx_resrv].swmr);
                     ts_exec_step(&ts, &tc, ar, tr, cmdtid);
                     //PANIC("idx = %d", ar->idx);
                 }
@@ -500,9 +505,12 @@ void task_train_state(int trackstate_tid) {
             SendCommand(cmdtid, c);
 
             ar->reversing = 0;
-            CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, 5, train->num); // TODO number
+            CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, 12, train->num); // TODO number
              // TODO exec switches
             tc_send(&tc, TERMINAL_FLAGS_UNSET, STATUS_FLAG_REVERSING, 0);
+            tc_send(&tc, TERMINAL_ROUTE_DBG2, 206, ar->route.rcs[ar->idx_resrv].swmr);
+            ts_exec_step(&ts, &tc, ar, activetrain, cmdtid);
+            ar->idx_resrv--; // REALLY BIG TODO 
             break;
         }
         case (TRAIN_STATE_NOTIFY_TERMINAL_COURIER):
