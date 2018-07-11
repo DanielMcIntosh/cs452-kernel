@@ -23,8 +23,9 @@ typedef struct active_route{
     int stopped;
 } ActiveRoute;
 
+#define ACTIVE_ROUTE_DONE_ACTIONS(ar) (ar->route.rcs[ar->idx_resrv].a == ACTION_NONE)
+#define ACTIVE_ROUTE_COMPLETE(ar) (ACTIVE_ROUTE_DONE_ACTIONS(ar) && ar->stopped)
 #define ACTIVE_ROUTE_INIT {ROUTE_INIT, 0, 0, 0, 0, 0, 1}
-#define ACTIVE_ROUTE_COMPLETE(ar) (ar->route.rcs[ar->idx_resrv].a == ACTION_NONE && ar->stopped)
 
 typedef struct train_state{
     int total_trains;
@@ -139,7 +140,7 @@ static inline int get_active_train_from_sensor(TrainState *ts, const int sensor,
 static void ts_exec_step(TerminalCourier * restrict tc, ActiveRoute *ar, int cmdtid) {
     // do current step:
     RouteCommand rc = ar->route.rcs[ar->idx_resrv];
-    const track_node *cnode = rc_to_track_node(rc);
+    const track_node *cnode = rc_to_track_node(rc, "ts_exec_step");
     switch (rc.a) {
         case (ACTION_STRAIGHT):
         {
@@ -163,17 +164,16 @@ static void ts_exec_step(TerminalCourier * restrict tc, ActiveRoute *ar, int cmd
             PANIC("Unhandled action type in ts_exec_step: %d", rc.a);
         }
     }
-    // If the route is over, set next step distance to intmax
     // NOTE THE ++ in the if, also not it will only happen if ar->idx_resrv < MAX_ROUTE_COMMAND
     if (ar->idx_resrv < MAX_ROUTE_COMMAND && ar->route.rcs[++ar->idx_resrv].a != ACTION_NONE) {
         RouteCommand nc = ar->route.rcs[ar->idx_resrv];
-        const track_node *nnode = rc_to_track_node(nc);
+        const track_node *nnode = rc_to_track_node(nc, "ts_exec_step");
         tc_send(tc, TERMINAL_ROUTE_DBG2, 208, cnode->num + 100*rc.swmr);
         tc_send(tc, TERMINAL_ROUTE_DBG2, 204, nnode->num + 100*nc.swmr);
         Delay(20);
-        ar->next_step_distance += distance_to_on_route(&ar->route, ar->idx_resrv - 1, cnode, nnode);
+        ar->next_step_distance += distance_to_on_route(&ar->route, ar->idx_resrv - 1, cnode, nnode, "ts_exec_step");
     } else {
-        ar->next_step_distance = INT_MAX;
+        ar->next_step_distance = INT_MAX - 10000;
         tc_send(tc, TERMINAL_ROUTE_DBG2, 204, 0);
     }
 }
@@ -187,20 +187,20 @@ static inline const track_node *get_resrv_end(const Route *route, int idx, const
     }
 
     //nth-sensor + stopping_dist + next_switch
-    resrv_end = nth_sensor_on_route(2,  route, &idx, resrv_end, &cur_dist);
+    resrv_end = nth_sensor_on_route(2,  route, &idx, resrv_end, &cur_dist, "get_resrv_end: 1");
     *resrv_dist += cur_dist;
     if (resrv_end == NULL) {
         return NULL;
     }
 
     cur_dist = stopping_distance;
-    resrv_end = forward_dist_on_route(  route, &idx, resrv_end, &cur_dist);
+    resrv_end = forward_dist_on_route(  route, &idx, resrv_end, &cur_dist, "get_resrv_end: 2");
     *resrv_dist += cur_dist;
     if (resrv_end == NULL) {
         return NULL;
     }
 
-    resrv_end = next_switch_on_route(   route, &idx, resrv_end, &cur_dist);
+    resrv_end = next_switch_on_route(   route, &idx, resrv_end, &cur_dist, "get_resrv_end: 3");
     *resrv_dist += cur_dist;
     return resrv_end;
 }
@@ -352,7 +352,7 @@ void task_train_state(int trackstate_tid) {
                 ASSERT(distance != 0, "distance between last sensor pair shouldn't be 0");
                 //have to delay initialization of next step distance until we hit the next sensor, since that's where the route actually starts
                 if (ar->idx_resrv == 0) {
-                    ar->next_step_distance = distance_to_on_route(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[0])); // TODO
+                    ar->next_step_distance = distance_to_on_route(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[0], "ar init next step"), "ar init next step"); // TODO
                     /*
                     if (!reserve_track(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[0]), &ts.reservations)) {
                         //TODO!!!!!
@@ -365,13 +365,13 @@ void task_train_state(int trackstate_tid) {
                 ar->remaining_distance -= distance;
                 tc_send(&tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
 
-                int dummy = 0;
-                //update ar->cur_pos_idx
-                next_sensor_on_route(&ar->route, &ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], &dummy);
-
                 bool resrv_successful;
                 int resrv_dist = 0;
                 const track_node *resrv_end = get_resrv_end(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], stopping_distance[train->speed], &resrv_dist);
+
+                int dummy = 0;
+                //update ar->cur_pos_idx
+                next_sensor_on_route(&ar->route, &ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], &dummy, "update cur_pos_idx");
 
                 //todo will fail after first sensor right now because we've already reserved some of this
                 //Therefore, we currently ignore whether we actually could reserve track
@@ -389,6 +389,7 @@ void task_train_state(int trackstate_tid) {
                 // Perform any actions we need to do:
                 //TODO pass dist, new idx, etc. since it's already being calculated for reservations
                 while (ar->next_step_distance <= resrv_dist) {
+                    ASSERT(!ACTIVE_ROUTE_DONE_ACTIONS(ar), "executing steps after finished");
                     tc_send(&tc, TERMINAL_ROUTE_DBG2, 209, resrv_dist);
                     tc_send(&tc, TERMINAL_ROUTE_DBG2, 206, ar->next_step_distance);
                     ts_exec_step(&tc, ar, cmdtid);

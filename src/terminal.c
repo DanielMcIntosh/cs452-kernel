@@ -107,7 +107,8 @@ static void output_base_terminal(Terminal *t) {
     cursor_to_position(cb, TERMINAL_INPUT_MAX_LINE + 1, 1);
     cb_write_string(cb, "TRACK: ");
     cb_write(cb, track);
-    cb_write_string(cb, "   " STYLED_FLAG_STRING);
+    cb_write_string(cb, "   " STYLED_FLAG_STRING "\033["S(TERMINAL_DEBUG_BASE_LINE)";"S(TERMINAL_DEBUG_MAX_LINE)"r");
+
 
     cursor_to_position(cb, 1, 29);
     cb_write_number(cb, STACK_SPACE_SIZE/TASK_POOL_SIZE - 4, 16);
@@ -732,14 +733,17 @@ void task_terminal(int trackstate_tid) {
             int n = tm.arg1;
             int n2 = tm.arg2;
             cb_write_string(&t.output, "\0337");
-            cursor_to_position(&t.output, TERMINAL_INPUT_MAX_LINE+3, t.dbg_col);
+            cursor_to_position(&t.output, TERMINAL_DEBUG_MAX_LINE+1, t.dbg_col);
             t.dbg_col += cb_write_number(&t.output, n, 10);
             cb_write_string(&t.output, ":");
             t.dbg_col += cb_write_number(&t.output, n2, 10);
             cb_write_string(&t.output, " ");
+            t.dbg_col += 2;
+            if (t.dbg_col > 97) {
+                cb_write_string(&t.output, "\n");
+                t.dbg_col = 0;
+            }
             cb_write_string(&t.output, "\0338");
-            t.dbg_col += 3;
-            if (t.dbg_col > 97) t.dbg_col -= 97;
             break;
         }
         //*
