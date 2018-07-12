@@ -255,6 +255,10 @@ int GetTrainSpeed(int trackstatetid, int train){
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = TRAIN_SPEED, {.data = train}};
     return sendTrackState(trackstatetid, &msg);
 }
+int GetStopDistance(int trackstatetid, int speed){
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = STOPDIST, {.data = speed}};
+    return sendTrackState(trackstatetid, &msg);
+}
 
 void task_track_state(int track){
     RegisterAs(NAME_TRACK_STATE);
@@ -286,8 +290,8 @@ void task_track_state(int track){
         50, 60,
         70, 80,
         90, 150,
-        400, 800,
-        1500, 2000
+        400, 720, // for train 58
+        850,1000
     };
 
     int short_speed[NUM_SHORTS] = 
@@ -334,6 +338,12 @@ void task_track_state(int track){
             Reply(tid, &rm, sizeof(rm));
             break;
         }
+        case (STOPDIST):
+        {
+            rm.ret = stopping_distance[(int) tm.data];
+            Reply(tid, &rm, sizeof(rm));
+            break;
+        }
         case (ROUTE):
         {
             ASSERT(current_speed != 0, "Trying to find route with speed == 0!");
@@ -372,6 +382,8 @@ void task_track_state(int track){
                     ASSERT(err == 0, "Forward Distance Failed");
                 }
                 rom.end_sensor = (int) f->num; 
+                rom.end_sensor = object;
+                rom.time_after_end_sensor = 0;
                 for (int i = 1; i <= NUM_SWITCHES; i++){
                     if (tp.switches[i].state != ts.switches[i].state) {
                         rom.switches[i] = tp.switches[i]; // pick up differences and unnknowns
@@ -479,7 +491,7 @@ void task_track_state(int track){
             //adjust stopping_distance
             int interval = BASE_STOP_DIST_ADJUSTMENT;
             for (int i = 0; i < data.iteration; ++i) {
-                interval = interval * 4 / 5;
+                interval = interval * 14 / 17;
             }
             ASSERT(interval >= 10, "interval < 10");
             stopping_distance[data.speed] += (data.triggered ? 1 : -1) * interval;

@@ -158,9 +158,28 @@ void task_calibrate(int train, int sensor_dest) {
     SendTerminalRequest(terminaltid, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING | STATUS_FLAG_CALIBRATING, 0);
 
     RouteMessage rom = {0, 0, {{0}}};
+    int track_state_tid = WhoIs(NAME_TRACK_STATE);
+    
     int alarm_tid;
     bool runnable_success;
-    int track_state_tid = WhoIs(NAME_TRACK_STATE);
+
+    RouteRequest rq = {.object = sensor_dest, .distance_past = 0};
+    int err = GetRoute(track_state_tid, rq, &rom);
+    ASSERT(err==0, "FAILED TO GET ROUTE");
+    //if (i < 2)
+        setup_track_state(cmdtid, &rom);
+
+    int sensor_to_wake = rom.end_sensor;
+    //wait until we hit <sensor_to_wake>
+    //for now, assume we're always successful in triggering <sensor_to_wake>
+    Runnable runnable_alarm1 = {&send_wakeup, my_tid, 0, 5000U, TRUE};
+    RunWhen(sensor_to_wake, &runnable_alarm1, PRIORITY_MID);
+    Receive(&alarm_tid, &runnable_success, sizeof(runnable_success));
+    Reply(alarm_tid, NULL, 0);
+    Command stop_cmd = {COMMAND_TR, 0, {.arg2 = train}};
+    SendCommand(cmdtid, stop_cmd);
+/*
+
     int speed = GetTrainSpeed(track_state_tid, train);
     bool overshot;
 
@@ -178,7 +197,7 @@ void task_calibrate(int train, int sensor_dest) {
             int sensor_to_wake = rom.end_sensor;
             //wait until we hit <sensor_to_wake>
             //for now, assume we're always successful in triggering <sensor_to_wake>
-            Runnable runnable_alarm1 = {&send_wakeup, my_tid, 0, 50000U, FALSE};
+            Runnable runnable_alarm1 = {&send_wakeup, my_tid, 0, 5000U, TRUE};
             RunWhen(sensor_to_wake, &runnable_alarm1, PRIORITY_MID);
             Receive(&alarm_tid, &runnable_success, sizeof(runnable_success));
             Reply(alarm_tid, NULL, 0);
@@ -194,7 +213,7 @@ void task_calibrate(int train, int sensor_dest) {
             SendCommand(cmdtid, stop_cmd);
 
             //sleep until we hit sensor_dest, timeout 2.5 s after we send stop command
-            Runnable runnable_alarm2 = {&send_wakeup, my_tid, 0, 250U, TRUE};
+            Runnable runnable_alarm2 = {&send_wakeup, my_tid, 0, 450U, TRUE};
             RunWhen(sensor_dest, &runnable_alarm2, PRIORITY_MID);
             Receive(&alarm_tid, &overshot, sizeof(overshot));
             Reply(alarm_tid, NULL, 0);
@@ -208,8 +227,41 @@ void task_calibrate(int train, int sensor_dest) {
             if (overshot) {
                 ++num_over;
             }
+            char * s= "CAL SD: ";
+            for (unsigned int i = 0; i <  sizeof("CAL SD: ")/sizeof(char); i++) {
+                SendTerminalRequest(terminaltid, TERMINAL_ECHO, s[i], 0);
+            }
+            int d = 1, base = 10;
+            int num = GetStopDistance(track_state_tid, speed);
+            while( (num / d) >= base) {
+                d  *= base; // find max digit
+            }
+            while (d != 0) {
+                int dgt = num / d; // get digit
+                num %= d;
+                d /= base;
+                SendTerminalRequest(terminaltid, TERMINAL_ECHO, '0'+dgt, 0);
+            }
+            SendTerminalRequest(terminaltid, TERMINAL_NEWLINE, 0, 0);
         }
     }
+    char * s= "CAL SD: ";
+    for (unsigned int i = 0; i <  sizeof("CAL SD: ")/sizeof(char); i++) {
+        SendTerminalRequest(terminaltid, TERMINAL_ECHO, s[i], 0);
+    }
+    int d = 1, base = 10;
+    int num = GetStopDistance(track_state_tid, speed);
+    while( (num / d) >= base) {
+        d  *= base; // find max digit
+    }
+    while (d != 0) {
+        int dgt = num / d; // get digit
+        num %= d;
+        d /= base;
+        SendTerminalRequest(terminaltid, TERMINAL_ECHO, '0'+dgt, 0);
+    }
+    SendTerminalRequest(terminaltid, TERMINAL_NEWLINE, 0, 0);
+    */
     SendTerminalRequest(terminaltid, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING | STATUS_FLAG_CALIBRATING, 0);
     Destroy();
 }

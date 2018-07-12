@@ -9,11 +9,12 @@ void * memcpy(void * dest, const void* src, unsigned int sz){
     register int n = sz >> 2;
     switch (sz & 0x3) {
             do {
-    case 0:     *dp++ = *sp++;
-    case 3:     *dp++ = *sp++;
-    case 2:     *dp++ = *sp++;
-    case 1:     *dp++ = *sp++;
-            } while (--n > 0);
+                {*dp++ = *sp++;  __attribute__ ((fallthrough));}
+    case 3:     {*dp++ = *sp++;  __attribute__ ((fallthrough));}
+    case 2:     {*dp++ = *sp++;  __attribute__ ((fallthrough));}
+    case 1:     {*dp++ = *sp++;  __attribute__ ((fallthrough));}
+    case 0:     ;
+            } while (n-- > 0);
     }
     return dest;
 }
@@ -27,4 +28,13 @@ void memswap(void *a, void *b, unsigned int sz) {
         *b1++=*b2;
         *b2++=b;
     }
+}
+
+void *memset(void *s, int c, unsigned int n) {
+  unsigned char *p = s;
+  while(n --> 0) {  
+      __asm__(""); // ensure that we don't optimize memset to memset
+      *p++ = (unsigned char)c;
+  }
+  return s;
 }

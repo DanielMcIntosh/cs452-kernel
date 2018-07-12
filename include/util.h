@@ -13,10 +13,19 @@
 #define NULL 0
 #endif
 
+#ifndef UINT_MAX
+#define UINT_MAX ((unsigned int)-1)
+#endif
+
+#ifndef INT_MAX
+#define INT_MAX (UINT_MAX / 2)
+#endif
+
 #define bool int
 
 void memswap(void * a, void * b, unsigned int sz);
 void * memcpy(void * dest, const void* src, unsigned int sz);
+void *memset(void *s, int c, unsigned int n);
 
 #ifndef MAX
 #define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))
@@ -37,5 +46,14 @@ void * memcpy(void * dest, const void* src, unsigned int sz);
 #ifndef MS_TO_S
 #define MS_TO_S(ms) ((ms)/1000)
 #endif
+
+#define likely(x)       __builtin_expect((x),1)
+#define unlikely(x)     __builtin_expect((x),0)
+
+#define array_dim(x) (sizeof(x) / sizeof(x[0]))
+#define sizeof_field(type, field) (sizeof(((type *)0)->field))
+#define field_dim(type, member) (sizeof_field(type, member) / sizeof_field(type, member[0]))
+
+#define FOREVER for(;;)
 
 #endif
