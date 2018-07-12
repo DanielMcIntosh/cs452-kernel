@@ -288,6 +288,13 @@ bool reserve_track(const Route *route, int idx, const track_node *start, const t
             mask.bits_low |= 0x1ULL << ind;
         }
         else {
+            if (n->type == NODE_BRANCH) {
+                ind = SWCLAMP(n->num) - 1 + 80;
+            }
+            else if (n->type == NODE_MERGE) {
+                ind = (SWCLAMP(n->num) - 1) + 80 + 22;
+            }
+            ind -= 64;
             mask.bits_high |= 0x1ULL << ind;
         }
 
@@ -295,7 +302,7 @@ bool reserve_track(const Route *route, int idx, const track_node *start, const t
     }
     ASSERT(n == end, "While Loop broken early");
 
-    if ((reservations->bits_low & mask.bits_low) || (reservations->bits_low & mask.bits_low)) {
+    if ((reservations->bits_low & mask.bits_low) || (reservations->bits_high & mask.bits_high)) {
         return FALSE;
     }
 

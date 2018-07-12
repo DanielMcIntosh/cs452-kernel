@@ -445,10 +445,6 @@ void task_train_state(int trackstate_tid) {
                 //update ar->cur_pos_idx
                 next_sensor_on_route(&ar->route, &ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], &dist_to_next_snsr, "update cur_pos_idx");
 
-                //todo will fail after first sensor right now because we've already reserved some of this
-                //Therefore, we currently ignore whether we actually could reserve track
-                //bool resrv_successful = reserve_track(&ar->route, ar->idx_resrv, rc_to_track_node(ar->route.rcs[ar->idx_resrv]), resrv_end, &ts.reservations);
-
                 if (dist_to_next_snsr + train->stopping_distance[train->speed] >= ar->remaining_distance && !ar->stopped) {
                     // so we have to stop between now and the next sensor. Figure out how long we need to wait:
                     int stopdelay = calc_reverse_time_from_velocity(train->velocity[train->speed], ar->remaining_distance, train->stopping_distance[train->speed]);
@@ -468,6 +464,8 @@ void task_train_state(int trackstate_tid) {
                     //todo will fail after first sensor right now because we've already reserved some of this
                     //Therefore, we currently ignore whether we actually could reserve track
                     bool resrv_successful = reserve_track(&ar->route, ar->idx_resrv, rc_to_track_node(ar->route.rcs[ar->idx_resrv], "track reservation"), resrv_end, &ts.reservations);
+                    tc_send(&tc, TERMINAL_PRINT_RESRV1, ts.reservations.bits_low & 0xFFFFFFFF, (ts.reservations.bits_low >> 32) & 0xFFFFFFFF);
+                    tc_send(&tc, TERMINAL_PRINT_RESRV2, ts.reservations.bits_high & 0xFFFFFFFF, (ts.reservations.bits_high >> 32) & 0xFFFFFFFF);
                 
                     // Perform any actions we need to do:
                     while ((ar->next_step_distance <= resrv_dist && !ACTIVE_ROUTE_DONE_ACTIONS(ar)) || FALSE) { // must perform next actio due to proximity directly or bc the reverse will take a while
@@ -572,6 +570,8 @@ void task_train_state(int trackstate_tid) {
             } else {
                 ts.reservations.bits_high ^= 0x1ULL << (tm.data - 64);
             }
+            tc_send(&tc, TERMINAL_PRINT_RESRV1, ts.reservations.bits_low & 0xFFFFFFFFULL, (ts.reservations.bits_low >> 32) & 0xFFFFFFFFULL);
+            tc_send(&tc, TERMINAL_PRINT_RESRV2, ts.reservations.bits_high & 0xFFFFFFFFULL, (ts.reservations.bits_high >> 32) & 0xFFFFFFFFULL);
             break;
         }
         case (NOTIFY_RV_TIMEOUT):

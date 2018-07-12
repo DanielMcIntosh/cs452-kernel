@@ -124,7 +124,7 @@ int cb_backspace(struct circlebuffer *cb){
     return 0;
 }
 
-int cb_write_string(struct circlebuffer * restrict cb, char * restrict s) {
+int cb_write_string(struct circlebuffer * restrict cb, const char * restrict s) {
     while (*s != '\0' && cb_write(cb, *s) == 0) {
         s++;
     }
