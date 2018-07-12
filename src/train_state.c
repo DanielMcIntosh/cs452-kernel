@@ -246,7 +246,7 @@ static void ts_exec_step(TrainState * restrict ts, TerminalCourier * restrict tc
     }
 }
 
-static inline const track_node *get_resrv_end(const Route *route, int idx, const track_node *start, int stopping_distance, int * restrict resrv_dist) {
+static inline const track_node *get_resrv_end(const ActiveRoute *ar, int idx, const track_node *start, int stopping_distance, int * restrict resrv_dist) {
     int cur_dist = 0;
     const track_node *resrv_end = start;
 
@@ -255,21 +255,25 @@ static inline const track_node *get_resrv_end(const Route *route, int idx, const
     }
 
     //nth-sensor + stopping_dist + next_switch
-    resrv_end = nth_sensor_on_route(2,  route, &idx, resrv_end, &cur_dist, "get_resrv_end: 1");
+    resrv_end = nth_sensor_on_route(2,  &ar->route, &idx, resrv_end, &cur_dist, "get_resrv_end: 1");
     *resrv_dist += cur_dist;
     if (resrv_end == NULL) {
-        return NULL;
+        return &track[ar->end_node];
     }
 
     cur_dist = stopping_distance;
-    resrv_end = forward_dist_on_route(  route, &idx, resrv_end, &cur_dist, "get_resrv_end: 2");
+    resrv_end = forward_dist_on_route(  &ar->route, &idx, resrv_end, &cur_dist, "get_resrv_end: 2");
     *resrv_dist += cur_dist;
     if (resrv_end == NULL) {
-        return NULL;
+        return &track[ar->end_node];
     }
 
-    resrv_end = next_switch_on_route(   route, &idx, resrv_end, &cur_dist, "get_resrv_end: 3");
+    cur_dist = 0;
+    resrv_end = next_switch_on_route(   &ar->route, &idx, resrv_end, &cur_dist, "get_resrv_end: 3");
     *resrv_dist += cur_dist;
+    if (resrv_end == NULL) {
+        return &track[ar->end_node];
+    }
     return resrv_end;
 }
 
@@ -283,6 +287,8 @@ static int ts_notify_terminal_buffer(int tstid, TerminalReq *treq) {
     return r;
 }
 
+#define NAV_SPEED 11
+
 void task_train_state(int trackstate_tid) {
     RegisterAs(NAME_TRAIN_STATE);
     int cmdtid = WhoIs(NAME_COMMANDSERVER);
@@ -294,6 +300,7 @@ void task_train_state(int trackstate_tid) {
     CreateWith2Args(PRIORITY_NOTIFIER, &task_terminal_courier, MyTid(), (int) &ts_notify_terminal_buffer);
 
     TrainState ts = TRAIN_STATE_INIT;
+
     init_train_state(&ts);
 
     TrainStateMessage tm;
@@ -327,7 +334,7 @@ void task_train_state(int trackstate_tid) {
             if (train->speed == 0){
                 min_dist = 0;
                 rev_penalty = 400;
-                train->speed = 10;
+                train->speed = NAV_SPEED;
             } else {
                 min_dist = train->stopping_distance[train->speed] - distance_past;
                 // assume the distance it takes to stop is the same as that needed to return to full speed in the opposite direction
@@ -354,7 +361,7 @@ void task_train_state(int trackstate_tid) {
                 trainserver_begin_reverse(&ts, ts.active_train_map[tr], 0);
                 ar.reversing = 1;
             } else {
-                CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, 11, train->num); // TODO number
+                CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, NAV_SPEED, train->num); // TODO number
                 ar.reversing = 0;
             }
             ar.route = route;
@@ -421,9 +428,9 @@ void task_train_state(int trackstate_tid) {
                 ar->remaining_distance = distance_to_on_route(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], &track[ar->end_node], "ar distance recalculate");
                 tc_send(&tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
 
-                bool resrv_successful;
+                //bool resrv_successful;
                 int resrv_dist = 0;
-                const track_node *resrv_end = get_resrv_end(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], train->stopping_distance[train->speed], &resrv_dist);
+                const track_node __attribute__((unused)) *resrv_end = get_resrv_end(ar, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], train->stopping_distance[train->speed], &resrv_dist);
 
                 int dist_to_next_snsr = 0;
                 //update ar->cur_pos_idx
@@ -547,7 +554,8 @@ void task_train_state(int trackstate_tid) {
             SendCommand(cmdtid, c);
 
             ar->reversing = 0;
-            CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, 12, train->num); // TODO number
+            CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, NAV_SPEED, train->num); // TODO number
+            train->speed = NAV_SPEED;
              // TODO exec switches
             tc_send(&tc, TERMINAL_FLAGS_UNSET, STATUS_FLAG_REVERSING, 0);
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 206, ar->route.rcs[ar->idx_resrv].swmr);

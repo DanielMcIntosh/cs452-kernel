@@ -1,6 +1,6 @@
 #include "track.h"
 #include "track_data.h"
-#include "track_state.h"
+#include "track_state.h" 
 #include "syscall.h"
 #include "debug.h"
 #include "minheap.h"
@@ -50,7 +50,7 @@ static void q_add(BFSNode** freeQ, BFSNode** freeQTail, BFSNode *node){
     *freeQTail = node;
 }
 
-#define ALLOW_REVERSE_START TRUE 
+#define ALLOW_REVERSE_START FALSE 
 #define ALLOW_REVERSE_ENROUTE FALSE
 
 int find_path_between_nodes(const Reservation * restrict reservations, int min_dist, int rev_penalty, const track_node *origin, const track_node *dest, Route * restrict r) {
@@ -177,8 +177,11 @@ inline const track_edge *next_edge_on_route(const Route *route, int * restrict i
     switch (n->type) {
     case (NODE_BRANCH):
     {
+        if(unlikely(route->rcs[*idx].a == ACTION_NONE)) {
+            return NULL; // End of route
+        }
         ASSERT(route->rcs[*idx].swmr == SWCLAMP(n->num), "Incorrect switch in path at idx %d: %d(%s), should be %d(%s) @ %s", *idx, route->rcs[*idx].swmr, track[SWITCH_TO_NODE(route->rcs[*idx].swmr)].name, SWCLAMP(n->num), n->name, sig);
-        ASSERT(route->rcs[*idx].a != ACTION_NONE, "Action None on route (idx: %d, node: %s) @ %s", *idx, n->name, sig);
+
         RouteCommand rc = route->rcs[(*idx)++];
         return &(n->edge[(rc.a == ACTION_STRAIGHT) ? DIR_STRAIGHT : DIR_CURVED]);
         break;
@@ -211,6 +214,7 @@ static inline const track_node *next_on_route(const Route *route, int * restrict
     const track_edge *e;
     do {
         e = next_edge_on_route(route, idx, n, sig);
+        if (e == NULL) return NULL;
         *distance += e->dist;
         n = e->dest;
     } while (n != NULL && n->type != type);
@@ -244,6 +248,10 @@ const track_node *forward_dist_on_route(const Route *route, int * restrict idx, 
     const track_edge *e;
     while (cur_dist < *distance && prev != NULL) {
         e = next_edge_on_route(route, idx, prev, sig);
+        if (e == NULL) {
+            *distance = cur_dist;
+            return NULL;
+        }
 
         cur_dist += e->dist;
         prev = e->dest;
