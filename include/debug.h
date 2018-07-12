@@ -15,7 +15,7 @@
 
 #define KPANIC(...) \
     bwprintf(COM2, __VA_ARGS__);\
-    __asm__("mov pc, #0");
+    __asm__("mov pc, #4");
 
 #define IS(x) #x
 #define S(x) IS(x) 

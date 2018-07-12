@@ -51,7 +51,7 @@ static void q_add(BFSNode** freeQ, BFSNode** freeQTail, BFSNode *node){
 }
 
 #define ALLOW_REVERSE_START FALSE 
-#define ALLOW_REVERSE_ENROUTE FALSE
+#define ALLOW_REVERSE_ENROUTE TRUE 
 
 int find_path_between_nodes(const Reservation * restrict reservations, int min_dist, int rev_penalty, const track_node *origin, const track_node *dest, Route * restrict r) {
     entry_t mh_array[BFS_MH_SIZE];
@@ -190,6 +190,11 @@ inline const track_edge *next_edge_on_route(const Route *route, int * restrict i
     {
         if (route->rcs[*idx].swmr == SWCLAMP(n->num) && route->rcs[*idx].a == ACTION_RV) {
             *idx+=1;
+            // TODO BIG HACK
+            if (n->edge[DIR_AHEAD].dist < 300) {
+                return n->edge[DIR_AHEAD].dest->edge[DIR_AHEAD].reverse;
+
+            }
             return n->edge[DIR_AHEAD].reverse;
         }
         __attribute__((fallthrough));
