@@ -193,7 +193,6 @@ inline const track_edge *next_edge_on_route(const Route *route, int * restrict i
             // TODO BIG HACK
             if (n->edge[DIR_AHEAD].dist < 300) {
                 return n->edge[DIR_AHEAD].dest->edge[DIR_AHEAD].reverse;
-
             }
             return n->edge[DIR_AHEAD].reverse;
         }

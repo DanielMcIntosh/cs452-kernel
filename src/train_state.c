@@ -17,6 +17,7 @@
 typedef struct active_route{
     Route route;
     int end_node;
+    int distance_past;
     int train;
     int remaining_distance;
     int next_step_distance;
@@ -28,7 +29,7 @@ typedef struct active_route{
 
 #define ACTIVE_ROUTE_DONE_ACTIONS(ar) (ar->route.rcs[ar->idx_resrv].a == ACTION_NONE)
 #define ACTIVE_ROUTE_COMPLETE(ar) (ACTIVE_ROUTE_DONE_ACTIONS(ar) && ar->stopped)
-#define ACTIVE_ROUTE_INIT {ROUTE_INIT, 0, 0, 0, 0, 0, 0, 0, 0}
+#define ACTIVE_ROUTE_INIT {ROUTE_INIT, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 typedef struct train_state{
     int total_trains;
@@ -372,7 +373,8 @@ void task_train_state(int trackstate_tid) {
             }
             ar.route = route;
             ar.end_node = object;
-            ar.remaining_distance = distance;
+            ar.remaining_distance = distance + distance_past;
+            ar.distance_past = distance_past;
             ar.stopped = 0;
             ASSERT(ts.active_train_map[tr] >= 0 && ts.active_train_map[tr] < MAX_CONCURRENT_TRAINS, "Invalid active train: %d", ts.active_train_map[tr]);
             ts.active_routes[ts.active_train_map[tr]] = ar;
@@ -432,7 +434,7 @@ void task_train_state(int trackstate_tid) {
                 } else {
                     ar->next_step_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[ar->idx_resrv], "ar next step recalculate rc2tn"), "ar next step recalculate");
                 }
-                ar->remaining_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], &track[ar->end_node], "ar distance recalculate");
+                ar->remaining_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], &track[ar->end_node], "ar distance recalculate") + ar->distance_past;
                 tc_send(&tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
 
                 //bool resrv_successful;
