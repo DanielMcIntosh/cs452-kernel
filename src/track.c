@@ -50,7 +50,8 @@ static void q_add(BFSNode** freeQ, BFSNode** freeQTail, BFSNode *node){
     *freeQTail = node;
 }
 
-#define ALLOW_REVERSE TRUE
+#define ALLOW_REVERSE_START TRUE 
+#define ALLOW_REVERSE_ENROUTE FALSE
 
 int find_path_between_nodes(const Reservation * restrict reservations, int min_dist, int rev_penalty, const track_node *origin, const track_node *dest, Route * restrict r) {
     entry_t mh_array[BFS_MH_SIZE];
@@ -72,13 +73,14 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
     fw->current_node = origin;
     fw->idx = 0;
     mh_add(&mh, (int) fw, 0);
-    BFSNode * rv = q_pop(&freeQ, &freeQTail);
-    rv->r = *r;
-    rv->r.reverse = 1;
-    rv->current_node = origin->reverse;
-    rv->idx = 0;
-    if (ALLOW_REVERSE) mh_add(&mh, (int) rv, rev_penalty);
-
+    if (ALLOW_REVERSE_START) {
+        BFSNode * rv = q_pop(&freeQ, &freeQTail);
+        rv->r = *r;
+        rv->r.reverse = 1;
+        rv->current_node = origin->reverse;
+        rv->idx = 0;
+        mh_add(&mh, (int) rv, rev_penalty);
+    }
     bfsnodes[BFS_MH_SIZE-1].next = NULL;
     int k = 0;
 
@@ -123,7 +125,7 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
             curved->idx=idx+1;
             mh_add(&mh, (unsigned long int) curved, distance + cn->edge[DIR_CURVED].dist);
         }
-        if (cn->type == NODE_MERGE && ALLOW_REVERSE) {
+        if (cn->type == NODE_MERGE && ALLOW_REVERSE_ENROUTE) {
             // Can reverse after hitting a merge:
             BFSNode * reverse = q_pop(&freeQ, &freeQTail);
             reverse->current_node = cn->reverse;
