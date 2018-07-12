@@ -426,6 +426,13 @@ void task_train_state(int trackstate_tid) {
                     ar->next_step_distance = 0;
                 } else {
                     ar->next_step_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[ar->idx_resrv], "ar next step recalculate rc2tn"), "ar next step recalculate");
+                    //have to delay initialization of next step distance until we hit the next sensor, since that's where the route actually starts
+                    if (ar->idx_resrv == 0) {
+                        bool success = reserve_track(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[0], "init reservations"), &ts.reservations);
+                        if (unlikely(!success)) {
+                            PANIC("FIRST step already reservered!");
+                        }
+                    }
                 }
                 ar->remaining_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], &track[ar->end_node], "ar distance recalculate");
                 tc_send(&tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
@@ -456,16 +463,18 @@ void task_train_state(int trackstate_tid) {
                     tc_send(&tc, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING, 0);
                     resrv_dist = 999999;
                 }
+
+                if (!ACTIVE_ROUTE_DONE_ACTIONS(ar)) {
+                    //todo will fail after first sensor right now because we've already reserved some of this
+                    //Therefore, we currently ignore whether we actually could reserve track
+                    bool resrv_successful = reserve_track(&ar->route, ar->idx_resrv, rc_to_track_node(ar->route.rcs[ar->idx_resrv], "track reservation"), resrv_end, &ts.reservations);
                 
-                //*
-                // Perform any actions we need to do:
-                while ((ar->next_step_distance <= resrv_dist && !ACTIVE_ROUTE_DONE_ACTIONS(ar)) || FALSE) { // must perform next actio due to proximity directly or bc the reverse will take a while
-                    tc_send(&tc, TERMINAL_ROUTE_DBG2, 206, ar->route.rcs[ar->idx_resrv].swmr);
-                    ts_exec_step(&ts, &tc, ar, tr, cmdtid, ar->next_step_distance);
-                    //PANIC("idx = %d", ar->idx);
+                    // Perform any actions we need to do:
+                    while ((ar->next_step_distance <= resrv_dist && !ACTIVE_ROUTE_DONE_ACTIONS(ar)) || FALSE) { // must perform next actio due to proximity directly or bc the reverse will take a while
+                        tc_send(&tc, TERMINAL_ROUTE_DBG2, 206, ar->route.rcs[ar->idx_resrv].swmr);
+                        ts_exec_step(&ts, &tc, ar, tr, cmdtid, ar->next_step_distance);
+                    }
                 }
-                //PANIC("IDX = %d", ar->idx);
-                //*/
             }
             
             break;

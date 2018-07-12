@@ -209,6 +209,7 @@ inline const track_edge *next_edge_on_route(const Route *route, int * restrict i
 }
 
 static inline const track_node *next_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, node_type type, char * restrict sig) {
+    ASSERT(track <= prev && prev <= track+TRACK_MAX, "invalid prev: %d, [%d -> %d]", prev, track, track+TRACK_MAX);
     const track_node *n = prev;
     *distance = 0;
     const track_edge *e;
