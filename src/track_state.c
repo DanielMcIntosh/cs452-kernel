@@ -239,7 +239,7 @@ void task_track_state() {
             Reservation reservations = tm.route_request.reservations;
 
             int __attribute__((unused)) distance;
-            int next =  prev;//predict_next_sensor(ts.switches, &track[prev], NULL, &distance)->num;
+            int next =  predict_next_sensor(ts.switches, &track[prev], NULL, &distance)->num;
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 208, next);
             const track_node *d = &track[end], *n = &track[next];
 

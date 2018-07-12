@@ -64,7 +64,8 @@ int __attribute__((pure))  calc_reverse_time(TrainState *ts, int activetrain){
 }
 
 int __attribute__((pure)) calc_reverse_time_from_velocity(int velocity, int distance_to_stop, int stopping_distance) {
-    return (velocity / (distance_to_stop - stopping_distance)) / VELOCITY_PRECISION; 
+    if (velocity == 0) return 0;
+    return (VELOCITY_PRECISION * (distance_to_stop - stopping_distance) / velocity); 
 }
 
 int notify_rv_timeout(int, int);
@@ -223,7 +224,7 @@ static void ts_exec_step(TrainState * restrict ts, TerminalCourier * restrict tc
         case (ACTION_RV):
         {
             Train *train = &(ts->active_trains[activetrain]);
-            int delay = calc_reverse_time_from_velocity(train->velocity[train->speed], distance_to_stop, train->velocity[train->speed]);
+            int delay = calc_reverse_time_from_velocity(train->velocity[train->speed], distance_to_stop, train->stopping_distance[train->speed]);
             trainserver_begin_reverse(ts, activetrain, delay);
             cnode = &track[MERGE_TO_NODE(rc.swmr)];
             ar->reversing = 1;
@@ -391,7 +392,7 @@ void task_train_state(int trackstate_tid) {
             int distance;
             int tr = get_active_train_from_sensor(&ts, sensor, &distance);
             ASSERT(tr >= 0, "Could not find which train hit sensor");
-            //tc_send(&tc, TERMINAL_ROUTE_DBG2, 202, tr);
+            tc_send(&tc, TERMINAL_ROUTE_DBG2, 202, tr);
 
             Train *train = &(ts.active_trains[tr]);
             ActiveRoute *ar = &(ts.active_routes[tr]);
@@ -406,6 +407,7 @@ void task_train_state(int trackstate_tid) {
                 }
                 // Time is in clock-ticks, velocity is in mm/(clock-tick) -> error is in units of mm
                 int dt = event_time - train->last_sensor_time;
+                ASSERT(dt != 0, "division by 0 @ dt");
                 int new_velocity = distance * VELOCITY_PRECISION / dt;
                 train->velocity[train->speed] = MOVING_AVERAGE(new_velocity, train->velocity[train->speed], 15);
             }
@@ -423,9 +425,9 @@ void task_train_state(int trackstate_tid) {
                 if (ACTIVE_ROUTE_DONE_ACTIONS(ar)) {
                     ar->next_step_distance = 0;
                 } else {
-                    ar->next_step_distance = distance_to_on_route(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[ar->idx_resrv], "ar next step recalculate rc2tn"), "ar next step recalculate");
+                    ar->next_step_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[ar->idx_resrv], "ar next step recalculate rc2tn"), "ar next step recalculate");
                 }
-                ar->remaining_distance = distance_to_on_route(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], &track[ar->end_node], "ar distance recalculate");
+                ar->remaining_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], &track[ar->end_node], "ar distance recalculate");
                 tc_send(&tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
 
                 //bool resrv_successful;
@@ -440,11 +442,14 @@ void task_train_state(int trackstate_tid) {
                 //Therefore, we currently ignore whether we actually could reserve track
                 //bool resrv_successful = reserve_track(&ar->route, ar->idx_resrv, rc_to_track_node(ar->route.rcs[ar->idx_resrv]), resrv_end, &ts.reservations);
 
-                if (dist_to_next_snsr + train->stopping_distance[train->speed] <= ar->remaining_distance && !ar->stopped) {
+                if (dist_to_next_snsr + train->stopping_distance[train->speed] >= ar->remaining_distance && !ar->stopped) {
                     // so we have to stop between now and the next sensor. Figure out how long we need to wait:
-                    int stopdelay = calc_reverse_time_from_velocity(train->velocity[train->speed], train->stopping_distance[train->speed], ar->remaining_distance);
+                    int stopdelay = calc_reverse_time_from_velocity(train->velocity[train->speed], ar->remaining_distance, train->stopping_distance[train->speed]);
                     DelayStop ds = {.delay = stopdelay, .rv = 0};
                     tc_send(&tc, TERMINAL_ROUTE_DBG2, 250, stopdelay);
+                    tc_send(&tc, TERMINAL_ROUTE_DBG2, 251, dist_to_next_snsr);
+                    tc_send(&tc, TERMINAL_ROUTE_DBG2, 252, train->stopping_distance[train->speed]);
+                    tc_send(&tc, TERMINAL_ROUTE_DBG2, 253, ar->remaining_distance);
                     CreateWith2Args(PRIORITY_NOTIFIER, &task_delay_stop, ds.data, train->num);
                     tc_send(&tc, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING, 0);
                     ar->stopped = 1;
@@ -513,19 +518,39 @@ void task_train_state(int trackstate_tid) {
                 ts.active_trains[ts.total_trains].stopping_distance[12] = 740;
                 ts.active_trains[ts.total_trains].stopping_distance[11] = 560;
                 ts.active_trains[ts.total_trains].stopping_distance[10] = 390;
+                
+                ts.active_trains[ts.total_trains].velocity[14] = 59000;
+                ts.active_trains[ts.total_trains].velocity[13] = 54000;
+                ts.active_trains[ts.total_trains].velocity[12] = 47250;
+                ts.active_trains[ts.total_trains].velocity[11] = 41000;
+                ts.active_trains[ts.total_trains].velocity[10] = 33650;
             } else if (data.train == 78) {
                 ts.active_trains[ts.total_trains].stopping_distance[14] = 950;
                 ts.active_trains[ts.total_trains].stopping_distance[13] = 740;
                 ts.active_trains[ts.total_trains].stopping_distance[12] = 560;
                 ts.active_trains[ts.total_trains].stopping_distance[11] = 430;
                 ts.active_trains[ts.total_trains].stopping_distance[10] = 340;
+
+                ts.active_trains[ts.total_trains].velocity[14] = 59000;
+                ts.active_trains[ts.total_trains].velocity[13] = 54000;
+                ts.active_trains[ts.total_trains].velocity[12] = 47250;
+                ts.active_trains[ts.total_trains].velocity[11] = 41000;
+                ts.active_trains[ts.total_trains].velocity[10] = 33650;
             } else {
                 ts.active_trains[ts.total_trains].stopping_distance[14] = 1000;
                 ts.active_trains[ts.total_trains].stopping_distance[13] = 860;
                 ts.active_trains[ts.total_trains].stopping_distance[12] = 600;
                 ts.active_trains[ts.total_trains].stopping_distance[11] = 470;
                 ts.active_trains[ts.total_trains].stopping_distance[10] = 360;
+
+                ts.active_trains[ts.total_trains].velocity[14] = 59000;
+                ts.active_trains[ts.total_trains].velocity[13] = 54000;
+                ts.active_trains[ts.total_trains].velocity[12] = 47250;
+                ts.active_trains[ts.total_trains].velocity[11] = 41000;
+                ts.active_trains[ts.total_trains].velocity[10] = 33650;
             }
+
+
             ts.active_trains[ts.total_trains].num = data.train;
             ++ts.total_trains;
             break;
