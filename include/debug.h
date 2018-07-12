@@ -13,11 +13,19 @@
     bwprintf(COM2, __VA_ARGS__);\
     Quit();
 
+#define KPANIC(...) \
+    bwprintf(COM2, __VA_ARGS__);\
+    __asm__("mov pc, #0");
+
 #define IS(x) #x
 #define S(x) IS(x) 
 #define ASSERT(x, y,vargs...) \
 if (unlikely(!(x))) {\
     PANIC("ASSERT FAILED: " S(x) "\r\nFUNCTION: %s\r\nFILE: "S(__FILE__) "\r\nLINE: " S(__LINE__) "\r\n" S(y) "\r\n", __func__,  ##vargs)\
+}
+#define KASSERT(x, y,vargs...) \
+if (unlikely(!(x))) {\
+    KPANIC("ASSERT FAILED: " S(x) "\r\nFUNCTION: %s\r\nFILE: "S(__FILE__) "\r\nLINE: " S(__LINE__) "\r\n" S(y) "\r\n", __func__,  ##vargs)\
 }
 
 #if DEBUG

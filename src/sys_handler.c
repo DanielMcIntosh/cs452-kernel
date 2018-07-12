@@ -40,6 +40,21 @@ static inline void handle_exit(TD *task) {
 //                                  MESSAGE PASSING
 //////////////////////////////////////////////////////////////////////////////////////////////
 
+static int is_deadlock(TD *sender, TD *receiver) {
+    // TODO
+    int k = 0;
+
+    if (receiver->state == STATE_BLK_RECEIVE || receiver->state == STATE_BLK_REPLY) {
+        TD * sndr = sender->rcv_queue;
+        while (sndr != NULL) {
+            if (sndr->tid == receiver->tid) return 1; //, "DEADLOCK: %d is sending to %d, but %d is currently sending to %d (in state: %d)", task->tid, receiver->tid, receiver->tid, task->tid, receiver->state);
+            sndr = sndr->rdynext;
+            KASSERT(k++ < 200, "definitely an infinite loop");
+        }
+   }
+    return 0;
+}
+
 static inline void handle_send(TD *task, TaskQueue *task_ready_queue){
     LOG("SEND called\r\n");
 
@@ -49,13 +64,7 @@ static inline void handle_send(TD *task, TaskQueue *task_ready_queue){
         return;
     }
 
-    if (receiver->state == STATE_BLK_RECEIVE || receiver->state == STATE_BLK_REPLY) {
-        TD * sndr = task->rcv_queue;
-        while (sndr != NULL) {
-            ASSERT(sndr->tid != receiver->tid, "DEADLOCK: %d is sending to %d, but %d is currently sending to %d (in state: %d)", task->tid, receiver->tid, receiver->tid, task->tid, receiver->state);
-        }
-   }
-
+    KASSERT(!is_deadlock(task, receiver), "DEADLOCK BETWEEN %d (%d) and %d (%d)", task->tid, *((int *) TD_arg(task, 1)), receiver->tid, *((int *) TD_arg(receiver, 1)));
 
     //reciever is already waiting for a message
     if (receiver->state == STATE_BLK_SEND)
