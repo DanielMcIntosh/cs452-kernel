@@ -15,7 +15,6 @@ typedef enum cmdtype{
     COMMAND_QUIT,
     COMMAND_INV,
     COMMAND_ROUTE,
-    COMMAND_CAL,
     COMMAND_MOVE,
     COMMAND_PARAM,
     COMMAND_ADD,

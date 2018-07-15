@@ -59,7 +59,6 @@ typedef enum trnstrequest{
     NOTIFY_SENSOR_EVENT,
     NOTIFY_TRAIN_SPEED,
     NOTIFY_TRAIN_DIRECTION,
-    NOTIFY_CAL,
     NOTIFY_NEW_TRAIN,
     NOTIFY_RESERVATION,
     NOTIFY_RV_TIMEOUT,
@@ -72,7 +71,6 @@ typedef enum trnstrequest{
 void task_train_state();
 
 int NotifyTrainSpeed(int trainstatetid, TrainData data);
-int NotifyCalibrationResult(int trainstatetid, CalData data);
 int NotifyNewTrain(int trainstatetid, NewTrain data);
 int NotifySensorEvent(int trainstatetid, SensorEvent data);
 int NotifyReservation(int trainstatetid, int data);

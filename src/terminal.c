@@ -362,31 +362,6 @@ static inline int parse_command(Command * restrict cmd, circlebuffer_t * restric
         cmd->smallarg2 = param;
         return 0;
     }
-    case 'c': // cal
-    {
-        err = cb_read_match(cb_input, "al ");
-        if (err != 0) {
-            break;
-        }
-
-        char sensor_char;
-        int sensor_num;
-        cb_read(cb_input, &sensor_char); // RADIX
-        err = cb_read_number(cb_input, &sensor_num); // SW #
-        if (err)
-            break;
-
-        int train;
-        err = cb_read_number(cb_input, &train);
-        if (err)
-            break;
-
-        // cal <sensor> <train>
-        cmd->type = COMMAND_CAL;
-        cmd->arg1 = SENSOR_PAIR_TO_SENSOR(sensor_char - 'A', sensor_num - 1);
-        cmd->arg2 = train;
-        return 0;
-    }
     case 'a': //add
     {
         err = cb_read_match(cb_input, "dd ");

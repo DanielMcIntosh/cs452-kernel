@@ -160,77 +160,6 @@ void send_wakeup(int tid, int __attribute__((unused)) arg1, bool success) {
     Send(tid, &success, sizeof(success), NULL, 0);
 }
 
-void task_calibrate(int __attribute__((unused)) train, int __attribute__((unused)) sensor_dest) {
-    int terminaltid = WhoIs(NAME_TERMINAL);
-    int trainstate_tid = WhoIs(NAME_TRAIN_STATE);
-    int my_tid = MyTid();
-    SendTerminalRequest(terminaltid, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING | STATUS_FLAG_CALIBRATING, 0);
-            /*
-    int cmdtid = WhoIs(NAME_COMMANDSERVER);
-
-    int my_tid = MyTid();
-
-
-    NavigateResult nav_res = {0, 0, 0, {}};
-    int alarm_tid;
-    bool runnable_success;
-    int speed = GetTrainSpeed(trainstate_tid, train);
-    bool overshot;
-
-    int num_over = 0;
-    while (num_over == 0 || num_over == CAL_ITERATIONS) {
-        num_over = 0;
-        for (int i = 0; i < CAL_ITERATIONS; ++i) {
-            //set the train on course to hit sensor_dest, and get timing info
-            const TrackPosition pos = {.object = sensor_dest, .distance_past = 0};
-            const NavigateRequest rq = {.position = pos, .train = train};
-            int err = NavigateTo(trainstate_tid, rq, &nav_res);
-            ASSERT(err==0, "FAILED TO GET ROUTE");
-            //if (i < 2)
-                setup_track_state(cmdtid, &nav_res);
-
-            int sensor_to_wake = nav_res.end_sensor;
-            //wait until we hit <sensor_to_wake>
-            //for now, assume we're always successful in triggering <sensor_to_wake>
-            Runnable runnable_alarm1 = {&send_wakeup, my_tid, 0, 50000U, FALSE};
-            RunWhen(sensor_to_wake, &runnable_alarm1, PRIORITY_MID);
-            Receive(&alarm_tid, &runnable_success, sizeof(runnable_success));
-            Reply(alarm_tid, NULL, 0);
-            if (!runnable_success)
-            {
-                continue;
-            }
-
-            int delay = nav_res.time_after_end_sensor;
-            //wait <delay> ticks, then send a stop command
-            Delay(delay);
-            Command stop_cmd = {COMMAND_TR, 0, {.arg2 = train}};
-            SendCommand(cmdtid, stop_cmd);
-
-            //sleep until we hit sensor_dest, timeout 2.5 s after we send stop command
-            Runnable runnable_alarm2 = {&send_wakeup, my_tid, 0, 250U, TRUE};
-            RunWhen(sensor_dest, &runnable_alarm2, PRIORITY_MID);
-            Receive(&alarm_tid, &overshot, sizeof(overshot));
-            Reply(alarm_tid, NULL, 0);
-
-            CalData cal_data = {i, speed, overshot};
-            NotifyCalibrationResult(trainstate_tid, cal_data);
-
-            Command accel_cmd = {COMMAND_TR, speed, {.arg2 = train}};
-            SendCommand(cmdtid, accel_cmd);
-
-            if (overshot) {
-                ++num_over;
-            }
-
-        }
-    }
-            i*/
-    SendTerminalRequest(terminaltid, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING | STATUS_FLAG_CALIBRATING, 0);
-
-    Destroy();
-}
-
 void task_commandserver(int trackstate_tid, int trainstate_tid){
     CommandServer cs = {0, 0, 0, -1, 0};
     RegisterAs(NAME_COMMANDSERVER);
@@ -354,13 +283,6 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
         {
             ParamData data = {.key = cm.command.smallarg1, .param = cm.command.smallarg2, .value = cm.command.arg1};
             NotifyParam(trackstate_tid, data); // TODO track state courier
-            break;
-        }
-        case COMMAND_CAL:
-        {
-            int sensor = cm.command.arg1;
-            int train = cm.command.arg2;
-            CreateWith2Args(PRIORITY_MID, &task_calibrate, train, sensor);
             break;
         }
         case COMMAND_ADD:
