@@ -1,3 +1,22 @@
+/*         E_T:     STK_LIM:     STK_MAX:      DIST_NX:                 RESERVATIONS:
+IDLE: %__  E_D:     STK_AVG:     VELO_PR:      SNSR_NX:                  A: 1234567890123456
+==---------[ ]--[ ]---------------------------------\                    B: 1234567890123456
+==--------[ ] [ ]-----------[ ]----[ ]-----------\   \                   C: 1234567890123456
+==--------/  /               \    /               \   |                  D: 1234567890123456
+            /                 \||/                 \  |                  E: 1234567890123456
+           /                  [  ]                  \ |                  BR:123456789012345678
+          |                    ||                   [ ]                      153 154 155 156
+          |                    ||                    |                   MR:123456789012345678
+          |                    ||                   [ ]                      153 154 155 156
+           \                  [  ]                  / |    
+            \                / || \                /  |
+==------\    \              /      \              /   |
+==------[ ]  [ ]-----------[ ]------[ ]---------/    /
+==-------[ ]   \-----------[ ]------[ ]-------------/ 
+==--------[ ]---------------[ ]----[ ]--------== 
+*/
+
+//ABOVE COMMENT IS FOR GETTING LINE, COLUMN VALUES
 #include <kernel.h>
 #include <circlebuffer.h>
 #include <terminal.h>
@@ -12,6 +31,7 @@
 #include <clock.h>
 #include <sensor.h>
 #include <track_state.h> 
+#include <train_state.h>
 
 typedef struct terminalparser {
     circlebuffer_t input;
@@ -54,15 +74,15 @@ static void output_base_terminal(Terminal *t) {
     const char track = GetValue(VALUE_TRACK_NAME);
     //
     //
-    char * topbar =  "           E_T:     STK_LIM:     STK_MAX:      DIST_NX:\r\n" \
-                     "IDLE: %__  E_D:     STK_AVG:     VELO_PR:      SNSR_NX:\r\n" ;
+    char * topbar =  "           E_T:     STK_LIM:     STK_MAX:      DIST_NX:                 RESERVATIONS:\r\n" \
+                     "IDLE: %__  E_D:     STK_AVG:     VELO_PR:      DIST_PR:\r\n" ;
     // E_T: 1, 16
     // STK_MAX: 1, 42
     // DIST_NX: 1, 56
     // E_D: 2, 16
     // STK_AVG: 2, 29
     // VELO_PR: 2, 42
-    // SNSR_NX: 2, 56
+    // DIST_PR: 2, 56
     char * trackA = 
         "==---------[ ]--[ ]---------------------------------\\ \r\n" \
         "==--------[ ] [ ]-----------[ ]----[ ]-----------\\   \\ \r\n" \
@@ -95,14 +115,30 @@ static void output_base_terminal(Terminal *t) {
         "==-------[ ]   \\-----------[ ]------[ ]-------------/  \r\n" \
         "==--------[ ]---------------[ ]----[ ]--------==  \r\n" \
         ;
+    const char * reservables = 
+    //we set a temporarily tab stop at 74 just to print this, and another, permanent one at 77
+        "\033[2;74H\033H   \033H\010\010\010"
+        "A: 1234567890123456\r\n\t"
+        "B: 1234567890123456\r\n\t"
+        "C: 1234567890123456\r\n\t"
+        "D: 1234567890123456\r\n\t"
+        "E: 1234567890123456\r\n\t"
+        "BR:123456789012345678\r\n\t"
+        "    153 154 155 156\r\n\t"
+        "MR:123456789012345678\r\n\t"
+        "    153 154 155 156\r\n\t"
+        //now clear the tab stop
+        "\033[g"
+        ;
     circlebuffer_t * restrict cb = &t->output;
     ASSERT(cb_write_string(cb, "\033[2J\033[3g\033[H") == 0, "Error outputting base terminal");
     ASSERT(cb_write_string(cb, topbar) == 0, "Error outputting base terminal");
     ASSERT(cb_write_string(cb, track == 'A' ? trackA : trackB) == 0, "Error outputting base terminal");
+    ASSERT(cb_write_string(cb, reservables) == 0, "Error outputting base terminal");
 
     cb_write_string(cb, " \033["S(TERMINAL_INPUT_BASE_LINE)";"S(TERMINAL_INPUT_MAX_LINE)"r");
     cursor_to_position(cb, t->input_line, t->input_col);
-    cb_write_string(cb, "\033H> ");
+    cb_write_string(cb, "> ");
     t->input_col+= 2;
 
     cursor_to_position(cb, TERMINAL_INPUT_MAX_LINE + 1, 1);
@@ -508,19 +544,53 @@ void task_uart2_courier(int servertid) {
 
 }
 
+static inline void print_styled_string(circlebuffer_t * restrict cb, char * const restrict styled_string, const int flags, const int increment, const int end) {
+    //append the 'restore cursor' to save a call to cb_write_string
+    for (int i = 1, cur = 2; i < end; i <<= 1, cur += increment) {
+        if (flags & i) {
+            //attribute 1 = Bright
+            styled_string[cur] = '1';
+        }
+    }
+    ASSERT(cb_write_string(cb, styled_string) == 0, "TERMINAL OUTPUT CB FULL");
+}
+
 static inline void print_status(circlebuffer_t * restrict cb, int status) {
     cb_write_string(cb, "\033[s");
     cursor_to_position(cb, TERMINAL_INPUT_MAX_LINE + 1, 12);
 
-    //append the 'restore cursor' to save a call to cb_write_string
     char str[] = STYLED_FLAG_STRING "\033[u";
-    for (int i = 1, cur = 2; i < STATUS_FLAG_END; i <<= 1, cur += 5) {
-        if (status & i) {
-            //attribute 1 = Bright
-            str[cur] = '1';
-        }
+    print_styled_string(cb, str, status, 5, STATUS_FLAG_END);
+}
+
+static inline void print_reservations1(circlebuffer_t * restrict cb, unsigned long long reservations) {
+    cb_write_string(cb, "\033[s\033[H\n\t");
+
+    for (int i = 0; i < 4; ++i) {
+        int flags = (reservations >> (i * 16)) & 0xFFFF;
+        char str[] = STYLED_RESRV_STRING_1 "\r\n\t";
+        print_styled_string(cb, str, flags, 5, (1 << 16));
     }
-    ASSERT(cb_write_string(cb, str) == 0, "TERMINAL OUTPUT CB FULL");
+    cb_write_string(cb, "\033[u");
+}
+static inline void print_reservations2(circlebuffer_t * restrict cb, unsigned long long reservations) {
+    cb_write_string(cb, "\033[s\033[6;77H");
+
+    int flags_snsr = reservations & 0xFFFF;
+    char str[] = STYLED_RESRV_STRING_1 "\r\n\t";
+    print_styled_string(cb, str, flags_snsr, 5, (1 << 16));
+
+    for (int i = 0; i < 2; ++i) {
+        int flags = ((reservations >> (16 + 22 * i)) & 0x3FFFF);
+        int flags_3way = ((reservations >> (16 + 18 + 22 * i)) & 0xF);
+
+        char str2[] = STYLED_RESRV_STRING_2 "\r\n\t";
+        print_styled_string(cb, str2, flags, 5, (1 << 18));
+        char str3[] = STYLED_RESRV_STRING_3 "\r\n\t";
+        print_styled_string(cb, str3, flags_3way, 8, (1 << 4));
+    }
+    cb_write_number(cb, reservations >> 32, 10);
+    cb_write_string(cb, "\033[u");
 }
 
 void task_terminal(int trackstate_tid) {
@@ -596,7 +666,7 @@ void task_terminal(int trackstate_tid) {
         case(TERMINAL_NEWLINE):
         {
             //wipe the prompt, and move down one line (NOT changing our column!)
-            cb_write_string(&t.output, "\r\t  \n");
+            cb_write_string(&t.output, "\r  \n");
             t.input_line++;
             if (t.input_line >= TERMINAL_INPUT_MAX_LINE) {
                 t.input_line = TERMINAL_INPUT_MAX_LINE;
@@ -606,7 +676,7 @@ void task_terminal(int trackstate_tid) {
                 cb_write(&t.output, ' ');
             }
             //write the prompt
-            cb_write_string(&t.output, "\r\t> ");
+            cb_write_string(&t.output, "\r> ");
             break;
         }
         case(TERMINAL_SENSOR):
@@ -747,7 +817,6 @@ void task_terminal(int trackstate_tid) {
             cb_write_string(&t.output, "\0338");
             break;
         }
-        //*
         case(TERMINAL_FLAGS_SET):
         {
             int flags = tm.arg1;
@@ -769,7 +838,18 @@ void task_terminal(int trackstate_tid) {
             }
             break;
         }
-        //*/
+        case(TERMINAL_PRINT_RESRV1):
+        {
+            unsigned long long flags = ((unsigned long long)tm.arg1) | (((unsigned long long)tm.arg2) << 32ULL);
+            print_reservations1(&t.output, flags);
+            break;
+        }
+        case(TERMINAL_PRINT_RESRV2):
+        {
+            unsigned long long flags = ((unsigned long long)tm.arg1) | (((unsigned long long)tm.arg2) << 32ULL);
+            print_reservations2(&t.output, flags);
+            break;
+        }
         case(TERMINAL_NOTIFY_COURIER):
         {
             t.notifier = tid;

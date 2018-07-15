@@ -24,7 +24,7 @@ int cb_read_int(struct circlebuffer *cb, int *i); // reads 4-char int
 
 int cb_write(struct circlebuffer *cb, char c);
 int cb_backspace(struct circlebuffer *cb);
-int cb_write_string(struct circlebuffer *cb, char *s);
+int cb_write_string(struct circlebuffer *cb, const char *s);
 int cb_write_int(struct circlebuffer *cb, int i);
 
 //d = base^(num_digits_to_print). This function will pad with 0's if necessary.

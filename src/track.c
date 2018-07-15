@@ -213,6 +213,7 @@ inline const track_edge *next_edge_on_route(const Route *route, int * restrict i
 }
 
 static inline const track_node *next_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, node_type type, char * restrict sig) {
+    ASSERT(track <= prev && prev <= track+TRACK_MAX, "invalid prev: %d, [%d -> %d]", prev, track, track+TRACK_MAX);
     const track_node *n = prev;
     *distance = 0;
     const track_edge *e;
@@ -283,7 +284,7 @@ int distance_to_on_route(const Route *route, int idx, const track_node *from, co
 
 bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations) {
     Reservation mask = RESERVATION_INIT;
-    const track_node *n = start;
+    const track_node *n = (start == end) ? start : next_edge_on_route(route, &idx, start, "reserve_track")->dest;;
     ASSERT(track <= n && n <= track+TRACK_MAX, "INVALID n: %d, [%d -> %d]", n, track, track+TRACK_MAX);
     while (n != end && n != NULL) {
         int ind = TRACK_NODE_TO_INDEX(n);
@@ -291,6 +292,13 @@ bool reserve_track(const Route *route, int idx, const track_node *start, const t
             mask.bits_low |= 0x1ULL << ind;
         }
         else {
+            if (n->type == NODE_BRANCH) {
+                ind = SWCLAMP(n->num) - 1 + 80;
+            }
+            else if (n->type == NODE_MERGE) {
+                ind = (SWCLAMP(n->num) - 1) + 80 + 22;
+            }
+            ind -= 64;
             mask.bits_high |= 0x1ULL << ind;
         }
 
@@ -298,7 +306,22 @@ bool reserve_track(const Route *route, int idx, const track_node *start, const t
     }
     ASSERT(n == end, "While Loop broken early");
 
-    if ((reservations->bits_low & mask.bits_low) || (reservations->bits_low & mask.bits_low)) {
+    int ind = TRACK_NODE_TO_INDEX(n);
+    if (ind < 64) {
+        mask.bits_low |= 0x1ULL << ind;
+    }
+    else {
+        if (n->type == NODE_BRANCH) {
+            ind = SWCLAMP(n->num) - 1 + 80;
+        }
+        else if (n->type == NODE_MERGE) {
+            ind = (SWCLAMP(n->num) - 1) + 80 + 22;
+        }
+        ind -= 64;
+        mask.bits_high |= 0x1ULL << ind;
+    }
+
+    if ((reservations->bits_low & mask.bits_low) || (reservations->bits_high & mask.bits_high)) {
         return FALSE;
     }
 
