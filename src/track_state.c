@@ -231,7 +231,6 @@ void task_track_state() {
         }
         case (ROUTE):
         {
-            Direction dir = tm.route_request.dir; // TODO remove this from request
             int prev = tm.route_request.prev;
             int end = tm.route_request.end;
             int min_dist = tm.route_request.min_dist;

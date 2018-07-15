@@ -32,6 +32,10 @@ typedef struct active_route{
 #define ACTIVE_ROUTE_DONE_ACTIONS(ar) (ar->route.rcs[ar->idx_resrv].a == ACTION_NONE)
 #define ACTIVE_ROUTE_COMPLETE(ar) (ACTIVE_ROUTE_DONE_ACTIONS(ar) && ar->stopped)
 #define ACTIVE_ROUTE_INIT {ROUTE_INIT, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+#define ACTIVE_ROUTE_SHOULD_STOP(ar, train, dist_to_next_snsr) (dist_to_next_snsr + train->stopping_distance[train->speed] >= (ar)->remaining_distance && !(ar)->stopped) 
+#define ACTIVE_ROUTE_NEXT_STEP_RV_IN_RANGE(ar, train, dist_to_next_snsr)  (ar->route.rcs[ar->cur_pos_idx].a == ACTION_RV) && (dist_to_next_snsr + train->stopping_distance[train->speed] <= ar->next_step_distance) && (!ar->reversing)
+#define ACTIVE_ROUTE_SHOULD_PERFORM_ACTION(ar, resrv_dist, next_step_rv_in_range) (ar->next_step_distance <= resrv_dist || nxt_step_rv_in_range) && !ACTIVE_ROUTE_DONE_ACTIONS(ar)
+
 
 typedef struct train_state{
     int total_trains;
@@ -311,7 +315,6 @@ static void handle_navigate(TrainState *ts, TerminalCourier *tc, TrainStateMessa
     ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor for train %d: %d", tr, train->last_sensor);
     RouteRequest req = {
         .reservations = ts->reservations, // TODO let a train run over its own reservations
-        .dir = train->direction,
         .next = train->last_sensor, //train->next_sensor,
         .prev = train->last_sensor,
         .end = object,
@@ -346,99 +349,113 @@ static void handle_navigate(TrainState *ts, TerminalCourier *tc, TrainStateMessa
     tc_send(tc, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING, 0);
 }
 
+static void train_on_sensor_event(Train *train, TerminalCourier *tc, int __attribute__((unused)) sensor, int event_time, int distance, int tr) {
+    if (train->last_sensor >= 0) {
+        return;
+    }
+    //we haven't reset our calculations && we actually hit the sensor we expected to (and not the one after?)
+    if (train->velocity[train->speed] != 0) {
+        int predicted_time = train->last_sensor_time + distance * VELOCITY_PRECISION / train->velocity[train->speed];
+        int error_time = (predicted_time - event_time);
+        int error_dist = error_time * train->velocity[train->speed] / VELOCITY_PRECISION;
+        tc_send(tc, TERMINAL_SENSOR_PREDICT, error_time, error_dist);
+    }
+    // Time is in clock-ticks, velocity is in mm/(clock-tick) -> error is in units of mm
+    int dt = event_time - train->last_sensor_time;
+    ASSERT(dt != 0, "division by 0 @ dt");
+    int new_velocity = distance * VELOCITY_PRECISION / dt;
+    train->velocity[train->speed] = MOVING_AVERAGE(new_velocity, train->velocity[train->speed], 15);
+
+    tc_send(tc, TERMINAL_VELOCITY_DEBUG, train->velocity[train->speed], distance);
+    train->last_sensor = sensor;
+    train->last_sensor_time = event_time;
+    ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor for train %d: %d", tr, train->last_sensor);
+}
+
+static void activeroute_recalculate_distances(ActiveRoute *ar, TrainState *ts, TerminalCourier *tc, int sensor, int distance) {
+    ASSERT(distance != 0, "distance between last sensor pair shouldn't be 0");
+    // recalculate next step distance and remaining distance every time
+    if (ACTIVE_ROUTE_DONE_ACTIONS(ar)) {
+        ar->next_step_distance = 0;
+    } else {
+        ar->next_step_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[ar->idx_resrv], "ar next step recalculate rc2tn"), "ar next step recalculate");
+        //have to delay initialization of next step distance until we hit the next sensor, since that's where the route actually starts
+        if (ar->idx_resrv == 0) {
+            bool success = reserve_track(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[0], "init reservations"), &ts->reservations);
+            if (unlikely(!success)) {
+                PANIC("FIRST step already reservered!");
+            }
+        }
+    }
+    ar->remaining_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], &track[ar->end_node], "ar distance recalculate") + ar->distance_past;
+    tc_send(tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
+}
+
+static int ar_stop(ActiveRoute *ar, Train *train, TerminalCourier *tc) {
+    // Figure out how long we need to wait:
+    int stopdelay = calc_reverse_time_from_velocity(train->velocity[train->speed], ar->remaining_distance, train->stopping_distance[train->speed]);
+    DelayStop ds = {.delay = stopdelay, .rv = 0};
+    CreateWith2Args(PRIORITY_NOTIFIER, &task_delay_stop, ds.data, train->num);
+    ar->stopped = 1;
+    tc_send(tc, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING, 0);
+    return 999999;
+}
+
+static void activeroute_exec_steps(ActiveRoute * restrict ar, Train * restrict train, TrainState * restrict ts, TerminalCourier * restrict tc, const track_node * resrv_end, int dist_to_next_snsr, int resrv_dist, int tr, int cmdtid) {
+    tc_send(tc, TERMINAL_ROUTE_DBG2, 260, rc_to_track_node(ar->route.rcs[ar->idx_resrv], "track reservation")->num);
+    tc_send(tc, TERMINAL_ROUTE_DBG2, 261, resrv_end->num);
+    //todo will fail after first sensor right now because we've already reserved some of this
+    //Therefore, we currently ignore whether we actually could reserve track
+    bool __attribute__((unused)) resrv_successful = reserve_track(&ar->route, ar->idx_resrv, rc_to_track_node(ar->route.rcs[ar->idx_resrv], "track reservation"), resrv_end, &ts->reservations);
+    tc_send(tc, TERMINAL_PRINT_RESRV1, ts->reservations.bits_low & 0xFFFFFFFF, (ts->reservations.bits_low >> 32) & 0xFFFFFFFF);
+    tc_send(tc, TERMINAL_PRINT_RESRV2, ts->reservations.bits_high & 0xFFFFFFFF, (ts->reservations.bits_high >> 32) & 0xFFFFFFFF);
+
+    // Perform any actions we need to do:
+    int nxt_step_rv_in_range = ACTIVE_ROUTE_NEXT_STEP_RV_IN_RANGE(ar, train, dist_to_next_snsr);
+    int k = 0;
+
+    while (ACTIVE_ROUTE_SHOULD_PERFORM_ACTION(ar, resrv_dist, next_step_rv_in_range))  { // must perform next actio due to proximity directly or bc the reverse will take a while
+        ts_exec_step(ts, tc, ar, tr, cmdtid, ar->next_step_distance + (nxt_step_rv_in_range ? 350 : 0), "action loop");
+        nxt_step_rv_in_range = ACTIVE_ROUTE_NEXT_STEP_RV_IN_RANGE(ar, train, dist_to_next_snsr);
+        ASSERT(k++ < 20, "infinite loop of execs");
+    }
+}
+
+static void activeroute_on_sensor_event(ActiveRoute *ar, Train *train, TrainState *ts, TerminalCourier *tc, int sensor, int distance, int tr, int cmdtid){
+    if (ACTIVE_ROUTE_COMPLETE(ar) || ar->reversing)
+        return;
+
+    activeroute_recalculate_distances(ar, ts, tc, sensor, distance);
+
+    int resrv_dist = 0;
+    const track_node __attribute__((unused)) *resrv_end = get_resrv_end(ar, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], train->stopping_distance[train->speed], &resrv_dist);
+
+    int dist_to_next_snsr = 0;
+    //update ar->cur_pos_idx
+    next_sensor_on_route(&ar->route, &ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], &dist_to_next_snsr, "update cur_pos_idx");
+
+    if (ACTIVE_ROUTE_SHOULD_STOP(ar, train, dist_to_next_snsr))
+        resrv_dist = ar_stop(ar, train, tc);
+
+    if (!ACTIVE_ROUTE_DONE_ACTIONS(ar))
+        activeroute_exec_steps(ar, train, ts, tc, resrv_end, dist_to_next_snsr, resrv_dist, tr, cmdtid);
+}
+
 static void handle_sensor_event(TrainState *ts, TerminalCourier *tc, TrainStateMessage *tm, int cmdtid, int tid) {
     ReplyMessage rm = {MESSAGE_REPLY, 0};
     Reply(tid, &rm, sizeof(rm)); 
-    int sensor = tm->sensor_event.sensor;
-
-    int event_time = tm->sensor_event.time;
-
     if (unlikely(ts->total_trains <= 0))
         return;
 
-    int distance;
+    int sensor = tm->sensor_event.sensor, event_time = tm->sensor_event.time, distance;
     int tr = get_active_train_from_sensor(ts, sensor, &distance, 1600); // TODO REV PENALTY
     ASSERT(tr >= 0, "Could not find which train hit sensor");
 
     Train *train = &(ts->active_trains[tr]);
     ActiveRoute *ar = &(ts->active_routes[tr]);
 
-    //we haven't reset our calculations && we actually hit the sensor we expected to (and not the one after?)
-    if (train->last_sensor >= 0) {
-        if (train->velocity[train->speed] != 0) {
-            int predicted_time = train->last_sensor_time + distance * VELOCITY_PRECISION / train->velocity[train->speed];
-            int error_time = (predicted_time - event_time);
-            int error_dist = error_time * train->velocity[train->speed] / VELOCITY_PRECISION;
-            tc_send(tc, TERMINAL_SENSOR_PREDICT, error_time, error_dist);
-        }
-        // Time is in clock-ticks, velocity is in mm/(clock-tick) -> error is in units of mm
-        int dt = event_time - train->last_sensor_time;
-        ASSERT(dt != 0, "division by 0 @ dt");
-        int new_velocity = distance * VELOCITY_PRECISION / dt;
-        train->velocity[train->speed] = MOVING_AVERAGE(new_velocity, train->velocity[train->speed], 15);
-    }
-
-    tc_send(tc, TERMINAL_VELOCITY_DEBUG, train->velocity[train->speed], distance);
-    train->last_sensor = sensor;
-    train->last_sensor_time = event_time;
-    ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor for train %d: %d", tr, train->last_sensor);
-
-    if (!ACTIVE_ROUTE_COMPLETE(ar) && !ar->reversing){
-        ASSERT(distance != 0, "distance between last sensor pair shouldn't be 0");
-        // recalculate next step distance and remaining distance every time
-        if (ACTIVE_ROUTE_DONE_ACTIONS(ar)) {
-            ar->next_step_distance = 0;
-        } else {
-            ar->next_step_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[ar->idx_resrv], "ar next step recalculate rc2tn"), "ar next step recalculate");
-            //have to delay initialization of next step distance until we hit the next sensor, since that's where the route actually starts
-            if (ar->idx_resrv == 0) {
-                bool success = reserve_track(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[0], "init reservations"), &ts->reservations);
-                if (unlikely(!success)) {
-                    PANIC("FIRST step already reservered!");
-                }
-            }
-        }
-        ar->remaining_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], &track[ar->end_node], "ar distance recalculate") + ar->distance_past;
-        tc_send(tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
-
-        int resrv_dist = 0;
-        const track_node __attribute__((unused)) *resrv_end = get_resrv_end(ar, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], train->stopping_distance[train->speed], &resrv_dist);
-
-        int dist_to_next_snsr = 0;
-        //update ar->cur_pos_idx
-        next_sensor_on_route(&ar->route, &ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], &dist_to_next_snsr, "update cur_pos_idx");
-
-        if (dist_to_next_snsr + train->stopping_distance[train->speed] >= ar->remaining_distance && !ar->stopped) {
-            // so we have to stop between now and the next sensor. Figure out how long we need to wait:
-            int stopdelay = calc_reverse_time_from_velocity(train->velocity[train->speed], ar->remaining_distance, train->stopping_distance[train->speed]);
-            DelayStop ds = {.delay = stopdelay, .rv = 0};
-            CreateWith2Args(PRIORITY_NOTIFIER, &task_delay_stop, ds.data, train->num);
-            ar->stopped = 1;
-            tc_send(tc, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING, 0);
-            resrv_dist = 999999;
-        }
-
-        if (!ACTIVE_ROUTE_DONE_ACTIONS(ar)) {
-            tc_send(tc, TERMINAL_ROUTE_DBG2, 260, rc_to_track_node(ar->route.rcs[ar->idx_resrv], "track reservation")->num);
-            tc_send(tc, TERMINAL_ROUTE_DBG2, 261, resrv_end->num);
-            //todo will fail after first sensor right now because we've already reserved some of this
-            //Therefore, we currently ignore whether we actually could reserve track
-            bool resrv_successful = reserve_track(&ar->route, ar->idx_resrv, rc_to_track_node(ar->route.rcs[ar->idx_resrv], "track reservation"), resrv_end, &ts->reservations);
-            tc_send(tc, TERMINAL_PRINT_RESRV1, ts->reservations.bits_low & 0xFFFFFFFF, (ts->reservations.bits_low >> 32) & 0xFFFFFFFF);
-            tc_send(tc, TERMINAL_PRINT_RESRV2, ts->reservations.bits_high & 0xFFFFFFFF, (ts->reservations.bits_high >> 32) & 0xFFFFFFFF);
-        
-            // Perform any actions we need to do:
-            int nxt_step_rv_in_range = (ar->route.rcs[ar->cur_pos_idx].a == ACTION_RV) && (dist_to_next_snsr + train->stopping_distance[train->speed] <= ar->next_step_distance) && (!ar->reversing);
-            int k = 0;
-
-            while ((ar->next_step_distance <= resrv_dist || nxt_step_rv_in_range) && !ACTIVE_ROUTE_DONE_ACTIONS(ar))  { // must perform next actio due to proximity directly or bc the reverse will take a while
-                tc_send(tc, TERMINAL_ROUTE_DBG2, 206, ar->route.rcs[ar->idx_resrv].swmr);
-                ts_exec_step(ts, tc, ar, tr, cmdtid, ar->next_step_distance + (nxt_step_rv_in_range ? 350 : 0), "action loop");
-                nxt_step_rv_in_range = (ar->route.rcs[ar->cur_pos_idx].a == ACTION_RV) && (dist_to_next_snsr + train->stopping_distance[train->speed] <= ar->next_step_distance) && (!ar->reversing);
-                ASSERT(k++ < 20, "infinite loop of execs");
-            }
-        }
-    }
+    train_on_sensor_event(train, tc, sensor, event_time, distance, tr);
+    activeroute_on_sensor_event(ar, train, ts, tc, sensor, distance, tr, cmdtid);
 }
 
 static void add_new_train(TrainState *ts, NewTrain data) {

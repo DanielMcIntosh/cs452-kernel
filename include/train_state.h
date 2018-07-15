@@ -24,6 +24,7 @@ typedef struct reservation {
 } __attribute__((packed)) Reservation;
 
 #define RESERVATION_INIT {0, 0}
+#define TRACK_RESERVED(reservations, cn) (0x1ULL << (TRACK_NODE_TO_INDEX(cn) % 64)) & ((TRACK_NODE_TO_INDEX(cn) < 64) ? reservations->bits_low : reservations->bits_high)
 
 typedef struct traindata {
     const unsigned int speed;

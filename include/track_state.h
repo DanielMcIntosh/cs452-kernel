@@ -54,7 +54,6 @@ typedef struct switchdata{
 
 typedef struct routerequest{
     const Reservation reservations;
-    const Direction dir : 8;
     const unsigned int next : 8;
     const unsigned int prev : 8;
     const unsigned int end : 8;

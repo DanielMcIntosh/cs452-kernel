@@ -56,4 +56,15 @@ void *memset(void *s, int c, unsigned int n);
 
 #define FOREVER for(;;)
 
+#ifndef __has_attribute
+    #define __has_attribute(x) 0
+#endif
+
+#if __has_attribute(fallthrough)
+#define FALLTHROUGH __attribute__((fallthrough))
+#else
+#define FALLTHROUGH
+#endif
+
+
 #endif

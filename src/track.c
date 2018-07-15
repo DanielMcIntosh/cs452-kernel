@@ -50,6 +50,18 @@ static void q_add(BFSNode** freeQ, BFSNode** freeQTail, BFSNode *node){
     *freeQTail = node;
 }
 
+static inline void bfs_add_node(minheap_t *mh, BFSNode **freeQ, BFSNode **freeQTail, Route *route, int idx, int distance, int cnnum, const track_node *dest, Action a, int dist){
+    BFSNode * straight = q_pop(freeQ, freeQTail);
+    straight->current_node = dest;
+    memcpy(&straight->r, route, sizeof(Route));
+    if (a != ACTION_NONE) {
+        straight->r.rcs[idx].swmr = SWCLAMP(cnnum);
+        straight->r.rcs[idx].a = a;
+    }
+    straight->idx=idx;
+    mh_add(mh, (unsigned long int) straight, distance + dist);
+}
+
 #define ALLOW_REVERSE_START FALSE 
 #define ALLOW_REVERSE_ENROUTE TRUE 
 
@@ -102,47 +114,24 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
             }
             *r = route;
             return distance;
-        } else if ((0x1ULL << (TRACK_NODE_TO_INDEX(cn) % 64)) & ((TRACK_NODE_TO_INDEX(cn) < 64) ? reservations->bits_low : reservations->bits_high)) { // TODO allow trains to use their own reserved track
+        } else if (TRACK_RESERVED(reservations, cn)) { // TODO allow trains to use their own reserved track
             continue;
         } 
         // continue the search
+        //
 
         if (cn->type == NODE_BRANCH) {
             // Can go either direction on a branch
-            BFSNode * straight = q_pop(&freeQ, &freeQTail);
-            straight->current_node = cn->edge[DIR_STRAIGHT].dest;
-            memcpy(&straight->r, &route, sizeof(Route));
-            straight->r.rcs[idx].swmr = SWCLAMP(cn->num);
-            straight->r.rcs[idx].a = ACTION_STRAIGHT;
-            straight->idx=idx+1;
-            mh_add(&mh, (unsigned long int) straight, distance + cn->edge[DIR_STRAIGHT].dist);
-
-            BFSNode * curved = q_pop(&freeQ, &freeQTail);
-            curved->current_node = cn->edge[DIR_CURVED].dest;
-            memcpy(&curved->r, &route, sizeof(Route));
-            curved->r.rcs[idx].swmr = SWCLAMP(cn->num);
-            curved->r.rcs[idx].a = ACTION_CURVED;
-            curved->idx=idx+1;
-            mh_add(&mh, (unsigned long int) curved, distance + cn->edge[DIR_CURVED].dist);
+            bfs_add_node(&mh, &freeQ, &freeQTail, &route, idx+1, distance, cn->num, cn->edge[DIR_STRAIGHT].dest, ACTION_STRAIGHT, cn->edge[DIR_STRAIGHT].dist);
+            bfs_add_node(&mh, &freeQ, &freeQTail, &route, idx+1, distance, cn->num, cn->edge[DIR_CURVED].dest, ACTION_CURVED, cn->edge[DIR_CURVED].dist);
         }
         if (cn->type == NODE_MERGE && ALLOW_REVERSE_ENROUTE) {
             // Can reverse after hitting a merge:
-            BFSNode * reverse = q_pop(&freeQ, &freeQTail);
-            reverse->current_node = cn->reverse;
-            memcpy(&reverse->r, &route, sizeof(Route));
-            reverse->r.rcs[idx].swmr = SWCLAMP(cn->num);
-            reverse->r.rcs[idx].a = ACTION_RV;
-            reverse->idx=idx+1;
-            mh_add(&mh, (unsigned long int) reverse, distance + rev_penalty);
+            bfs_add_node(&mh, &freeQ, &freeQTail, &route, idx+1, distance, cn->num, cn->reverse, ACTION_CURVED, rev_penalty);
         }
         if (cn->type == NODE_MERGE || cn->type == NODE_SENSOR || cn->type == NODE_ENTER) {
             // Can go straight on merges, sensors, and enters.
-            BFSNode * ahead = q_pop(&freeQ, &freeQTail);
-            ahead->current_node = cn->edge[DIR_AHEAD].dest;
-            ahead->idx = idx;
-            memcpy(&ahead->r, &route, sizeof(Route));
-            mh_add(&mh, (unsigned long int) ahead, distance + cn->edge[DIR_AHEAD].dist);
-            ASSERT(distance + cn->edge[DIR_AHEAD].dist > 0, "fuck");
+            bfs_add_node(&mh, &freeQ, &freeQTail, &route, idx,   distance, cn->num, cn->edge[DIR_AHEAD].dest, ACTION_NONE, cn->edge[DIR_AHEAD].dist);
         }
     }
 
@@ -196,7 +185,7 @@ inline const track_edge *next_edge_on_route(const Route *route, int * restrict i
             }
             return n->edge[DIR_AHEAD].reverse;
         }
-        __attribute__((fallthrough));
+        FALLTHROUGH;
     }
     case (NODE_ENTER):
     case (NODE_SENSOR):

@@ -136,12 +136,12 @@ static inline void commandserver_exec_switch(CommandServer * restrict cs, int ar
     }
 }
 
-static inline void commandserver_exec_reverse(int train, int speed, int servertid, int trainstate_tid, TerminalCourier *tc) {
+static inline void commandserver_exec_reverse(int train, int speed, int servertid, int __attribute__((unused)) trainstate_tid, TerminalCourier *tc) {
     Putc(servertid, 1, 0);
     Putc(servertid, 1, train);
     tc_send(tc, TERMINAL_FLAGS_SET, STATUS_FLAG_REVERSING, 0);
     CreateWith2Args(PRIORITY_NOTIFIER, &task_reverse_train, train, speed);
-    TrainData td = {0, train};
+    //TrainData td = {0, train};
     //NotifyTrainSpeed(trainstate_tid, td); // TODO train state courier
 }
 
@@ -273,7 +273,7 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
 
             Putc(servertid, 1, sm.speed);
             Putc(servertid, 1, train);
-            TrainData td = {train, sm.speed};
+            //TrainData td = {train, sm.speed};
             //NotifyTrainSpeed(trainstate_tid, td);
             CreateWith2Args(PRIORITY_LOW, &task_short_move, train, sm.delay);
 
@@ -320,7 +320,7 @@ void task_commandserver(int trackstate_tid, int trainstate_tid){
             //reaccelerate
             Putc(servertid, 1, speed);
             Putc(servertid, 1, train);
-            TrainData td = {speed, train};
+            //TrainData td = {speed, train};
             //NotifyTrainSpeed(trainstate_tid, td);
             break;
         }
