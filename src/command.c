@@ -266,17 +266,12 @@ void __attribute__((noreturn)) task_commandserver(int trackstate_tid, int trains
         case COMMAND_MOVE:
         {
             int train = cm.command.arg2;
-            int distance = cm.command.arg1;
-            ShortMessage sm;
-
-            GetShort(trackstate_tid, distance, &sm); // TODO track state courier
-
-            Putc(servertid, 1, sm.speed);
+            int dist = cm.command.arg1;
+            // precision: 4 digits past the decimal
+            int delay = ((1263030) + (59912) * (dist) / 10 - (394) * (dist * dist) / 100) / 10000;
+            Putc(servertid, 1, 14);
             Putc(servertid, 1, train);
-            //TrainData td = {train, sm.speed};
-            //NotifyTrainSpeed(trainstate_tid, td);
-            CreateWith2Args(PRIORITY_LOW, &task_short_move, train, sm.delay);
-
+            CreateWith2Args(PRIORITY_LOW, &task_short_move, train, delay);
             break;
         }
         case COMMAND_PARAM:

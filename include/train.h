@@ -25,6 +25,7 @@ typedef struct train{
     Direction direction;
     int velocity[NUM_SPEEDS];
     int stopping_distance[NUM_SPEEDS];
+    int short_delay_coeffs[3];
     int next_sensor;
     int next_sensor_predict_time;
     int last_sensor;
@@ -32,6 +33,6 @@ typedef struct train{
     int last_sensor_dist;
 } Train;
 
-#define TRAIN_INIT {0, 0,  0, {0}, {0}, 0, 0, 0, 0, 0}
+#define TRAIN_INIT {0, 0,  0, {0}, {0}, {0, 0, 0}, -1, 0, -1, 0, 0}
 
 #endif
