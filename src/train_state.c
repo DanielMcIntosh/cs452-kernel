@@ -362,7 +362,7 @@ static void handle_navigate(TrainState *ts, TerminalCourier *tc, TrainStateMessa
 }
 
 static void train_on_sensor_event(Train *train, TerminalCourier *tc, int __attribute__((unused)) sensor, int event_time, int distance, int tr) {
-    if (train->last_sensor >= 0) {
+    if (train->last_sensor < 0) {
         return;
     }
     //we haven't reset our calculations && we actually hit the sensor we expected to (and not the one after?)
