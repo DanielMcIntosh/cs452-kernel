@@ -57,6 +57,7 @@ static inline void bfs_add_node(minheap_t *mh, BFSNode **freeQ, BFSNode **freeQT
     if (a != ACTION_NONE) {
         straight->r.rcs[idx].swmr = SWCLAMP(cnnum);
         straight->r.rcs[idx].a = a;
+        idx++;
     }
     straight->idx=idx;
     mh_add(mh, (unsigned long int) straight, distance + dist);
@@ -122,16 +123,16 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
 
         if (cn->type == NODE_BRANCH) {
             // Can go either direction on a branch
-            bfs_add_node(&mh, &freeQ, &freeQTail, &route, idx+1, distance, cn->num, cn->edge[DIR_STRAIGHT].dest, ACTION_STRAIGHT, cn->edge[DIR_STRAIGHT].dist);
-            bfs_add_node(&mh, &freeQ, &freeQTail, &route, idx+1, distance, cn->num, cn->edge[DIR_CURVED].dest, ACTION_CURVED, cn->edge[DIR_CURVED].dist);
+            bfs_add_node(&mh, &freeQ, &freeQTail, &route, idx, distance, cn->num, cn->edge[DIR_STRAIGHT].dest, ACTION_STRAIGHT, cn->edge[DIR_STRAIGHT].dist);
+            bfs_add_node(&mh, &freeQ, &freeQTail, &route, idx, distance, cn->num, cn->edge[DIR_CURVED].dest, ACTION_CURVED, cn->edge[DIR_CURVED].dist);
         }
         if (cn->type == NODE_MERGE && ALLOW_REVERSE_ENROUTE) {
             // Can reverse after hitting a merge:
-            bfs_add_node(&mh, &freeQ, &freeQTail, &route, idx+1, distance, cn->num, cn->reverse, ACTION_CURVED, rev_penalty);
+            bfs_add_node(&mh, &freeQ, &freeQTail, &route, idx, distance, cn->num, cn->reverse, ACTION_RV, rev_penalty);
         }
         if (cn->type == NODE_MERGE || cn->type == NODE_SENSOR || cn->type == NODE_ENTER) {
             // Can go straight on merges, sensors, and enters.
-            bfs_add_node(&mh, &freeQ, &freeQTail, &route, idx,   distance, cn->num, cn->edge[DIR_AHEAD].dest, ACTION_NONE, cn->edge[DIR_AHEAD].dist);
+            bfs_add_node(&mh, &freeQ, &freeQTail, &route, idx, distance, cn->num, cn->edge[DIR_AHEAD].dest, ACTION_NONE, cn->edge[DIR_AHEAD].dist);
         }
     }
 
