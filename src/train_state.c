@@ -265,12 +265,9 @@ static void ts_exec_step(TrainState * restrict ts, TerminalCourier * restrict tc
 }
 
 static inline const track_node *get_resrv_end(const ActiveRoute *ar, int idx, const track_node *start, int stopping_distance, int * restrict resrv_dist) {
+    ASSERT(start != NULL, "start node is null! idx = %d, stopping_distance = %d", idx, stopping_distance);
     int cur_dist = 0;
     const track_node *resrv_end = start;
-
-    if (resrv_end == NULL) {
-        return NULL;
-    }
 
     //nth-sensor + stopping_dist + next_switch
     resrv_end = nth_sensor_on_route(2,  &ar->route, &idx, resrv_end, &cur_dist, "get_resrv_end: 1");
@@ -439,7 +436,7 @@ static void activeroute_on_sensor_event(ActiveRoute *ar, Train *train, TrainStat
 
     // update cur_pos_idx
     while (ar->last_handled_sensor != -1 && ar->last_handled_sensor != sensor){
-        ar->last_handled_sensor =  next_sensor_on_route(&ar->route, &ar->cur_pos_idx, &track[SENSOR_TO_NODE(ar->last_handled_sensor)], &dist_to_next_snsr, "update cur_pos_idx")->num ;
+        ar->last_handled_sensor =  next_sensor_on_route(&ar->route, &ar->cur_pos_idx, &track[SENSOR_TO_NODE(ar->last_handled_sensor)], &dist_to_next_snsr, "update cur_pos_idx")->num;
     }
     ar->last_handled_sensor = sensor;
 
