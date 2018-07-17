@@ -172,6 +172,7 @@ const track_node* rc_to_track_node(RouteCommand rc, const char * restrict sig) {
 
 inline const track_edge *next_edge_on_route(const Route *route, int * restrict idx, const track_node *n, const char * restrict sig) {
     ASSERT(track <= n && n <= track+TRACK_MAX, "invalid n: %d, [%d -> %d] @ %s", n, track, track+TRACK_MAX, sig);
+    ASSERT(0 <= *idx && *idx < MAX_ROUTE_COMMAND, "invalid idx: %d", *idx);
     switch (n->type) {
     case (NODE_BRANCH):
     {
