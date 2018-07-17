@@ -31,12 +31,12 @@ typedef struct active_route{
 } ActiveRoute;
 
 #define ACTIVE_ROUTE_DONE_ACTIONS(ar) (ar->route.rcs[ar->idx_resrv].a == ACTION_NONE)
-#define ACTIVE_ROUTE_COMPLETE(ar) (ACTIVE_ROUTE_DONE_ACTIONS(ar) && ar->stopped)
+#define ACTIVE_ROUTE_COMPLETE(ar) ((ACTIVE_ROUTE_DONE_ACTIONS(ar) && ar->stopped))
 #define ACTIVE_ROUTE_INIT {ROUTE_INIT, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-#define ACTIVE_ROUTE_SHOULD_STOP(ar, train, dist_to_next_snsr) (dist_to_next_snsr + train->stopping_distance[train->speed] >= (ar)->remaining_distance && !(ar)->stopped) 
-#define ACTIVE_ROUTE_NEXT_STEP_RV_IN_RANGE(ar, train, d)  (ar->route.rcs[ar->cur_pos_idx].a == ACTION_RV) && (d + train->stopping_distance[train->speed] <= ar->next_step_distance) && (!ar->reversing)
-#define ACTIVE_ROUTE_NEXT_STEP_RV(ar)  (ar->route.rcs[ar->cur_pos_idx].a == ACTION_RV) && (!ar->reversing)
-#define ACTIVE_ROUTE_SHOULD_PERFORM_ACTION(ar, resrv_dist, nxt_step_rv_in_range) (ar->next_step_distance <= resrv_dist || nxt_step_rv_in_range) && !ACTIVE_ROUTE_DONE_ACTIONS(ar)
+#define ACTIVE_ROUTE_SHOULD_STOP(ar, train, dist_to_next_snsr) ((dist_to_next_snsr + train->stopping_distance[train->speed] >= (ar)->remaining_distance && !(ar)->stopped))
+#define ACTIVE_ROUTE_NEXT_STEP_RV_IN_RANGE(ar, train, d)  ((ar->route.rcs[ar->cur_pos_idx].a == ACTION_RV) && (d + train->stopping_distance[train->speed] <= ar->next_step_distance) && (!ar->reversing))
+#define ACTIVE_ROUTE_NEXT_STEP_RV(ar)  ((ar->route.rcs[ar->cur_pos_idx].a == ACTION_RV) && (!ar->reversing))
+#define ACTIVE_ROUTE_SHOULD_PERFORM_ACTION(ar, resrv_dist, nxt_step_rv_in_range) ((ar->next_step_distance <= resrv_dist || nxt_step_rv_in_range) && !ACTIVE_ROUTE_DONE_ACTIONS(ar))
 
 
 typedef struct train_state{
@@ -292,7 +292,7 @@ static inline const track_node *get_resrv_end(const ActiveRoute *ar, int idx, co
     return resrv_end;
 }
 
-static int ts_notify_terminal_buffer(int tstid, TerminalReq *treq) {
+static inline int ts_notify_terminal_buffer(int tstid, TerminalReq * restrict treq) {
     ASSERT(treq != NULL, "null TerminalRequest output");
     TrainStateMessage tm = {MESSAGE_TRAIN_STATE, TRAIN_STATE_NOTIFY_TERMINAL_COURIER, .data = 0};
     TerminalCourierMessage tcm;
@@ -302,7 +302,7 @@ static int ts_notify_terminal_buffer(int tstid, TerminalReq *treq) {
     return r;
 }
 
-static void handle_navigate(TrainState *ts, TerminalCourier *tc, TrainStateMessage *tm, int trackstate_tid, int tid) {
+static inline void handle_navigate(TrainState * restrict ts, TerminalCourier * restrict tc, TrainStateMessage * restrict tm, int trackstate_tid, int tid) {
     int object = tm->nav_req.position.object;
     int distance_past = tm->nav_req.position.distance_past;
     int tr = tm->nav_req.train;
@@ -329,7 +329,7 @@ static void handle_navigate(TrainState *ts, TerminalCourier *tc, TrainStateMessa
         .min_dist = min_dist,
         .rev_penalty = rev_penalty
     };
-    Route route = ROUTE_INIT; 
+    Route route = ROUTE_INIT;
     int distance = GetRoute(trackstate_tid, req, &route);
     rm.ret = distance;
     Reply(tid, &rm, sizeof(rm));
@@ -358,7 +358,7 @@ static void handle_navigate(TrainState *ts, TerminalCourier *tc, TrainStateMessa
     tc_send(tc, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING, 0);
 }
 
-static void train_on_sensor_event(Train *train, TerminalCourier *tc, int __attribute__((unused)) sensor, int event_time, int distance, int tr) {
+static inline void train_on_sensor_event(Train * restrict train, TerminalCourier * restrict tc, int sensor, int event_time, int distance) {
     if (train->last_sensor < 0) {
         return;
     }
@@ -378,10 +378,10 @@ static void train_on_sensor_event(Train *train, TerminalCourier *tc, int __attri
     tc_send(tc, TERMINAL_VELOCITY_DEBUG, train->velocity[train->speed], distance);
     train->last_sensor = sensor;
     train->last_sensor_time = event_time;
-    ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor for train %d: %d", tr, train->last_sensor);
+    ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor for train %d: %d", train->num, train->last_sensor);
 }
 
-static void activeroute_recalculate_distances(ActiveRoute *ar, TrainState *ts, TerminalCourier *tc, int sensor, int distance) {
+static inline void activeroute_recalculate_distances(ActiveRoute * restrict ar, TrainState * restrict ts, TerminalCourier * restrict tc, int sensor, int distance) {
     ASSERT(distance != 0, "distance between last sensor pair shouldn't be 0");
     // recalculate next step distance and remaining distance every time
     if (ACTIVE_ROUTE_DONE_ACTIONS(ar)) {
@@ -401,7 +401,7 @@ static void activeroute_recalculate_distances(ActiveRoute *ar, TrainState *ts, T
     tc_send(tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
 }
 
-static int ar_stop(ActiveRoute *ar, Train *train, TerminalCourier *tc) {
+static inline int ar_stop(ActiveRoute * restrict ar, Train * restrict train, TerminalCourier * restrict tc) {
     // Figure out how long we need to wait:
     int stopdelay = calc_reverse_time_from_velocity(train->velocity[train->speed], ar->remaining_distance, train->stopping_distance[train->speed]);
     DelayStop ds = {.delay = stopdelay, .rv = 0};
@@ -411,7 +411,7 @@ static int ar_stop(ActiveRoute *ar, Train *train, TerminalCourier *tc) {
     return 999999;
 }
 
-static void activeroute_exec_steps(ActiveRoute * restrict ar, Train * restrict __attribute__((unused)) train, TrainState * restrict ts, TerminalCourier * restrict tc, const track_node * resrv_end, int __attribute__((unused)) dist_to_next_snsr, int resrv_dist, int tr, int cmdtid) {
+static inline void activeroute_exec_steps(ActiveRoute * restrict ar, TrainState * restrict ts, TerminalCourier * restrict tc, const track_node *resrv_end, int resrv_dist, int tr, int cmdtid) {
     tc_send(tc, TERMINAL_ROUTE_DBG2, 260, rc_to_track_node(ar->route.rcs[ar->idx_resrv], "track reservation")->num);
     tc_send(tc, TERMINAL_ROUTE_DBG2, 261, resrv_end->num);
     //todo will fail after first sensor right now because we've already reserved some of this
@@ -429,7 +429,7 @@ static void activeroute_exec_steps(ActiveRoute * restrict ar, Train * restrict _
     }
 }
 
-static void activeroute_on_sensor_event(ActiveRoute *ar, Train *train, TrainState *ts, TerminalCourier *tc, int sensor, int distance, int tr, int cmdtid){
+static inline void activeroute_on_sensor_event(ActiveRoute * restrict ar, Train * restrict train, TrainState * restrict ts, TerminalCourier * restrict tc, int sensor, int distance, int tr, int cmdtid){
     int dist_to_next_snsr = 0;
     if (ACTIVE_ROUTE_COMPLETE(ar) || ar->reversing)
         return;
@@ -449,10 +449,10 @@ static void activeroute_on_sensor_event(ActiveRoute *ar, Train *train, TrainStat
         resrv_dist = ar_stop(ar, train, tc);
 
     if (!ACTIVE_ROUTE_DONE_ACTIONS(ar))
-        activeroute_exec_steps(ar, train, ts, tc, resrv_end, dist_to_next_snsr, resrv_dist, tr, cmdtid);
+        activeroute_exec_steps(ar, ts, tc, resrv_end, resrv_dist, tr, cmdtid);
 }
 
-static void handle_sensor_event(TrainState *ts, TerminalCourier *tc, TrainStateMessage *tm, int cmdtid, int tid) {
+static inline void handle_sensor_event(TrainState * restrict ts, TerminalCourier * restrict tc, TrainStateMessage * restrict tm, int cmdtid, int tid) {
     ReplyMessage rm = {MESSAGE_REPLY, 0};
     Reply(tid, &rm, sizeof(rm)); 
     if (unlikely(ts->total_trains <= 0))
@@ -465,11 +465,11 @@ static void handle_sensor_event(TrainState *ts, TerminalCourier *tc, TrainStateM
     Train *train = &(ts->active_trains[tr]);
     ActiveRoute *ar = &(ts->active_routes[tr]);
 
-    train_on_sensor_event(train, tc, sensor, event_time, distance, tr);
+    train_on_sensor_event(train, tc, sensor, event_time, distance);
     activeroute_on_sensor_event(ar, train, ts, tc, sensor, distance, tr, cmdtid);
 }
 
-static void add_new_train(TrainState *ts, NewTrain data) {
+static inline void add_new_train(TrainState * restrict ts, NewTrain data) {
     ASSERT(ts->total_trains >= 0, "Invalid total trains: %d", ts->total_trains);
 
     ts->active_train_map[data.train] = ts->total_trains;
