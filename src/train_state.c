@@ -390,6 +390,7 @@ static void activeroute_recalculate_distances(ActiveRoute *ar, TrainState *ts, T
     if (ACTIVE_ROUTE_DONE_ACTIONS(ar)) {
         ar->next_step_distance = 0;
     } else {
+        ASSERT(ar->idx_resrv >= ar->cur_pos_idx, "should have reserved ahead of cur_pos_idx, idx_resrv = %d, cur_pos_idx = %d, sensor = %d", ar->idx_resrv, ar->cur_pos_idx, sensor);
         ar->next_step_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[ar->idx_resrv], "ar next step recalculate rc2tn"), "ar next step recalculate");
         //have to delay initialization of next step distance until we hit the next sensor, since that's where the route actually starts
         if (ar->idx_resrv == 0) {
