@@ -109,7 +109,7 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
         const track_node *cn = bn->current_node;
         q_add(&freeQ, &freeQTail, bn);
         if (unlikely(cn == dest) && distance > (!route.reverse ? min_dist : (min_dist + rev_penalty))) { // found shortest path > min_dist
-            for (int i = idx+1; i < MAX_ROUTE_COMMAND; i++){
+            for (int i = idx; i < MAX_ROUTE_COMMAND; i++){
                 route.rcs[i].swmr = 0;
                 route.rcs[i].a = ACTION_NONE;
             }
@@ -128,7 +128,15 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
         }
         if (cn->type == NODE_MERGE && ALLOW_REVERSE_ENROUTE) {
             // Can reverse after hitting a merge:
-            bfs_add_node(&mh, &freeQ, &freeQTail, &route, idx, distance, cn->num, cn->reverse, ACTION_RV, rev_penalty);
+            const track_node *rev;
+            if (likely(cn->num <= 18)) {
+                rev = cn->reverse;
+            }
+            else {
+                // if we're in the middle, our next node is not cn->reverse, but SW3_COMPLEMENT(cn->num)
+                rev = &track[SWITCH_TO_NODE(SW3_COMPLEMENT(cn->num))];
+            }
+            bfs_add_node(&mh, &freeQ, &freeQTail, &route, idx, distance, cn->num, rev, ACTION_RV, rev_penalty);
         }
         if (cn->type == NODE_MERGE || cn->type == NODE_SENSOR || cn->type == NODE_ENTER) {
             // Can go straight on merges, sensors, and enters.
@@ -263,7 +271,7 @@ int distance_to_on_route(const Route *route, int idx, const track_node *from, co
     const track_edge *e;
     while (n != to && n != NULL) {
         e = next_edge_on_route(route, &idx, n, sig);
-        ASSERT(e != NULL, "Null edge on route: from %s, to %s, idx: %d @ %s", from->name, to->name, idx, sig);
+        ASSERT(e != NULL, "Null edge on route: from %s, to %s, n: %s, idx: %d @ %s", from->name, to->name, n->name, idx, sig);
         distance += e->dist;
         n = e->dest;
     }
