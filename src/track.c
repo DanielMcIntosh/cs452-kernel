@@ -171,7 +171,7 @@ const track_node* rc_to_track_node(RouteCommand rc, const char * restrict sig) {
 }
 
 inline const track_edge *next_edge_on_route(const Route *route, int * restrict idx, const track_node *n, const char * restrict sig) {
-    ASSERT(track <= n && n <= track+TRACK_MAX, "invalid n: %d, [%d -> %d] @ %s", n, track, track+TRACK_MAX, sig);
+    ASSERT_VALID_TRACK_SIG(n, sig);
     ASSERT(0 <= *idx && *idx < MAX_ROUTE_COMMAND, "invalid idx: %d", *idx);
     switch (n->type) {
     case (NODE_BRANCH):
@@ -212,7 +212,7 @@ inline const track_edge *next_edge_on_route(const Route *route, int * restrict i
 }
 
 static inline const track_node *next_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, node_type type, const char * restrict sig) {
-    ASSERT(track <= prev && prev <= track+TRACK_MAX, "invalid prev: %d, [%d -> %d] @ %s", prev, track, track+TRACK_MAX, sig);
+    ASSERT_VALID_TRACK_SIG(prev, sig);
     const track_node *n = prev;
     *distance = 0;
     const track_edge *e;
@@ -227,17 +227,17 @@ static inline const track_node *next_on_route(const Route *route, int * restrict
 }
 
 inline const track_node *next_sensor_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig) {
-    ASSERT(track <= prev && prev <= track+TRACK_MAX, "invalid prev: %d, [%d -> %d] @ %s", prev, track, track+TRACK_MAX, sig);
+    ASSERT_VALID_TRACK_SIG(prev, sig);
     return next_on_route(route, idx, prev, distance, NODE_SENSOR, sig);
 }
 inline const track_node *next_switch_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig) {
-    ASSERT(track <= prev && prev <= track+TRACK_MAX, "invalid prev: %d, [%d -> %d] @ %s", prev, track, track+TRACK_MAX, sig);
+    ASSERT_VALID_TRACK_SIG(prev, sig);
     return next_on_route(route, idx, prev, distance, NODE_BRANCH, sig);
 }
 
 //TODO distance is overwritten by successive calls to next_sensor_on_route, so it isn't actually the resulting distance
 const track_node *nth_sensor_on_route(int n, const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig) {
-    ASSERT(track <= prev && prev <= track+TRACK_MAX, "invalid prev: %d, [%d -> %d] @ %s", prev, track, track+TRACK_MAX, sig);
+    ASSERT_VALID_TRACK_SIG(prev, sig);
     int cur_dist = 0;
     for (int i = 0; i < n && likely(prev != NULL); ++i) {
         prev = next_sensor_on_route(route, idx, prev, &cur_dist, sig);
@@ -247,7 +247,7 @@ const track_node *nth_sensor_on_route(int n, const Route *route, int * restrict 
 }
 
 const track_node *forward_dist_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig) {
-    ASSERT(track <= prev && prev <= track+TRACK_MAX, "INVALID prev: %d, [%d -> %d] @ %s", prev, track, track+TRACK_MAX, sig);
+    ASSERT_VALID_TRACK_SIG(prev, sig);
     int cur_dist = 0;
     const track_edge *e;
     while (cur_dist < *distance && prev != NULL) {
@@ -265,8 +265,8 @@ const track_node *forward_dist_on_route(const Route *route, int * restrict idx, 
 }
 
 int distance_to_on_route(const Route *route, int idx, const track_node *from, const track_node *to, const char * restrict sig) {
-    ASSERT(track <= to && to <= track+TRACK_MAX, "INVALID to: %d, [%d -> %d] @ %s", to, track, track+TRACK_MAX, sig);
-    ASSERT(track <= from && from <= track+TRACK_MAX, "INVALID from: %d, [%d -> %d] @ %s", from, track, track+TRACK_MAX, sig);
+    ASSERT_VALID_TRACK_SIG(to, sig);
+    ASSERT_VALID_TRACK_SIG(from, sig);
     const track_node *n = from;
     int distance = 0;
     const track_edge *e;
@@ -298,8 +298,25 @@ static inline void add_to_mask(const track_node *n, Reservation * restrict mask)
     }
 }
 
+static inline void remove_from_mask(const track_node *n, Reservation * restrict mask) {
+    int ind = TRACK_NODE_TO_INDEX(n);
+    if (ind < 64) {
+        mask->bits_low &= ~(0x1ULL << ind);
+    }
+    else {
+        if (n->type == NODE_BRANCH) {
+            ind = SWCLAMP(n->num) - 1 + 80;
+        }
+        else if (n->type == NODE_MERGE) {
+            ind = (SWCLAMP(n->num) - 1) + 80 + 22;
+        }
+        ind -= 64;
+        mask->bits_high &= ~(0x1ULL << ind);
+    }
+}
+
 bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations) {
-    ASSERT(track <= start && start <= track+TRACK_MAX, "INVALID start: %d, [%d -> %d]", start, track, track+TRACK_MAX);
+    ASSERT_VALID_TRACK(start);
 
     Reservation mask = RESERVATION_INIT;
     add_to_mask(end, &mask);
@@ -322,3 +339,26 @@ bool reserve_track(const Route *route, int idx, const track_node *start, const t
     return TRUE;
 }
 
+void free_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations) {
+    ASSERT_VALID_TRACK(start);
+
+    Reservation mask = RESERVATION_INIT;
+    add_to_mask(end, &mask);
+
+    const track_node *n = start;
+    while (n != end && n != NULL) {
+        n = next_edge_on_route(route, &idx, n, "reserve_track")->dest;
+
+        add_to_mask(n, &mask);
+    }
+    ASSERT(n == end, "While Loop broken early");
+
+    ASSERT(((reservations->bits_low & mask.bits_low) == mask.bits_low) && ((reservations->bits_high & mask.bits_high) == mask.bits_high)) {
+        return FALSE;
+    }
+
+    reservations->bits_low |= mask.bits_low;
+    reservations->bits_high |= mask.bits_high;
+
+    return TRUE;
+}

@@ -60,9 +60,9 @@ typedef struct {
 
 int task_init(TaskQueue *queue, char *stack_space, unsigned int stack_space_size);
 
-int task_getTid(TD *task);
-int task_getParentTid(TD *task);
-int task_get_stack_size(TD *task);
+int __attribute__((pure)) task_getTid(TD *task);
+int __attribute__((pure)) task_getParentTid(TD *task);
+int __attribute__((pure)) task_get_stack_size(TD *task);
 
 TD *task_nextActive(TaskQueue *queue);
 void task_react_to_state(TD *task, TaskQueue *queue);

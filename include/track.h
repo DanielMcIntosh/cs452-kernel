@@ -5,6 +5,8 @@
 #include "train_state.h"
 
 extern track_node track[TRACK_MAX];
+#define ASSERT_VALID_TRACK(n) ASSERT(track <= (n) && (n) <= track+TRACK_MAX, "INVALID "S(n)": %d, [%d -> %d]", (int)(n), (int)track, (int)track+TRACK_MAX)
+#define ASSERT_VALID_TRACK_SIG(n, sig) ASSERT(track <= (n) && (n) <= track+TRACK_MAX, "INVALID "S(n)": %d, [%d -> %d] @ %s", (int)(n), (int)track, (int)track+TRACK_MAX, (sig))
 
 #define MAX_ROUTE_COMMAND 15
 // 18 -> 126 bits which is the min dist to a power of 2 for a while I think - this is totally changeably but routes probably aren't more than 18 switches long?

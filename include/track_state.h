@@ -94,14 +94,13 @@ typedef enum trkstrequest{
     NUM_TRACK_STATE_REQUESTS
 } TrackStateRequest;
 
-void task_track_state();
+void __attribute__((noreturn)) task_track_state();
 
 int NotifySensorData(int trackstatetid, SensorData data);
 int NotifySwitchStatus(int trackstatetid, SwitchData data);
 int NotifyParam(int trackstatetid, ParamData data);
 
 int GetSwitchState(int trackstatetid, int sw);
-int GetActiveTrain(int trackstatetid, int train);
 int GetRoute(int trackstatetid, RouteRequest req, Route *res);
 int GetShort(int trackstatetid, int distance, ShortMessage *sm);
 

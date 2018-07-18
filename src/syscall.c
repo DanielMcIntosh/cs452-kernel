@@ -49,7 +49,7 @@ void Pass(){
 
 void __attribute((noreturn)) Exit(){
     syscall_0(SYSCALL_EXIT);
-    Exit();
+    __builtin_unreachable();
 }
 
 int MyTid(){
@@ -82,7 +82,7 @@ int AwaitEvent(int eventType){
 
 int __attribute__((noreturn)) Quit(){
     syscall_0(SYSCALL_QUIT);
-    Quit();
+    __builtin_unreachable();
 }
 
 int EnterCriticalSection(){
@@ -95,7 +95,7 @@ int ExitCriticalSection(){
 
 int __attribute__((noreturn)) Destroy(){
     syscall_0(SYSCALL_DESTROY);
-    Destroy();
+    __builtin_unreachable();
 }
 
 int CreateWithArgument(Priority priority, void (*code)(int), int argument){

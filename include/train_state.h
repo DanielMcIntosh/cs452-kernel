@@ -69,7 +69,7 @@ typedef enum trnstrequest{
     NUM_TRAIN_STATE_REQUESTS
 } TrainStateRequest;
 
-void task_train_state();
+void __attribute__((noreturn)) task_train_state();
 
 int NotifyTrainSpeed(int trainstatetid, TrainData data);
 int NotifyNewTrain(int trainstatetid, NewTrain data);

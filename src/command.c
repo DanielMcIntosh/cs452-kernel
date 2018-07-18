@@ -77,7 +77,7 @@ static void init_switches(CommandServer *cs){
     }
 }
 
-void task_solenoid_notifier(int tid){
+void __attribute__((noreturn)) task_solenoid_notifier(int tid){
     Command c = {COMMAND_NOTIFY_SOLENOID_TIMER, 0, {.arg2 = 0}};
     FOREVER {
         SendCommand(tid, c);
@@ -85,11 +85,11 @@ void task_solenoid_notifier(int tid){
     }
 }
 
-int calcReverseTime(int speed){
+int __attribute__((const)) calcReverseTime(int speed){
     return 350 / (15 - speed) + 75;
 }
 
-void task_reverse_train(int train, int speed){
+void __attribute__((noreturn)) task_reverse_train(int train, int speed){
     int tid = WhoIs(NAME_COMMANDSERVER), terminaltid = WhoIs(NAME_TERMINAL);
     Delay(calcReverseTime(speed));
     Command crv = {COMMAND_NOTIFY_RV_REVERSE, train, {.arg2 = 15}};
@@ -101,7 +101,7 @@ void task_reverse_train(int train, int speed){
     Destroy();
 }
 
-void task_switch_courier(int cmdtid, int terminaltid){
+void __attribute__((noreturn)) task_switch_courier(int cmdtid, int terminaltid){
     Command c = {COMMAND_NOTIFY_COURIER, 0, {.arg2 = 0}};
     FOREVER {
         int r = SendCommand(cmdtid, c);
@@ -112,7 +112,7 @@ void task_switch_courier(int cmdtid, int terminaltid){
     }
 }
 
-void task_short_move(int train, int delay){
+void __attribute__((noreturn)) task_short_move(int train, int delay){
     int tid = WhoIs(NAME_COMMANDSERVER);
     Delay(delay);
     Command c = {COMMAND_TR, 0, {.arg2 = train}};
@@ -160,7 +160,7 @@ void send_wakeup(int tid, int __attribute__((unused)) arg1, bool success) {
     Send(tid, &success, sizeof(success), NULL, 0);
 }
 
-void task_commandserver(int trackstate_tid, int trainstate_tid){
+void __attribute__((noreturn)) task_commandserver(int trackstate_tid, int trainstate_tid){
     CommandServer cs = {0, 0, 0, -1, 0};
     RegisterAs(NAME_COMMANDSERVER);
     int servertid = WhoIs(NAME_UART1_SEND), tid;

@@ -19,7 +19,7 @@ typedef struct te_message{
     int sensor;
 } TrainEventMessage;
 
-void task_train_event_courier() {
+void __attribute__((noreturn)) task_train_event_courier() {
     RegisterAs(NAME_TRAIN_EVENT_COURIER);
 
     TrainEventMessage tm;
@@ -73,7 +73,7 @@ void TrainEvent_Notify(int courier_tid, int sensor) {
     Send(courier_tid, &msg, sizeof(msg), NULL, 0);
 }
 
-void task_runner(int sensor) {
+void __attribute__((noreturn)) task_runner(int sensor) {
     int caller_tid;
     Runnable to_run;
     Receive(&caller_tid, &to_run, sizeof(to_run));

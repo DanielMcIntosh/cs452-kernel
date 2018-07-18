@@ -46,7 +46,7 @@ static void mh_bubble_down(minheap_t *mh, unsigned int idx) {
     }
 }
 
-int mh_add(minheap_t *mh, int item, unsigned int value) {
+int mh_add(minheap_t *mh, unsigned long item, unsigned int value) {
     if (mh->count >= mh->size){
         return ERR_MH_FULL;
     }
@@ -87,6 +87,6 @@ int mh_peek_min(minheap_t * restrict mh, entry_t * restrict min){
     return 0;
 }
 
-int mh_empty(minheap_t *mh){
+int __attribute__((pure)) mh_empty(minheap_t *mh){
     return mh->count == 0;
 }

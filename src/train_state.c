@@ -73,7 +73,7 @@ int __attribute__((pure))  calc_reverse_time(TrainState *ts, int activetrain){
     return 450 / (15 - ts->active_trains[activetrain].speed) + 75; // BIG TODO
 }
 
-int __attribute__((pure)) calc_reverse_time_from_velocity(int velocity, int distance_to_stop, int stopping_distance) {
+int __attribute__((const)) calc_reverse_time_from_velocity(int velocity, int distance_to_stop, int stopping_distance) {
     if (velocity == 0) return 0;
     return (VELOCITY_PRECISION * (distance_to_stop - stopping_distance) / velocity); 
 }
@@ -88,14 +88,14 @@ int notify_rv_start(int trainstatetid, int train) {
     return sendTrainState(trainstatetid, &msg);
 }
 
-void task_notify_rv_timeout(int delay, int activetrain){
+void __attribute__((noreturn)) task_notify_rv_timeout(int delay, int activetrain){
     int tid = WhoIs(NAME_TRAIN_STATE);
     Delay(delay);
     notify_rv_timeout(tid, activetrain);
     Destroy();
 }
 
-void task_delay_reaccel(int speed, int train){
+void __attribute__((noreturn)) task_delay_reaccel(int speed, int train){
     int tid = WhoIs(NAME_COMMANDSERVER);
     Delay(20);
     Command c = {COMMAND_TR, speed, .arg2=train};
@@ -112,7 +112,7 @@ typedef union delaystop{
 
 } DelayStop;
 
-void task_delay_stop(int data, int train){
+void __attribute__((noreturn)) task_delay_stop(int data, int train){
     int tid = WhoIs(NAME_TRAIN_STATE);
     int cmdtid = WhoIs(NAME_COMMANDSERVER);
     DelayStop ds = {.data = data};
@@ -194,10 +194,10 @@ static inline int get_active_train_from_sensor(TrainState *ts, const int sensor,
         const track_node *n = &track[ts->active_trains[i].last_sensor];
 
         Route r = ROUTE_INIT;
-        int distance = find_path_between_nodes(&resrv, 1, rev_penalty, n, d, &r);
+        int cur_dist = find_path_between_nodes(&resrv, 1, rev_penalty, n, d, &r);
         //TODO notify track_state of any switches we would have to have taken, incase a switch wasn't in the expected state
-        if (distance < min_dist) {
-            min_dist = distance;
+        if (cur_dist < min_dist) {
+            min_dist = cur_dist;
             train = i;
         }
     }
@@ -208,7 +208,7 @@ static inline int get_active_train_from_sensor(TrainState *ts, const int sensor,
 
 static int ar_stop(ActiveRoute*, Train*, TerminalCourier*);
 
-static void ts_exec_step(TrainState * restrict ts, TerminalCourier * restrict tc, ActiveRoute * restrict ar, int activetrain, int cmdtid, int distance_to_stop, char * sig) {
+static void ts_exec_step(TrainState * restrict ts, TerminalCourier * restrict tc, ActiveRoute * restrict ar, int activetrain, int cmdtid, int distance_to_stop, const char * sig) {
     // do current step:
     RouteCommand rc = ar->route.rcs[ar->idx_resrv];
     Train *train = &(ts->active_trains[activetrain]);
@@ -235,7 +235,6 @@ static void ts_exec_step(TrainState * restrict ts, TerminalCourier * restrict tc
             }
             //*/
             ASSERT(!ar->reversing, "CANNOT EXECUTE RV WHEN ROUTE IS ALREADY REVERSING");
-            Train *train = &(ts->active_trains[activetrain]);
             int delay = calc_reverse_time_from_velocity(train->velocity[train->speed], distance_to_stop, train->stopping_distance[train->speed]);
             trainserver_begin_reverse(ts, activetrain, delay);
             cnode = &track[MERGE_TO_NODE(rc.swmr)];
@@ -265,7 +264,7 @@ static void ts_exec_step(TrainState * restrict ts, TerminalCourier * restrict tc
 }
 
 static inline int get_resrv_dist(const ActiveRoute * restrict ar, int idx, const track_node *start, int stopping_distance) {
-    ASSERT(track <= start && start <= track+TRACK_MAX, "invalid start: %d, [%d -> %d]", start, track, track+TRACK_MAX);
+    ASSERT_VALID_TRACK(start);
     int cur_dist = 0, total_dist = 0;
     const track_node *resrv_end = start;
 
@@ -275,7 +274,7 @@ static inline int get_resrv_dist(const ActiveRoute * restrict ar, int idx, const
     if (resrv_end == NULL) {
         return total_dist;
     }
-    ASSERT(track <= resrv_end && resrv_end <= track+TRACK_MAX, "invalid resrv_end: %d, [%d -> %d]", resrv_end, track, track+TRACK_MAX);
+    ASSERT_VALID_TRACK(resrv_end);
 
     cur_dist = stopping_distance;
     resrv_end = forward_dist_on_route(  &ar->route, &idx, resrv_end, &cur_dist, "get_resrv_dist: 2");
@@ -283,7 +282,7 @@ static inline int get_resrv_dist(const ActiveRoute * restrict ar, int idx, const
     if (resrv_end == NULL) {
         return total_dist;
     }
-    ASSERT(track <= resrv_end && resrv_end <= track+TRACK_MAX, "invalid resrv_end: %d, [%d -> %d]", resrv_end, track, track+TRACK_MAX);
+    ASSERT_VALID_TRACK(resrv_end);
 
     cur_dist = 0;
     resrv_end = next_switch_on_route(   &ar->route, &idx, resrv_end, &cur_dist, "get_resrv_dist: 3");
@@ -291,7 +290,7 @@ static inline int get_resrv_dist(const ActiveRoute * restrict ar, int idx, const
     if (resrv_end == NULL) {
         return total_dist;
     }
-    ASSERT(track <= resrv_end && resrv_end <= track+TRACK_MAX, "invalid resrv_end: %d, [%d -> %d]", resrv_end, track, track+TRACK_MAX);
+    ASSERT_VALID_TRACK(resrv_end);
     return total_dist;
 }
 
@@ -541,7 +540,7 @@ static inline void add_new_train(TrainState * restrict ts, NewTrain data) {
     ++ts->total_trains;
 }
 
-void task_train_state(int trackstate_tid) {
+void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
     RegisterAs(NAME_TRAIN_STATE);
     int cmdtid = WhoIs(NAME_COMMANDSERVER);
 

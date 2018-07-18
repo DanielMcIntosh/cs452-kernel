@@ -16,6 +16,6 @@ typedef struct sensor {
     SensorState state;
 } Sensor;
 
-void task_sensor_server();
+void __attribute__((noreturn)) task_sensor_server();
 
 #endif

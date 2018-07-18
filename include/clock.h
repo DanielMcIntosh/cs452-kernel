@@ -27,8 +27,8 @@ extern struct debugclock {
     volatile unsigned char enable;
 } __attribute__ ((packed)) *clk4;  //have to specify packed to ensure GCC doesn't word align enable
 
-void task_clockserver();
-void task_clockprinter(int terminaltid);
+void __attribute__((noreturn)) task_clockserver();
+void __attribute__((noreturn)) task_clockprinter(int terminaltid);
 
 int Time();
 int Delay(int ticks);

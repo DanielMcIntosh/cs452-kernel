@@ -20,14 +20,14 @@ typedef struct namemessage {
 
 int TID_NS = 0;
 
-int legal_name(char * n){
+int __attribute__((pure)) legal_name(const char * n){
     int len = 0;
     while (*n++ != NULL)
         len++;
     return len <= 8;
 }
 
-void task_nameserver(){
+void __attribute__((noreturn)) task_nameserver(){
     LOG("NameServer init\r\n");
     NameServer ns;
     ht_init(&ns.ht);
@@ -67,7 +67,7 @@ void task_nameserver(){
     }
 }
 
-int RegisterAs(char * name) {
+int RegisterAs(const char * name) {
     NameMessage msg;
     msg.id = MESSAGE_REGAS;
     memcpy(msg.name, name, MAXNAMESIZE); 
@@ -75,7 +75,7 @@ int RegisterAs(char * name) {
     return msg.tid;
 }
 
-int WhoIs(char * name){
+int WhoIs(const char * name){
     NameMessage msg;
     msg.id = MESSAGE_WHOIS;
     memcpy(msg.name, name, MAXNAMESIZE);
@@ -83,7 +83,7 @@ int WhoIs(char * name){
     return msg.tid;
 }
 
-char *NameLookup(int tid, char *result_buf) {
+const char *NameLookup(int tid, char *result_buf) {
     NameMessage msg;
     msg.id = MESSAGE_NAME_LOOKUP;
     msg.tid = tid;

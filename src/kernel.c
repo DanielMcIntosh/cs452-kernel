@@ -47,7 +47,7 @@ TD* schedule(TaskQueue *task_ready_queue){
 }
 
 #define IDLE_ITERATIONS 2000000
-void task_idle() {
+void __attribute__((noreturn)) task_idle() {
     int i, j = 0;
     int movingavg = 99;
     int alpha = 60;
@@ -72,7 +72,7 @@ void task_idle() {
 }
 #undef IDLE_ITERATIONS
 
-void task_stack_metric_printer(int terminaltid){
+void __attribute__((noreturn)) task_stack_metric_printer(int terminaltid){
     LOG("STACK METRIC PRINTER INIT");
     FOREVER{
         SendTerminalRequest(terminaltid, TERMINAL_STACK_METRICS, GetValue(VALUE_STACK_AVG), GetValue(VALUE_STACK_MAX));

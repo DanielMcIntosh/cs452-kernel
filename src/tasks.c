@@ -16,7 +16,7 @@ static const char LogTable256[256] =
     LT(7), LT(7), LT(7), LT(7), LT(7), LT(7), LT(7), LT(7)
 };
 
-static inline int log_2(unsigned int v) {
+static inline int __attribute__((const)) log_2(unsigned int v) {
     register unsigned int t; // temporaries
 
     return (t = v >> 8) ? 8 + LogTable256[t] : LogTable256[v];
@@ -96,15 +96,15 @@ int task_init(TaskQueue * restrict queue, char * restrict stack_space, unsigned 
     return 0;
 }
 
-int task_getTid(TD *task) {
+int __attribute__((pure)) task_getTid(TD *task) {
     return task->tid;
 }
 
-int task_getParentTid(TD *task) {
+int __attribute__((pure)) task_getParentTid(TD *task) {
     return task->p_tid;
 }
 
-int task_get_stack_size(TD *task) {
+int __attribute__((pure)) task_get_stack_size(TD *task) {
     return task->sp_base - (int)task->sp;
 }
 

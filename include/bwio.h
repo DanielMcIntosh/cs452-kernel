@@ -32,13 +32,13 @@ int bwgetc( int channel );
 
 int bwputx( int channel, char c );
 
-int bwputstr( int channel, char *str );
+int bwputstr( int channel, const char *str );
 
 int bwputr( int channel, unsigned int reg );
 
-void bwputw( int channel, int n, char fc, char *bf );
+void bwputw( int channel, int n, char fc, const char *bf );
 
-void bwprintf( int channel, char *format, ... );
+void bwprintf( int channel, const char *format, ... ) __attribute__((format (printf, 2, 3)));
 
 #endif 
 

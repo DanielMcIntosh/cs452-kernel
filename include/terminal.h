@@ -65,5 +65,5 @@ typedef enum terminalrequest {
 
 int SendTerminalRequest(int terminaltid, TerminalRequest rq, int arg1, int arg2);
 
-void task_terminal();
+void __attribute__((noreturn)) task_terminal();
 #endif

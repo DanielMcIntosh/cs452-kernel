@@ -24,7 +24,7 @@ typedef struct terminalcouriermsg {
 typedef void (*TerminalCourierFunction)(int tid, TerminalReq* treq);
 
 // NOTE: fn is a TerminalCourierFunction
-void task_terminal_courier(int tid, int fn);
+void __attribute__((noreturn)) task_terminal_courier(int tid, int fn);
 int tc_send(TerminalCourier *tc, TerminalRequest tr, int arg1, int arg2);
 int tc_update_notifier(TerminalCourier *tc, int notifiertid);
 

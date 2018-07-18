@@ -6,7 +6,7 @@
 #include <name.h>
 #include <debug.h>
 
-void task_terminal_courier(int snd_tid, int fn) {
+void __attribute__((noreturn)) task_terminal_courier(int snd_tid, int fn) {
     TerminalCourierFunction tcf = (TerminalCourierFunction) fn;
     int terminaltid = WhoIs(NAME_TERMINAL);
     TerminalReq treq;

@@ -13,7 +13,7 @@ typedef struct {
     char run_on_timeout;
 } Runnable;
 
-void task_train_event_courier();
+void __attribute__((noreturn)) task_train_event_courier();
 void TrainEvent_Notify(int train_evt_courrier_tid, int sensor);
 
 //if timeout == 0, never timeout

@@ -5,7 +5,7 @@
 #include <syscall.h>
 
 
-static int hash(char * key) {
+static __attribute__((pure)) int hash(char * key) {
     /*
     int h = 0;
     while(*key != NULL)

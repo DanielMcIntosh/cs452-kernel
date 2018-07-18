@@ -182,7 +182,7 @@ int GetShort(int trackstatetid, int distance, ShortMessage *sm) {
     return (r >= 0 ? 0 : -1);
 }
 
-void task_track_state() {
+void __attribute__((noreturn)) task_track_state() {
     RegisterAs(NAME_TRACK_STATE);
     const int train_evt_courier_tid = Create(PRIORITY_MID, &task_train_event_courier);
 
@@ -238,7 +238,9 @@ void task_track_state() {
             Reservation reservations = tm.route_request.reservations;
 
             int __attribute__((unused)) distance;
-            int next =  predict_next_sensor(ts.switches, &track[prev], NULL, &distance)->num;
+            const track_node *tmp = predict_next_sensor(ts.switches, &track[prev], NULL, &distance);
+            ASSERT(tmp != NULL, "next sensor null!");
+            int next = tmp->num;
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 208, next);
             const track_node *d = &track[end], *n = &track[next];
 

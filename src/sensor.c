@@ -39,7 +39,7 @@ typedef struct couriermessage {
     Command c;
 } CourierMessage;
 
-void task_sensor_read_notifier(int servertid){
+void __attribute__((noreturn)) task_sensor_read_notifier(int servertid){
     int gettid = WhoIs(NAME_UART1_RCV);
     SensorMessage sm = {MESSAGE_SENSOR, SENSOR_READ_NOTIFY, 0};
     FOREVER{
@@ -48,7 +48,7 @@ void task_sensor_read_notifier(int servertid){
     }
 }
 
-void task_sensor_timeout_notifier(int servertid){
+void __attribute__((noreturn)) task_sensor_timeout_notifier(int servertid){
     SensorMessage sm = {MESSAGE_SENSOR, SENSOR_TIMEOUT, 0};
     ReplyMessage rm = {0, 0};
     FOREVER{
@@ -57,7 +57,7 @@ void task_sensor_timeout_notifier(int servertid){
     }
 }
 
-void task_sensor_courier(int servertid){
+void __attribute__((noreturn)) task_sensor_courier(int servertid){
     SensorMessage sm = {MESSAGE_SENSOR, SENSOR_COURIER, 0};
     CourierMessage cm = {0, {0, 0, {.arg2 = 0}}};
     int commandtid = WhoIs(NAME_COMMANDSERVER);
@@ -78,7 +78,7 @@ int ss_notify_terminal_buffer(int sensortid, TerminalReq *treq) {
     return r;
 }
 
-void task_sensor_server(int trackstatetid){
+void __attribute__((noreturn)) task_sensor_server(int trackstatetid){
     // concept: 2 notifiers - a timeout notifier, and a read notifier
     // server waits for bytes to be sent from com1; if it times out, we send it again
     SensorServer ss = {{0}, 0, 0, 0, 0, 1};

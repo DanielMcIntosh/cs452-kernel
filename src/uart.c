@@ -46,7 +46,7 @@ typedef struct uartmessage{
     char argumentstr[UART_STR_MAX];
 } UARTMessage;
 
-static inline void generic_uart_rcv_notifier(int servertid, int uart) {
+static inline void __attribute__((noreturn)) generic_uart_rcv_notifier(int servertid, int uart) {
     int event = (uart == 1? EVENT_UART_1_RCV : EVENT_UART_2_RCV);
     UARTMessage msg = {MESSAGE_UART, NOTIFY_RCV, 0, {0}};
     ReplyMessage rm = {0, 0};
@@ -62,14 +62,14 @@ static inline void generic_uart_rcv_notifier(int servertid, int uart) {
     }
 };
 
-void task_uart1_rcv_notifier() {
+void __attribute__((noreturn)) task_uart1_rcv_notifier() {
     generic_uart_rcv_notifier(WhoIs(NAME_UART1_RCV), 1);
 }
-void task_uart2_rcv_notifier() {
+void __attribute__((noreturn)) task_uart2_rcv_notifier() {
     generic_uart_rcv_notifier(WhoIs(NAME_UART2_RCV), 2);
 }
 
-static inline void generic_uart_send_notifier(int servertid, int uart) {
+static inline void __attribute__((noreturn)) generic_uart_send_notifier(int servertid, int uart) {
     int event = (uart == 1? EVENT_UART_1_SEND : EVENT_UART_2_SEND);
     struct uart *u = (uart == 1 ? uart1 : uart2);
     UARTMessage msg = {MESSAGE_UART, NOTIFY_SEND, 0, {0}};
@@ -83,7 +83,7 @@ static inline void generic_uart_send_notifier(int servertid, int uart) {
     }
 }
 
-void task_uart1_modem_notifier() {
+void __attribute__((noreturn)) task_uart1_modem_notifier() {
     UARTMessage msg = {MESSAGE_UART, NOTIFY_MODEM, 0, {0}};
     ReplyMessage rm = {0, 0};
 
@@ -96,14 +96,14 @@ void task_uart1_modem_notifier() {
     }
 }
 
-void task_uart1_send_notifier() {
+void __attribute__((noreturn)) task_uart1_send_notifier() {
     generic_uart_send_notifier(WhoIs(NAME_UART1_SEND), 1);
 }
-void task_uart2_send_notifier() {
+void __attribute__((noreturn)) task_uart2_send_notifier() {
     generic_uart_send_notifier(WhoIs(NAME_UART2_SEND), 2);
 }
 
-static inline void generic_uart_rcv_server(int uart) {
+static inline void __attribute__((noreturn)) generic_uart_rcv_server(int uart) {
     char rcvQ_buf[RCVQ_BUF_SIZE];
     char getQ_buf[GETQ_BUF_SIZE]; 
     circlebuffer_t cb_rcv;
@@ -155,7 +155,7 @@ static inline void generic_uart_rcv_server(int uart) {
     }
 }
 
-static inline void generic_uart_send_server(int uart) {
+static inline __attribute__((noreturn)) void generic_uart_send_server(int uart) {
     char txQ_buf[TXQ_BUF_SIZE];
     circlebuffer_t cb_tx;
     cb_init(&cb_tx, txQ_buf, TXQ_BUF_SIZE);
@@ -242,19 +242,19 @@ static inline void generic_uart_send_server(int uart) {
     }
 }
 
-void task_uart1rcv() { 
+void __attribute__((noreturn)) task_uart1rcv() { 
     RegisterAs(NAME_UART1_RCV);
     generic_uart_rcv_server(1);
 }
-void task_uart2rcv() {
+void __attribute__((noreturn)) task_uart2rcv() {
     RegisterAs(NAME_UART2_RCV);
     generic_uart_rcv_server(2);
 }
-void task_uart1send() {
+void __attribute__((noreturn)) task_uart1send() {
     RegisterAs(NAME_UART1_SEND);
     generic_uart_send_server(1);
 }
-void task_uart2send() {
+void __attribute__((noreturn)) task_uart2send() {
     RegisterAs(NAME_UART2_SEND);
     generic_uart_send_server(2);
 }

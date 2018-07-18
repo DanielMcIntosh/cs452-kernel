@@ -40,10 +40,10 @@ typedef struct timeoutmessage{
     unsigned int ticks;
 } TimeoutMessage;
 
-static void task_timeout(int clock_tid);
-static void task_clocknotifier(int clk_tid);
+static void __attribute__((noreturn)) task_timeout(int clock_tid);
+static void __attribute__((noreturn)) task_clocknotifier(int clk_tid);
 
-void task_clockserver(){
+void __attribute__((noreturn)) task_clockserver(){
     LOG("ClockServer init\r\n");
     RegisterAs(NAME_CLOCK);
 
@@ -115,7 +115,7 @@ void task_clockserver(){
     }
 }
 
-static void task_clocknotifier(int clk_tid){
+static void __attribute__((noreturn)) task_clocknotifier(int clk_tid){
     ReplyMessage rm = {0, 0};
     LOG("ClockNotifier init\r\n");
     ClockMessage cm;
@@ -156,7 +156,7 @@ int DelayUntil(int ticks){
     return clockSend(DELAYUNTIL, ticks);
 }
 
-void task_timeout_update_courier(int timeout_srv_tid, int clock_tid) {
+void __attribute__((noreturn)) task_timeout_update_courier(int timeout_srv_tid, int clock_tid) {
     ClockMessage cm = {MESSAGE_CLOCK, UPDATE_TIMEOUT, 0};
     TimeoutMessage tm = {0, 0};
 
@@ -166,7 +166,7 @@ void task_timeout_update_courier(int timeout_srv_tid, int clock_tid) {
     }
 }
 
-void task_timeout_courier(int timeout_srv_tid, int clock_tid) {
+void __attribute__((noreturn)) task_timeout_courier(int timeout_srv_tid, int clock_tid) {
     ClockMessage cm = {MESSAGE_CLOCK, REQUEST_TIMEOUT, 0};
     TimeoutMessage tm = {0, 0};
 
@@ -176,7 +176,7 @@ void task_timeout_courier(int timeout_srv_tid, int clock_tid) {
     }
 }
 
-static void task_timeout(int clock_tid) {
+static void __attribute__((noreturn)) task_timeout(int clock_tid) {
     RegisterAs(NAME_TIMEOUT);
     int mytid = MyTid();
     int rcv_courier = CreateWith2Args(PRIORITY_HIGHER, &task_timeout_courier, mytid, clock_tid);
@@ -247,7 +247,7 @@ void Timeout(unsigned int ticks) {
     Send(timeout_tid, &tm, sizeof(tm), NULL, 0);
 }
 
-void task_clockprinter(int terminaltid){
+void __attribute__((noreturn)) task_clockprinter(int terminaltid){
     LOG("CLOCK PRINTER INIT");
     int time = Time();
     int time_since_startup_hundred_millis = 0;

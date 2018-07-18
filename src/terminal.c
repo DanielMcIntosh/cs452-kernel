@@ -71,11 +71,12 @@ static inline void cursor_to_position(struct circlebuffer *cb, int line, int col
 }
 
 static void output_base_terminal(Terminal *t) {
-    const char track = GetValue(VALUE_TRACK_NAME);
+    const char track_char = GetValue(VALUE_TRACK_NAME);
     //
     //
-    char * topbar =  "           E_T:     STK_LIM:     STK_MAX:      DIST_NX:                 RESERVATIONS:\r\n" \
-                     "IDLE: %__  E_D:     STK_AVG:     VELO_PR:      DIST_PR:\r\n" ;
+    const char * topbar =
+    "           E_T:     STK_LIM:     STK_MAX:      DIST_NX:                 RESERVATIONS:\r\n" \
+    "IDLE: %__  E_D:     STK_AVG:     VELO_PR:      DIST_PR:\r\n" ;
     // E_T: 1, 16
     // STK_MAX: 1, 42
     // DIST_NX: 1, 56
@@ -83,7 +84,7 @@ static void output_base_terminal(Terminal *t) {
     // STK_AVG: 2, 29
     // VELO_PR: 2, 42
     // DIST_PR: 2, 56
-    char * trackA = 
+    const char * trackA = 
         "==---------[ ]--[ ]---------------------------------\\ \r\n" \
         "==--------[ ] [ ]-----------[ ]----[ ]-----------\\   \\ \r\n" \
         "==--------/  /               \\    /               \\   | \r\n" \
@@ -99,7 +100,7 @@ static void output_base_terminal(Terminal *t) {
         "==-------[ ]   \\-----------[ ]------[ ]-------------/  \r\n" \
         "==--------[ ]---------------[ ]----[ ]--------==  \r\n" \
         ;
-    char * trackB = 
+    const char * trackB = 
         "==---------[ ]--[ ]---------------------------------\\ \r\n" \
         "==--------[ ] [ ]-----------[ ]----[ ]-----------\\   \\ \r\n" \
         "          /  /               \\    /               \\   | \r\n" \
@@ -133,7 +134,7 @@ static void output_base_terminal(Terminal *t) {
     circlebuffer_t * restrict cb = &t->output;
     ASSERT(cb_write_string(cb, "\033[2J\033[3g\033[H") == 0, "Error outputting base terminal");
     ASSERT(cb_write_string(cb, topbar) == 0, "Error outputting base terminal");
-    ASSERT(cb_write_string(cb, track == 'A' ? trackA : trackB) == 0, "Error outputting base terminal");
+    ASSERT(cb_write_string(cb, track_char == 'A' ? trackA : trackB) == 0, "Error outputting base terminal");
     ASSERT(cb_write_string(cb, reservables) == 0, "Error outputting base terminal");
 
     cb_write_string(cb, " \033["S(TERMINAL_INPUT_BASE_LINE)";"S(TERMINAL_INPUT_MAX_LINE)"r");
@@ -143,7 +144,7 @@ static void output_base_terminal(Terminal *t) {
 
     cursor_to_position(cb, TERMINAL_INPUT_MAX_LINE + 1, 1);
     cb_write_string(cb, "TRACK: ");
-    cb_write(cb, track);
+    cb_write(cb, track_char);
     cb_write_string(cb, "   " STYLED_FLAG_STRING "\033["S(TERMINAL_DEBUG_BASE_LINE)";"S(TERMINAL_DEBUG_MAX_LINE)"r");
 
 
@@ -474,7 +475,7 @@ static inline int parse_command(Command * restrict cmd, circlebuffer_t * restric
     return err;
 }
 
-void task_terminal_command_parser(int terminaltid){
+void __attribute__((noreturn)) task_terminal_command_parser(int terminaltid){
     int rcv_tid = WhoIs(NAME_UART2_RCV);
     int command_tid = WhoIs(NAME_COMMANDSERVER);
     char c;
@@ -508,7 +509,7 @@ void task_terminal_command_parser(int terminaltid){
     }
 }
 
-void task_uart2_courier(int servertid) {
+void __attribute__((noreturn)) task_uart2_courier(int servertid) {
     int gettid = WhoIs(NAME_UART2_SEND);
     TerminalMessage tm = {MESSAGE_TERMINAL, TERMINAL_NOTIFY_COURIER, 0, 0};
     ReplyMessage rm;
@@ -568,7 +569,7 @@ static inline void print_reservations2(circlebuffer_t * restrict cb, unsigned lo
     cb_write_string(cb, "\033[u");
 }
 
-void task_terminal(int trackstate_tid) {
+void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
     const int trackA_switch_positions[][2] = {
         {-1, -1},
         {14, 10},

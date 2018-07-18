@@ -53,7 +53,7 @@ int cb_peek(struct circlebuffer * restrict cb, char * restrict c){
     return 0;
 }
 
-int cb_ch2d(char ch){
+int __attribute__((const)) cb_ch2d(char ch){
     return ch - '0';
 }
 
@@ -78,7 +78,7 @@ int cb_read_number(struct circlebuffer * restrict cb, int * restrict i){
     return r;
 }
 
-int cb_read_match(circlebuffer_t * restrict cb, char * restrict str) {
+int cb_read_match(circlebuffer_t * restrict cb, const char * restrict str) {
     char c;
     while (!cb_empty(cb) && *str != '\0') {
         cb_read(cb, &c);
@@ -134,7 +134,7 @@ int cb_write_string(struct circlebuffer * restrict cb, const char * restrict s) 
 
 int cb_write_int(struct circlebuffer *cb, int i) {
     for (int y = 0; y < 4; y++) {
-        int err = cb_write(cb, i & 0xFF);
+        int err = cb_write(cb, ((unsigned int)i) & 0xFF);
         if (err) return err;
         i >>= 8;
     }
@@ -143,9 +143,10 @@ int cb_write_int(struct circlebuffer *cb, int i) {
 
 //d = base^(num_digits_to_print). This function will pad with 0's if necessary.
 inline int cb_write_fixed_size_number(struct circlebuffer *cb, unsigned int num, unsigned int base, unsigned int d) {
-    int dgt, f=0;
+    unsigned char dgt;
+    int f = 0;
     while (d != 0) {
-        dgt = num / d; // get digit
+        dgt = (num / d) & 0xF; // get digit
         num %= d;
         d /= base;
         int err = cb_write(cb, dgt + ( dgt < 10 ? '0' : ('A' - 10)));
@@ -164,11 +165,11 @@ int cb_write_number(struct circlebuffer *cb, int num, unsigned int base) {
         num *= -1;
         f++;
     }
-    unsigned int d = 1;
-
-    while( (num / d) >= base) {
+    unsigned int d = 1, u_num = (unsigned int)num;
+    
+    while( (u_num / d) >= base) {
         d  *= base; // find max digit
     }
 
-    return f + cb_write_fixed_size_number(cb, num, base, d);
+    return f + cb_write_fixed_size_number(cb, u_num, base, d);
 }

@@ -36,7 +36,7 @@ int RPS_Quit(int rps_tid){
     return (size == sizeof(msg)) ? 0 : size;
 }
 
-int wins(RPS a, RPS b){
+int __attribute__((const)) wins(RPS a, RPS b){
     if (a == b) return TIE;
     if ((b + 1) % 3 == a) return WIN;
     return LOSE;
@@ -48,7 +48,7 @@ typedef struct {
     int unpaired; // this is single threaded - no point in a queue
 } RPSServer;
 
-void task_rps(){
+void __attribute__((noreturn)) task_rps(){
     LOG("RPS Server Start");
     RPSServer rps;
     for (int i = 0; i < TASK_POOL_SIZE; i++){
