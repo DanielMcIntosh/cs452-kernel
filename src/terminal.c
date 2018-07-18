@@ -835,7 +835,7 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
             const char *n = tn->name;
             cb_write_string(&t.output, "\0337");
             cursor_to_position(&t.output, TERMINAL_DEBUG_MAX_LINE+1, t.pos_col);
-            while (n != NULL){
+            while (*n != '\0'){
                 t.pos_col++;
                 cb_write(&t.output, *n);
                 n++;

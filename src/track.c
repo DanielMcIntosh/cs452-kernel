@@ -172,7 +172,7 @@ const track_node* rc_to_track_node(RouteCommand rc, const char * restrict sig) {
 
 inline const track_edge *next_edge_on_route(const Route *route, int * restrict idx, const track_node *n, const char * restrict sig) {
     ASSERT_VALID_TRACK_SIG(n, sig);
-    ASSERT(0 <= *idx && *idx < MAX_ROUTE_COMMAND, "invalid idx: %d", *idx);
+    ASSERT(0 <= *idx && *idx < MAX_ROUTE_COMMAND, "invalid idx: %d @ %s", *idx, sig);
     switch (n->type) {
     case (NODE_BRANCH):
     {
@@ -270,8 +270,12 @@ const track_node *forward_dist_on_route(const Route *route, int * restrict idx, 
     int cur_dist = *distance;
     prev = forward_dist_on_route_no_extra(route, idx, prev, &cur_dist, sig);
     // cur_dist is the amount of distance remaining between prev and the goal distance.
-    const track_edge *e = next_edge_on_route(route, idx, prev, sig);
-    *distance += (e->dist - cur_dist); // the amount added minus the amount missing
+    if (prev != NULL) {
+        const track_edge *e = next_edge_on_route(route, idx, prev, sig);
+        *distance += (e->dist - cur_dist); // the amount added minus the amount missing
+    } else {
+        *distance -= cur_dist;
+    }
     return prev;
 }
 

@@ -96,7 +96,11 @@ int notify_rv_start(int trainstatetid, int train) {
 int notify_stop(int trainstatetid, int train) {
     TrainStateMessage msg = {.type = MESSAGE_TRAIN_STATE, .request = NOTIFY_STOP, .data = train};
     return sendTrainState(trainstatetid, &msg);
+}
 
+int notify_stopped(int trainstatetid, int train) {
+    TrainStateMessage msg = {.type = MESSAGE_TRAIN_STATE, .request = NOTIFY_STOPPED, .data = train};
+    return sendTrainState(trainstatetid, &msg);
 }
 
 void __attribute__((noreturn)) task_notify_rv_timeout(int delay, int activetrain){
@@ -131,6 +135,13 @@ void __attribute__((noreturn)) task_delay_stop(int data, int train){
     if (ds.rv) {
         notify_rv_start(tid, train);
     }
+    Destroy();
+}
+
+void task_notify_stopped(int delay, int train){
+    int tid = WhoIs(NAME_TRAIN_STATE);
+    Delay(delay);
+    notify_stopped(tid, train);
     Destroy();
 }
 
@@ -408,7 +419,7 @@ static void train_on_sensor_event(TrainState *restrict ts, Train * restrict trai
         Position_HandleConstVelo(&train->pos, &ar->route, event_time, train->velocity[train->speed]);
     }
 
-    Position_HandleSensorHit(&train->pos, &track[SENSOR_TO_NODE(sensor)], ar->cur_pos_idx, event_time);
+    Position_HandleSensorHit(&train->pos, &track[SENSOR_TO_NODE(sensor)], event_time, ar->cur_pos_idx);
 
     tc_send(tc, TERMINAL_VELOCITY_DEBUG, train->velocity[train->speed], acceleration);
     train->last_sensor = sensor;
@@ -740,6 +751,7 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             Command c = {COMMAND_TR, 0, .arg2 = train};
             SendCommand(cmdtid, c);
             Position_HandleDecel(&tr->pos, &ts.active_routes[activetrain].route, Time(), tr->velocity[tr->speed]/2, 0);
+            // TODO switch this to HandleBeginStop
             //tc_send(&tc, TERMINAL_ROUTE_DBG2, 212, train);
             CreateWith2Args(PRIORITY_NOTIFIER, &task_notify_rv_timeout, calc_reverse_time(&ts, activetrain), activetrain);
             ts.active_trains[activetrain].speed = 0;
@@ -753,6 +765,17 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             Train *tr = TRAIN(&ts, train);
             Command c = {COMMAND_TR, 0, .arg2=train};
             SendCommand(cmdtid, c);
+            Position_HandleDecel(&tr->pos, &ts.active_routes[activetrain].route, Time(), 0, 0);
+            // TODO switch this to HandleBeginStop
+            CreateWith2Args(PRIORITY_LOW, &task_notify_stopped, calc_reverse_time(&ts, activetrain), train);
+            break;
+        }
+        case (NOTIFY_STOPPED):
+        {
+            Reply(tid, &rm, sizeof(rm));
+            int train = tm.data;
+            int activetrain = ts.active_train_map[train];
+            Train *tr = TRAIN(&ts, train);
             Position_HandleStop(&tr->pos, &ts.active_routes[activetrain].route, ts.active_routes[activetrain].cur_pos_idx, Time());
             break;
         }
