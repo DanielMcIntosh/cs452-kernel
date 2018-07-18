@@ -422,18 +422,20 @@ static inline void activeroute_exec_steps(ActiveRoute * restrict ar, TrainState 
     while (ACTIVE_ROUTE_SHOULD_PERFORM_ACTION(ar, resrv_dist, nxt_step_rv_in_range))  { // must perform next actio due to proximity directly or bc the reverse will take a while
         resrv_start = resrv_end;
 
-        ts_exec_step(ts, tc, ar, tr, cmdtid, ar->next_step_distance + (nxt_step_rv_in_range ? 350 : 0), "action loop");
-
-        if (!ACTIVE_ROUTE_DONE_ACTIONS(ar)) {
-            resrv_end = rc_to_track_node(ar->route.rcs[ar->idx_resrv], "resrv_end");
+        if (ar->route.rcs[ar->idx_resrv+1].a != ACTION_NONE) {
+            resrv_end = rc_to_track_node(ar->route.rcs[ar->idx_resrv+1], "resrv_end");
         }
         else {
             resrv_end = &track[ar->end_node];
         }
         //todo will fail after first sensor right now because we've already reserved some of this
         //Therefore, we currently ignore whether we actually could reserve track
-        bool __attribute__((unused)) resrv_successful = reserve_track(&ar->route, ar->idx_resrv - 1, resrv_start, resrv_end, &ts->reservations);
-        //bool free_successful = free_track(&ar->route, ar->cur_pos_idx, SENSOR_TO_NODE(train->last_sensor), SENSOR_TO_NODE(sensor), &ts.reservations);
+        bool resrv_successful = reserve_track(&ar->route, ar->idx_resrv, resrv_start, resrv_end, &ts->reservations);
+        if (!resrv_successful) {
+            break;
+        }
+
+        ts_exec_step(ts, tc, ar, tr, cmdtid, ar->next_step_distance + (nxt_step_rv_in_range ? 350 : 0), "action loop");
 
         nxt_step_rv_in_range = ACTIVE_ROUTE_NEXT_STEP_RV(ar);
         ASSERT(k++ < 20, "infinite loop of execs");
