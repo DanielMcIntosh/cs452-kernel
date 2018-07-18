@@ -376,16 +376,18 @@ static inline void handle_navigate(TrainState * restrict ts, TerminalCourier * r
     ar.distance_past = distance_past;
     ar.stopped = 0;
     ar.last_handled_sensor = -1;
-    if (route.reverse != 0) {
+    if (route.reverse != 0) { // TODO
         //tc_send(&tc, TERMINAL_ROUTE_DBG2, 215, ts.active_train_map[tr]);
         trainserver_begin_reverse(ts, ts->active_train_map[tr], 0);
         ar.reversing = 1;
     } else {
         CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, NAV_SPEED, train->num); // TODO number
         ar.reversing = 0;
+        Position_HandleAccel(&train->pos, &ar.route, Time(), 0, 0);
     }
     ASSERT(0 <= ts->active_train_map[tr] && ts->active_train_map[tr] < MAX_CONCURRENT_TRAINS, "Invalid active train: %d", ts->active_train_map[tr]);
     ts->active_routes[ts->active_train_map[tr]] = ar;
+
     for (int i = 0; i < MAX_ROUTE_COMMAND && ar.route.rcs[i].a != ACTION_NONE; i++){
         tc_send(tc, TERMINAL_ROUTE_DBG, ar.route.rcs[i].swmr, ar.route.rcs[i].a);
     }
@@ -415,11 +417,9 @@ static void train_on_sensor_event(TrainState *restrict ts, Train * restrict trai
     // Calculate acceleration over the last track section:
     int acceleration = (new_velocity - old_velocity) / dt;
     ActiveRoute *ar = &ts->active_routes[ts->active_train_map[tr]];
-    if (ABS(acceleration) < ZERO_ACCEL_TOLERANCE && train->pos.state != PSTATE_CONST_VELO) {
+    if (ABS(acceleration) < ZERO_ACCEL_TOLERANCE && train->pos.state == PSTATE_ACCEL) {
         Position_HandleConstVelo(&train->pos, &ar->route, event_time, train->velocity[train->speed]);
     }
-
-    Position_HandleSensorHit(&train->pos, &track[SENSOR_TO_NODE(sensor)], event_time, ar->cur_pos_idx);
 
     tc_send(tc, TERMINAL_VELOCITY_DEBUG, train->velocity[train->speed], acceleration);
     train->last_sensor = sensor;
@@ -549,6 +549,9 @@ static inline void handle_sensor_event(TrainState * restrict ts, TerminalCourier
 
     train_on_sensor_event(ts, train, tc, sensor, event_time, distance, tr);
     activeroute_on_sensor_event(ar, train, ts, tc, sensor, distance, tr, cmdtid);
+
+    Position_HandleSensorHit(&train->pos, &track[SENSOR_TO_NODE(sensor)], event_time, ar->cur_pos_idx);
+
 
     train->last_sensor = sensor;
     train->last_sensor_time = event_time;
@@ -763,10 +766,10 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             int train = tm.data;
             int activetrain = ts.active_train_map[train];
             Train *tr = TRAIN(&ts, train);
+            ActiveRoute *ar = &ts.active_routes[activetrain];
             Command c = {COMMAND_TR, 0, .arg2=train};
             SendCommand(cmdtid, c);
-            Position_HandleDecel(&tr->pos, &ts.active_routes[activetrain].route, Time(), 0, 0);
-            // TODO switch this to HandleBeginStop
+            Position_HandleBeginStop(&tr->pos, &ar->route, Time(), &track[ar->end_node], ar->distance_past);
             CreateWith2Args(PRIORITY_LOW, &task_notify_stopped, calc_reverse_time(&ts, activetrain), train);
             break;
         }
