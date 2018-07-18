@@ -12,10 +12,12 @@
 #include <command.h>
 #include <circlebuffer.h>
 #include <clock.h>
+#include <features.h>
 
 #define NAV_SPEED 12
 #define SHORT_COEFF_PRECISION 10000
 #define ZERO_ACCEL_TOLERANCE 2000
+
 
 #define TRAIN(ts, tr) (&((ts)->active_trains[(ts)->active_train_map[(tr)]]))
 typedef struct active_route{
@@ -289,6 +291,7 @@ static void ts_exec_step(TrainState * restrict ts, TerminalCourier * restrict tc
     if (ar->idx_resrv < MAX_ROUTE_COMMAND && ar->route.rcs[++ar->idx_resrv].a != ACTION_NONE) {
         RouteCommand nc = ar->route.rcs[ar->idx_resrv];
         const track_node *nnode = rc_to_track_node(nc, sig);
+        ASSERT(nc.swmr >= 0, "invalid swmr: %d\r\n", nc.swmr);
         ar->next_step_distance += distance_to_on_route(&ar->route, ar->idx_resrv - 1, cnode, nnode, sig);
     } else {
         ar->next_step_distance = INT_MAX - 10000;
@@ -436,7 +439,7 @@ static inline void activeroute_recalculate_distances(ActiveRoute * restrict ar, 
         ASSERT(ar->idx_resrv >= ar->cur_pos_idx, "should have reserved ahead of cur_pos_idx, idx_resrv = %d, cur_pos_idx = %d, sensor = %d", ar->idx_resrv, ar->cur_pos_idx, sensor);
         ar->next_step_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[ar->idx_resrv], "ar next step recalculate rc2tn"), "ar next step recalculate");
         //have to delay initialization of next step distance until we hit the next sensor, since that's where the route actually starts
-        if (ar->idx_resrv == 0) {
+        if (ar->idx_resrv == 0 && RESERVE_TRACK) {
             bool success = reserve_track(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[0], "init reservations"), &ts->reservations);
             if (unlikely(!success)) {
                 PANIC("FIRST step already reservered!");
@@ -469,8 +472,6 @@ static int ar_stop(ActiveRoute * restrict ar, Train * restrict train, TerminalCo
     tc_send(tc, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING, 0);
     return 999999;
 }
-
-#define RESERVE_TRACK FALSE
 
 static void activeroute_exec_steps(ActiveRoute * restrict ar, TrainState * restrict ts, TerminalCourier * restrict tc, int resrv_dist, int tr, int cmdtid) {
     const track_node *resrv_start;
@@ -523,7 +524,7 @@ static inline void activeroute_on_sensor_event(ActiveRoute * restrict ar, Train 
 
     int resrv_dist = get_resrv_dist(ar, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], train->stopping_distance[train->speed]);
 
-    ASSERT(resrv_dist > ar->next_step_distance, "Resrv dist too small: resrv_dist = %d, sensor = %s, idx_resrv = %d, next_step_distance = %d", resrv_dist, track[SENSOR_TO_NODE(sensor)].name, ar->idx_resrv, ar->next_step_distance);
+    //ASSERT(resrv_dist > ar->next_step_distance, "Resrv dist too small: resrv_dist = %d, sensor = %s, idx_resrv = %d, next_step_distance = %d", resrv_dist, track[SENSOR_TO_NODE(sensor)].name, ar->idx_resrv, ar->next_step_distance);
 
     if (ACTIVE_ROUTE_SHOULD_STOP(ar, train, dist_to_next_snsr)) {
         resrv_dist = ar_stop(ar, train, tc);
@@ -753,8 +754,11 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             tc_send(&tc, TERMINAL_FLAGS_SET, STATUS_FLAG_REVERSING, 0);
             Command c = {COMMAND_TR, 0, .arg2 = train};
             SendCommand(cmdtid, c);
-            Position_HandleDecel(&tr->pos, &ts.active_routes[activetrain].route, Time(), tr->velocity[tr->speed]/2, 0);
-            // TODO switch this to HandleBeginStop
+            // figure out end position:
+            // TODO not convinced I like this method of doing things
+            int time = Time();
+            TrackPosition tp = Position_CalculateNow(&tr->pos, &ts.active_routes[activetrain].route, time);
+            Position_HandleBeginStop(&tr->pos, &ts.active_routes[activetrain].route, time, &track[tp.object], tp.distance_past + tr->stopping_distance[tr->speed]);
             //tc_send(&tc, TERMINAL_ROUTE_DBG2, 212, train);
             CreateWith2Args(PRIORITY_NOTIFIER, &task_notify_rv_timeout, calc_reverse_time(&ts, activetrain), activetrain);
             ts.active_trains[activetrain].speed = 0;

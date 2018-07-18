@@ -1,9 +1,10 @@
-#include "track.h"
-#include "track_data.h"
-#include "track_state.h" 
-#include "syscall.h"
-#include "debug.h"
-#include "minheap.h"
+#include <track.h>
+#include <track_data.h>
+#include <track_state.h> 
+#include <syscall.h>
+#include <debug.h>
+#include <minheap.h>
+#include <features.h>
 
 track_node track[TRACK_MAX];
 
@@ -62,9 +63,6 @@ static inline void bfs_add_node(minheap_t *mh, BFSNode **freeQ, BFSNode **freeQT
     straight->idx=idx;
     mh_add(mh, (unsigned long int) straight, distance + dist);
 }
-
-#define ALLOW_REVERSE_START FALSE 
-#define ALLOW_REVERSE_ENROUTE TRUE 
 
 int find_path_between_nodes(const Reservation * restrict reservations, int min_dist, int rev_penalty, const track_node *origin, const track_node *dest, Route * restrict r) {
     entry_t mh_array[BFS_MH_SIZE];
@@ -152,7 +150,7 @@ const track_node* rc_to_track_node(RouteCommand rc, const char * restrict sig) {
         case (ACTION_CURVED):
         case (ACTION_STRAIGHT):
         {
-            return &track[SWITCH_TO_NODE(rc.swmr)];
+            return &track[SWITCH_TO_NODE_NSC(rc.swmr)];
         }
         case (ACTION_RV):
         {
@@ -206,7 +204,7 @@ inline const track_edge *next_edge_on_route(const Route *route, int * restrict i
     }
     default:
     {
-        PANIC("in: distance_to_on_route - INVALID TRACK NODE TYPE: %d", n->type);
+        PANIC("in: next_edge_on_route - INVALID TRACK NODE TYPE: %d @ %s", n->type, sig);
     }
     }
 }
@@ -249,6 +247,7 @@ const track_node *nth_sensor_on_route(int n, const Route *route, int * restrict 
 const track_node *forward_dist_on_route_no_extra(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig) {
     ASSERT_VALID_TRACK_SIG(prev, sig);
     int cur_dist = 0;
+    int idx_old = *idx;
     const track_edge *e;
     while (cur_dist < *distance && prev != NULL) {
         e = next_edge_on_route(route, idx, prev, sig);
@@ -256,10 +255,12 @@ const track_node *forward_dist_on_route_no_extra(const Route *route, int * restr
             *distance = cur_dist;
             return NULL;
         } else if (cur_dist + e->dist > *distance) {
+            *idx = idx_old;
             break; // TODO cleaner way to do this?
         }
         cur_dist += e->dist;
         prev = e->dest;
+        idx_old = *idx;
     }
     *distance -= cur_dist;
     return prev;
@@ -273,6 +274,7 @@ const track_node *forward_dist_on_route(const Route *route, int * restrict idx, 
     if (prev != NULL) {
         const track_edge *e = next_edge_on_route(route, idx, prev, sig);
         *distance += (e->dist - cur_dist); // the amount added minus the amount missing
+        prev = e->dest;
     } else {
         *distance -= cur_dist;
     }

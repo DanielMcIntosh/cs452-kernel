@@ -1,0 +1,9 @@
+#ifndef FEATURES_H
+#define FEATURES_H
+
+#define RESERVE_TRACK FALSE
+
+#define ALLOW_REVERSE_START FALSE
+#define ALLOW_REVERSE_ENROUTE FALSE
+
+#endif
