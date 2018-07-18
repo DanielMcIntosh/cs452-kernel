@@ -246,7 +246,7 @@ const track_node *nth_sensor_on_route(int n, const Route *route, int * restrict 
     return prev;
 }
 
-const track_node *forward_dist_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig) {
+const track_node *forward_dist_on_route_no_extra(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig) {
     ASSERT_VALID_TRACK_SIG(prev, sig);
     int cur_dist = 0;
     const track_edge *e;
@@ -255,12 +255,23 @@ const track_node *forward_dist_on_route(const Route *route, int * restrict idx, 
         if (e == NULL) {
             *distance = cur_dist;
             return NULL;
+        } else if (cur_dist + e->dist > *distance) {
+            break; // TODO cleaner way to do this?
         }
-
         cur_dist += e->dist;
         prev = e->dest;
     }
-    *distance = cur_dist;
+    *distance -= cur_dist;
+    return prev;
+}
+
+const track_node *forward_dist_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig) {
+    ASSERT_VALID_TRACK_SIG(prev, sig);
+    int cur_dist = *distance;
+    prev = forward_dist_on_route_no_extra(route, idx, prev, &cur_dist, sig);
+    // cur_dist is the amount of distance remaining between prev and the goal distance.
+    const track_edge *e = next_edge_on_route(route, idx, prev, sig);
+    *distance += (e->dist - cur_dist); // the amount added minus the amount missing
     return prev;
 }
 
@@ -330,30 +341,6 @@ bool reserve_track(const Route *route, int idx, const track_node *start, const t
     ASSERT(n == end, "While Loop broken early");
 
     if ((reservations->bits_low & mask.bits_low) || (reservations->bits_high & mask.bits_high)) {
-        return FALSE;
-    }
-
-    reservations->bits_low |= mask.bits_low;
-    reservations->bits_high |= mask.bits_high;
-
-    return TRUE;
-}
-
-void free_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations) {
-    ASSERT_VALID_TRACK(start);
-
-    Reservation mask = RESERVATION_INIT;
-    add_to_mask(end, &mask);
-
-    const track_node *n = start;
-    while (n != end && n != NULL) {
-        n = next_edge_on_route(route, &idx, n, "reserve_track")->dest;
-
-        add_to_mask(n, &mask);
-    }
-    ASSERT(n == end, "While Loop broken early");
-
-    ASSERT(((reservations->bits_low & mask.bits_low) == mask.bits_low) && ((reservations->bits_high & mask.bits_high) == mask.bits_high)) {
         return FALSE;
     }
 

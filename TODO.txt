@@ -36,3 +36,12 @@ NOT THAT IMPORTANT:
 
     find instances of RunWhen
 
+
+BRIAN:
+    1. position
+        a) position infra
+        b) accel calibration
+        c) short move integration
+    2. short move integration
+    3. short move calibration
+    4. error handling?

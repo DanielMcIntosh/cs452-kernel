@@ -39,6 +39,10 @@ void *memset(void *s, int c, unsigned int n);
 #define CLAMP(X, Y, Z) (((X) > (Y)) ? (Y) : (((X) < (Z)) ? (Z) : (X)))
 #endif
 
+#ifndef ABS
+#define ABS(X) (X > 0 ? X : -X)
+#endif
+
 #ifndef MOVING_AVERAGE
 #define MOVING_AVERAGE(N, O, A) ((A)*(N)/100 + (100-(A))*(O)/100)
 #endif

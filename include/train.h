@@ -1,3 +1,5 @@
+#include <position.h>
+
 #ifndef TRAIN_H
 #define TRAIN_H
 
@@ -31,8 +33,9 @@ typedef struct train{
     int last_sensor;
     int last_sensor_time; 
     int last_sensor_dist;
+    Position pos;
 } Train;
 
-#define TRAIN_INIT {0, 0,  0, {0}, {0}, {0, 0, 0}, -1, 0, -1, 0, 0}
+#define TRAIN_INIT {0, 0,  0, {0}, {0}, {0, 0, 0}, -1, 0, -1, 0, 0, POSITION_INIT}
 
 #endif

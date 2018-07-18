@@ -45,6 +45,7 @@ const track_node *next_sensor_on_route(const Route *route, int * restrict idx, c
 const track_node *next_switch_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig);
 const track_node *nth_sensor_on_route(int n, const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig);
 
+const track_node *forward_dist_on_route_no_extra(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig);
 const track_node *forward_dist_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig);
 
 int distance_to_on_route(const Route *route, int idx, const track_node *from, const track_node *to, const char * restrict sig);

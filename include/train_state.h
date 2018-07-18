@@ -17,6 +17,11 @@ typedef struct position {
     const int distance_past : 16;
 } TrackPosition;
 
+typedef union tps {
+    TrackPosition tp;
+    int bytes;
+} TrackPositionUnion;
+
 typedef struct reservation {
     //actually only need 124, but round up to a power of 8 (and conviniently 32)
     long long bits_low : 64;
@@ -56,6 +61,7 @@ typedef enum trnstrequest{
     TRAIN_SPEED, 
     ACTIVE_TRAIN,
     NAVIGATE,
+    TRAIN_POSITION,
 
     NOTIFY_SENSOR_EVENT,
     NOTIFY_TRAIN_SPEED,
@@ -64,6 +70,7 @@ typedef enum trnstrequest{
     NOTIFY_RESERVATION,
     NOTIFY_RV_TIMEOUT,
     NOTIFY_RV_START,
+    NOTIFY_STOP,
     TRAIN_STATE_NOTIFY_TERMINAL_COURIER,
 
     NUM_TRAIN_STATE_REQUESTS
@@ -79,5 +86,6 @@ int NotifyReservation(int trainstatetid, int data);
 int GetTrainSpeed(int trainstatetid, int train);
 int GetActiveTrain(int trainstatetid, int train);
 int NavigateTo(int trainstatetid, NavigateRequest nav_req);
+TrackPosition GetTrainPosition(int trainstatetid, int train);
 
 #endif //_TRAIN_STATE_H_
