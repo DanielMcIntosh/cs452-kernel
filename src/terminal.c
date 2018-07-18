@@ -45,6 +45,7 @@ typedef struct terminal {
     int sensor_line;
     int dbg_col;
     int dbg2_col;
+    int pos_col;
     int notifier;
 } Terminal;
 
@@ -74,9 +75,9 @@ static void output_base_terminal(Terminal *t) {
     const char track_char = GetValue(VALUE_TRACK_NAME);
     //
     //
-    const char * topbar =
+    const char * topbar = 
     "           E_T:     STK_LIM:     STK_MAX:      DIST_NX:                 RESERVATIONS:\r\n" \
-    "IDLE: %__  E_D:     STK_AVG:     VELO_PR:      DIST_PR:\r\n" ;
+    "IDLE: %__  E_D:     STK_AVG:     VELO_PR:         A_PR:\r\n" ;
     // E_T: 1, 16
     // STK_MAX: 1, 42
     // DIST_NX: 1, 56
@@ -139,14 +140,13 @@ static void output_base_terminal(Terminal *t) {
 
     cb_write_string(cb, " \033["S(TERMINAL_INPUT_BASE_LINE)";"S(TERMINAL_INPUT_MAX_LINE)"r");
     cursor_to_position(cb, t->input_line, t->input_col);
-    cb_write_string(cb, "> ");
-    t->input_col+= 2;
+    cb_write_string(cb, "\r >");
+    t->input_col = TERMINAL_INPUT_BASE_COL+3;
 
     cursor_to_position(cb, TERMINAL_INPUT_MAX_LINE + 1, 1);
     cb_write_string(cb, "TRACK: ");
     cb_write(cb, track_char);
-    cb_write_string(cb, "   " STYLED_FLAG_STRING "\033["S(TERMINAL_DEBUG_BASE_LINE)";"S(TERMINAL_DEBUG_MAX_LINE)"r");
-
+    cb_write_string(cb, "   " STYLED_FLAG_STRING); //"\033["S(TERMINAL_DEBUG_BASE_LINE)";"S(TERMINAL_DEBUG_MAX_LINE)"r");
 
     cursor_to_position(cb, 1, 29);
     cb_write_number(cb, STACK_SPACE_SIZE/TASK_POOL_SIZE - 4, 16);
@@ -610,7 +610,7 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
     char cb_terminal_buf[CB_TERMINAL_BUF_SIZE];
     circlebuffer_t cb_terminal;
     cb_init(&cb_terminal, cb_terminal_buf, sizeof(cb_terminal_buf));
-    Terminal t = {cb_terminal, TERMINAL_INPUT_BASE_LINE, TERMINAL_INPUT_BASE_COL, SENSOR_LINE_BASE, 0, 0, 0};
+    Terminal t = {cb_terminal, TERMINAL_INPUT_BASE_LINE, TERMINAL_INPUT_BASE_COL, SENSOR_LINE_BASE, 0, 0, 0, 0};
     int tid, err; char c;
     TerminalMessage tm = {0, 0, 0, 0};
     ReplyMessage rm = {MESSAGE_REPLY, 0};
@@ -651,6 +651,7 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
             for (int i = TERMINAL_INPUT_BASE_COL+2; i < TERMINAL_INPUT_MAX_COL; i++) {
                 cb_write(&t.output, ' ');
             }
+            t.input_col = TERMINAL_INPUT_BASE_COL + 2;
             //write the prompt
             cb_write_string(&t.output, "\r> ");
             break;
@@ -780,14 +781,14 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
             int n = tm.arg1;
             int n2 = tm.arg2;
             cb_write_string(&t.output, "\0337");
-            cursor_to_position(&t.output, TERMINAL_DEBUG_MAX_LINE+1, t.dbg2_col);
+            cursor_to_position(&t.output, TERMINAL_DEBUG_BASE_LINE, t.dbg2_col);
             t.dbg2_col += cb_write_number(&t.output, n, 10);
             cb_write_string(&t.output, ":");
             t.dbg2_col += cb_write_number(&t.output, n2, 10);
             cb_write_string(&t.output, " ");
             t.dbg2_col += 2;
             if (t.dbg2_col > 97) {
-                cb_write_string(&t.output, "\n");
+                //cb_write_string(&t.output, "\n");
                 t.dbg2_col = 0;
             }
             cb_write_string(&t.output, "\0338");
@@ -824,6 +825,28 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
         {
             unsigned long long flags = ((unsigned long long)tm.arg1) | (((unsigned long long)tm.arg2) << 32ULL);
             print_reservations2(&t.output, flags);
+            break;
+        }
+        case (TERMINAL_POS_DBG):
+        {
+            int node = tm.arg1;
+            int dist = tm.arg2;
+            track_node * tn = &track[node];
+            const char *n = tn->name;
+            cb_write_string(&t.output, "\0337");
+            cursor_to_position(&t.output, TERMINAL_DEBUG_MAX_LINE+1, t.pos_col);
+            while (n != NULL){
+                t.pos_col++;
+                cb_write(&t.output, *n);
+                n++;
+            }
+            cb_write(&t.output,'+');
+            t.pos_col++;
+            t.pos_col += cb_write_number(&t.output, dist, 10);
+            if (t.pos_col > 97) {
+                t.pos_col = 0;
+            }
+            cb_write_string(&t.output, "\0338");
             break;
         }
         case(TERMINAL_NOTIFY_COURIER):

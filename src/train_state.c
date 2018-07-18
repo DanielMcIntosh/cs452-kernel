@@ -228,6 +228,7 @@ static inline int get_active_train_from_sensor(TrainState *ts, const int sensor,
 }
 
 static int ar_stop(ActiveRoute*, Train*, TerminalCourier*);
+static void task_train_printer(int);
 
 static void ts_exec_step(TrainState * restrict ts, TerminalCourier * restrict tc, ActiveRoute * restrict ar, int activetrain, int cmdtid, int distance_to_stop, const char * sig) {
     // do current step:
@@ -460,7 +461,7 @@ static int ar_stop(ActiveRoute * restrict ar, Train * restrict train, TerminalCo
 
 #define RESERVE_TRACK FALSE
 
-static inline void activeroute_exec_steps(ActiveRoute * restrict ar, TrainState * restrict ts, TerminalCourier * restrict tc, int resrv_dist, int tr, int cmdtid) {
+static void activeroute_exec_steps(ActiveRoute * restrict ar, TrainState * restrict ts, TerminalCourier * restrict tc, int resrv_dist, int tr, int cmdtid) {
     const track_node *resrv_start;
     const track_node *resrv_end = rc_to_track_node(ar->route.rcs[ar->idx_resrv], "resrv_start");
     //we assign resrv_end to resrv_start first thing in the loop
@@ -479,10 +480,10 @@ static inline void activeroute_exec_steps(ActiveRoute * restrict ar, TrainState 
         //todo will fail after first sensor right now because we've already reserved some of this
         //Therefore, we currently ignore whether we actually could reserve track
         if (RESERVE_TRACK) {
-        bool resrv_successful = reserve_track(&ar->route, ar->idx_resrv, resrv_start, resrv_end, &ts->reservations);
-        if (!resrv_successful) {
-            break;
-        }
+            bool resrv_successful = reserve_track(&ar->route, ar->idx_resrv, resrv_start, resrv_end, &ts->reservations);
+            if (!resrv_successful) {
+                break;
+            }
         }
 
         ts_exec_step(ts, tc, ar, tr, cmdtid, ar->next_step_distance + (nxt_step_rv_in_range ? 350 : 0), "action loop");
@@ -604,6 +605,18 @@ static inline void add_new_train(TrainState * restrict ts, NewTrain data) {
 
     ts->active_trains[ts->total_trains].num = data.train;
     ++ts->total_trains;
+
+    CreateWithArgument(PRIORITY_LOW, &task_train_printer, data.train);
+}
+
+static void __attribute__((noreturn)) task_train_printer(int train){
+    int trainstate_tid = WhoIs(NAME_TRAIN_STATE);
+    int terminal_tid = WhoIs(NAME_TERMINAL);
+    FOREVER {
+        TrackPosition tp = GetTrainPosition(trainstate_tid, train);
+        SendTerminalRequest(terminal_tid, TERMINAL_POS_DBG, tp.object, tp.distance_past);
+        Delay(50); // 500 ms delay
+    }
 }
 
 void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
