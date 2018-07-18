@@ -133,9 +133,10 @@ void __attribute__((noreturn)) task_delay_stop(int data, int train){
     int tid = WhoIs(NAME_TRAIN_STATE);
     DelayStop ds = {.data = data};
     Delay(ds.delay);
-    notify_stop(tid, train);
     if (ds.rv) {
         notify_rv_start(tid, train);
+    } else {
+        notify_stop(tid, train);
     }
     Destroy();
 }
@@ -728,14 +729,20 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
              * 1. Send speed 15 command (reverse)
              * 2. Dispatch worker to send a speed command after a delay (two speed commands right after each other are bad I think)
             //*/
+
             int activetrain = tm.data;
             ActiveRoute *ar = &(ts.active_routes[activetrain]);
             Train *train = &(ts.active_trains[activetrain]);
+
+            Position_HandleStop(&train->pos, &ts.active_routes[activetrain].route, ts.active_routes[activetrain].cur_pos_idx, Time());
+            ASSERT(train->pos.state == PSTATE_STOPPED, "cannot reverse when not yet stopped, %d | %d", train->pos.state, activetrain);
+
             Command c = {COMMAND_TR, 15, {.arg2 = train->num}};
             SendCommand(cmdtid, c);
             // find current node (using stopping distance past the merge we just reversed at?
             // also, find the distance we are past said current node (same deal)
             // then, find the distance from that to the next stop on the route.
+            // then, use that to decide if we need to use a short move or a regular move
             ar->reversing = 0;
             CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, NAV_SPEED, train->num); // TODO number
             train->speed = NAV_SPEED;
@@ -759,8 +766,8 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             int time = Time();
             TrackPosition tp = Position_CalculateNow(&tr->pos, &ts.active_routes[activetrain].route, time);
             Position_HandleBeginStop(&tr->pos, &ts.active_routes[activetrain].route, time, &track[tp.object], tp.distance_past + tr->stopping_distance[tr->speed]);
-            //tc_send(&tc, TERMINAL_ROUTE_DBG2, 212, train);
-            CreateWith2Args(PRIORITY_NOTIFIER, &task_notify_rv_timeout, calc_reverse_time(&ts, activetrain), activetrain);
+            tc_send(&tc, TERMINAL_ROUTE_DBG2, 212, train);
+            CreateWith2Args(PRIORITY_LOW, &task_notify_rv_timeout, calc_reverse_time(&ts, activetrain), activetrain);
             ts.active_trains[activetrain].speed = 0;
             break;
         }

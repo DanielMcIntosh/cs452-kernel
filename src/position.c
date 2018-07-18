@@ -29,6 +29,7 @@ void Position_HandleStop(Position *p, Route *r, int idx_new, int time) {
     ASSERT(p->state == PSTATE_DECEL, "Cannot stop without first decelerating.");
     //int dt = time - p->last_update_time;
     //int distance = p->millis_off_last_node + p->v * dt + (1 / 2) * p->a * dt * dt;
+    p->state = PSTATE_STOPPED;
     int distance = p->millis_off_stop_end;
     int idx = p->last_route_idx;
     // TODO this will totally break with reversing if you reverse onto a branch?
