@@ -215,6 +215,7 @@ void init_train_state(TrainState *ts) {
     for (int i = 0; i < MAX_CONCURRENT_TRAINS; i++) {
         ts->active_trains[i] = init_train;
         ts->active_routes[i].stopped = 1;
+        ts->active_routes[i].last_handled_sensor = -1;
     }
 
     ts->reservations = init_reservation;
@@ -515,6 +516,15 @@ static void activeroute_exec_steps(ActiveRoute * restrict ar, TrainState * restr
 
 static inline void activeroute_on_sensor_event(ActiveRoute * restrict ar, Train * restrict train, TrainState * restrict ts, TerminalCourier * restrict tc, int sensor, int distance, int tr, int cmdtid){
     int dist_to_next_snsr = 0;
+
+    if (likely(ar->last_handled_sensor != -1)) {
+        //TODO: free when we're past the sensor, not when we hit it
+        free_track(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(ar->last_handled_sensor)], &track[SENSOR_TO_NODE(sensor)], &ts->reservations);
+
+        tc_send(tc, TERMINAL_PRINT_RESRV1, ts->reservations.bits_low & 0xFFFFFFFF, (ts->reservations.bits_low >> 32) & 0xFFFFFFFF);
+        tc_send(tc, TERMINAL_PRINT_RESRV2, ts->reservations.bits_high & 0xFFFFFFFF, (ts->reservations.bits_high >> 32) & 0xFFFFFFFF);
+    }
+
     if (ACTIVE_ROUTE_COMPLETE(ar) || ar->reversing)
         return;
 

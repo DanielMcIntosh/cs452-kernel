@@ -49,7 +49,11 @@ const track_node *forward_dist_on_route_no_extra(const Route *route, int * restr
 const track_node *forward_dist_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig);
 
 int distance_to_on_route(const Route *route, int idx, const track_node *from, const track_node *to, const char * restrict sig);
+
+//EXclusive of start, but INclusive of end. When start == end, reserves end (and therefore start)
 bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations);
+//INclusive of start, but EXclusive of end. When start == end, doesn't free anything
+void free_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations);
 
 #endif //_TRACK_H_
 

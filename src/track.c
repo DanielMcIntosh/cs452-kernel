@@ -315,6 +315,7 @@ static inline void add_to_mask(const track_node *n, Reservation * restrict mask)
     }
 }
 
+/*
 static inline void remove_from_mask(const track_node *n, Reservation * restrict mask) {
     int ind = TRACK_NODE_TO_INDEX(n);
     if (ind < 64) {
@@ -331,9 +332,13 @@ static inline void remove_from_mask(const track_node *n, Reservation * restrict 
         mask->bits_high &= ~(0x1ULL << ind);
     }
 }
+//*/
 
+//EXclusive of start, but INclusive of end
 bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations) {
     ASSERT_VALID_TRACK(start);
+    //in theory should handle end == null just fine by reserving to the end of the route, but put this here anyways
+    ASSERT_VALID_TRACK(end);
 
     Reservation mask = RESERVATION_INIT;
     add_to_mask(end, &mask);
@@ -354,4 +359,32 @@ bool reserve_track(const Route *route, int idx, const track_node *start, const t
     reservations->bits_high |= mask.bits_high;
 
     return TRUE;
+}
+
+//INclusive of start, but EXclusive of end
+void free_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations) {
+    ASSERT_VALID_TRACK(start);
+    //in theory should handle end == null just fine by freeing to the end of the route, but put this here anyways
+    ASSERT_VALID_TRACK(end);
+
+    Reservation mask = RESERVATION_INIT;
+    const track_node *n = start;
+    while (n != end && n != NULL) {
+        add_to_mask(n, &mask);
+        n = next_edge_on_route(route, &idx, n, "reserve_track")->dest;
+    }
+    ASSERT(n == end, "While Loop broken early");
+
+    /*
+    ASSERT(((reservations->bits_low  & mask.bits_low ) == mask.bits_low ) &&
+           ((reservations->bits_high & mask.bits_high) == mask.bits_high), "Tried to free unreserved track!"
+            " mask_low = %d %d, mask_high = %d %d, resrv_low = %d %d, resrv_high = %d %d",
+            (int)(mask.bits_low           & 0xFFFFFFFF), (int)((mask.bits_low  >> 32)          & 0xFFFFFFFF),
+            (int)(mask.bits_high          & 0xFFFFFFFF), (int)((mask.bits_high >> 32)          & 0xFFFFFFFF),
+            (int)(reservations->bits_low  & 0xFFFFFFFF), (int)((reservations->bits_low  >> 32) & 0xFFFFFFFF),
+            (int)(reservations->bits_high & 0xFFFFFFFF), (int)((reservations->bits_high >> 32) & 0xFFFFFFFF));
+    //*/
+
+    reservations->bits_low &= ~(mask.bits_low);
+    reservations->bits_high &= ~(mask.bits_high);
 }
