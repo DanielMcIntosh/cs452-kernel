@@ -282,8 +282,9 @@ const track_node *forward_dist_on_route(const Route *route, int * restrict idx, 
 }
 
 int distance_to_on_route(const Route *route, int idx, const track_node *from, const track_node *to, const char * restrict sig) {
-    ASSERT_VALID_TRACK_SIG(to, sig);
     ASSERT_VALID_TRACK_SIG(from, sig);
+    //in theory should handle to == null just fine by returning the distance to the switch after the end of the route, but put this here anyways
+    ASSERT_VALID_TRACK_SIG(to, sig);
     const track_node *n = from;
     int distance = 0;
     const track_edge *e;
@@ -298,7 +299,7 @@ int distance_to_on_route(const Route *route, int idx, const track_node *from, co
     return (unlikely(n == NULL)) ? -1 : distance;
 }
 
-int __attribute__((warn_unused_result)) get_dist_to_nxt_sensor(const Route *route, int idx, const track_node *cur_sensor, const char * restrict sig) {
+int get_dist_to_nxt_sensor(const Route *route, int idx, const track_node *cur_sensor, const char * restrict sig) {
     int res;
     next_sensor_on_route(route, &idx, cur_sensor, &res, sig);
     return res;
@@ -343,7 +344,7 @@ static inline void remove_from_mask(const track_node *n, Reservation * restrict 
 //EXclusive of start, but INclusive of end
 bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations, const char * restrict sig) {
     ASSERT_VALID_TRACK_SIG(start, sig);
-    //in theory should handle end == null just fine by reserving to the end of the route, but put this here anyways
+    //in theory should handle end == null just fine by reserving to the switch after the end of the route, but put this here anyways
     ASSERT_VALID_TRACK_SIG(end, sig);
 
     Reservation mask = RESERVATION_INIT;
@@ -375,7 +376,7 @@ bool reserve_track(const Route *route, int idx, const track_node *start, const t
 //INclusive of start, but EXclusive of end
 void free_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations) {
     ASSERT_VALID_TRACK(start);
-    //in theory should handle end == null just fine by freeing to the end of the route, but put this here anyways
+    //in theory should handle end == null just fine by freeing to the switch after the end of the route, but put this here anyways
     ASSERT_VALID_TRACK(end);
 
     Reservation mask = RESERVATION_INIT;

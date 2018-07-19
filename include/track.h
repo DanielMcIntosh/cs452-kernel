@@ -36,26 +36,26 @@ typedef struct route {
 #define ROUTE_INIT {{{0, 0, 0}}, 0, 0}
 
 void init_track();
-int find_path_between_nodes(const Reservation * restrict reservations, int min_dist, int rev_penalty, const track_node *origin, const track_node *dest, Route * restrict r);
+int find_path_between_nodes(const Reservation * restrict reservations, int min_dist, int rev_penalty, const track_node *origin, const track_node *dest, Route * restrict r) __attribute__((nonnull));
 
-const track_node *rc_to_track_node(RouteCommand rc, const char * restrict sig);
-const track_edge *next_edge_on_route(const Route *route, int * restrict ind, const track_node *n, const char * restrict sig);
+const track_node *rc_to_track_node(RouteCommand rc, const char * restrict sig) __attribute__((warn_unused_result));
+const track_edge *next_edge_on_route(const Route *route, int * restrict ind, const track_node *n, const char * restrict sig) __attribute__((nonnull));
 
-const track_node *next_sensor_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig);
-const track_node *next_switch_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig);
-const track_node *nth_sensor_on_route(int n, const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig);
+const track_node *next_sensor_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig) __attribute__((nonnull));
+const track_node *next_switch_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig) __attribute__((nonnull));
+const track_node *nth_sensor_on_route(int n, const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig) __attribute__((nonnull));
 
-const track_node *forward_dist_on_route_no_extra(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig);
-const track_node *forward_dist_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig);
+const track_node *forward_dist_on_route_no_extra(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig) __attribute__((nonnull));
+const track_node *forward_dist_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, const char * restrict sig) __attribute__((nonnull));
 
-int distance_to_on_route(const Route *route, int idx, const track_node *from, const track_node *to, const char * restrict sig);
+int distance_to_on_route(const Route *route, int idx, const track_node *from, const track_node *to, const char * restrict sig) __attribute__((warn_unused_result, nonnull));
 
-int get_dist_to_nxt_sensor(const Route *route, int idx, const track_node *cur_sensor, const char * restrict sig) __attribute__((warn_unused_result));
+int get_dist_to_nxt_sensor(const Route *route, int idx, const track_node *cur_sensor, const char * restrict sig) __attribute__((warn_unused_result, nonnull));
 
 //EXclusive of start, but INclusive of end. When start == end, reserves end (and therefore start)
-bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations, const char * restrict sig);
+bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations, const char * restrict sig) __attribute__((warn_unused_result, nonnull));
 //INclusive of start, but EXclusive of end. When start == end, doesn't free anything
-void free_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations);
+void free_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations) __attribute__((nonnull));
 
 #endif //_TRACK_H_
 

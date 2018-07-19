@@ -84,8 +84,8 @@ int NotifyNewTrain(int trainstatetid, NewTrain data);
 int NotifySensorEvent(int trainstatetid, SensorEvent data);
 int NotifyReservation(int trainstatetid, int data);
 
-int GetTrainSpeed(int trainstatetid, int train);
-int GetActiveTrain(int trainstatetid, int train);
+int GetTrainSpeed(int trainstatetid, int train) __attribute__((warn_unused_result));
+int GetActiveTrain(int trainstatetid, int train) __attribute__((warn_unused_result));
 int NavigateTo(int trainstatetid, NavigateRequest nav_req);
 TrackPosition GetTrainPosition(int trainstatetid, int train);
 

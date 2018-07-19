@@ -108,9 +108,9 @@ int NotifySensorData(int trackstatetid, SensorData data);
 int NotifySwitchStatus(int trackstatetid, SwitchData data);
 int NotifyParam(int trackstatetid, ParamData data);
 
-int GetSwitchState(int trackstatetid, int sw);
-int GetRoute(int trackstatetid, RouteRequest req, Route *res);
-int GetShort(int trackstatetid, int distance, ShortMessage *sm);
-TrackPosition GetFdist(int trackstatetid, FdistReq fdr);
+int GetSwitchState(int trackstatetid, int sw) __attribute__((warn_unused_result));
+int GetRoute(int trackstatetid, RouteRequest req, Route *res) __attribute__((nonnull));
+int GetShort(int trackstatetid, int distance, ShortMessage *sm) __attribute__((nonnull));
+TrackPosition GetFdist(int trackstatetid, FdistReq fdr) __attribute__((warn_unused_result));
 
 #endif

@@ -66,17 +66,17 @@ typedef struct tsmessage{
     };
 } TrainStateMessage;
 
-int __attribute__((pure))  calc_reverse_time(Train *train){
+int __attribute__((pure, warn_unused_result))  calc_reverse_time(Train *train){
     ASSERT(train->speed !=  15, "DIVISION BY ZERO");
     return 450 / (15 - train->speed) + 75; // BIG TODO
 }
 
-int __attribute__((const)) calc_reverse_time_from_velocity(int velocity, int distance_to_stop, int stopping_distance) {
+int __attribute__((const, warn_unused_result)) calc_reverse_time_from_velocity(int velocity, int distance_to_stop, int stopping_distance) {
     if (velocity == 0) return 0;
     return (VELOCITY_PRECISION * (distance_to_stop - stopping_distance) / velocity); 
 }
 
-int __attribute__((pure)) calc_short_delay(Train *train, int dist_millis) {
+int __attribute__((pure, warn_unused_result)) calc_short_delay(Train *train, int dist_millis) {
     return (train->short_delay_coeffs[0] + train->short_delay_coeffs[1] * (dist_millis / 10) + train->short_delay_coeffs[2] * (dist_millis * dist_millis / 100)) / SHORT_COEFF_PRECISION;
 }
 
@@ -104,55 +104,6 @@ int notify_stop(int trainstatetid, int train) {
 int notify_stopped(int trainstatetid, int train) {
     TrainStateMessage msg = {.type = MESSAGE_TRAIN_STATE, .request = NOTIFY_STOPPED, .data = train};
     return sendTrainState(trainstatetid, &msg);
-}
-
-void __attribute__((noreturn)) task_notify_rv_timeout(int delay, int tr){
-    int tid = WhoIs(NAME_TRAIN_STATE);
-    Delay(delay);
-    notify_rv_timeout(tid, tr);
-    Destroy();
-}
-
-void __attribute__((noreturn)) task_delay_reaccel(int speed, int train){
-    int tid = WhoIs(NAME_COMMANDSERVER);
-    Delay(20);
-    Command c = {COMMAND_TR, speed, .arg2=train};
-    SendCommand(tid, c);
-    Destroy();
-}
-
-typedef union delaystop{
-    int data;
-    struct {
-        int delay: 16;
-        int rv: 2;
-    };
-
-} DelayStop;
-
-void __attribute__((noreturn)) task_delay_stop(int data, int train){
-    int tid = WhoIs(NAME_TRAIN_STATE);
-    DelayStop ds = {.data = data};
-    Delay(ds.delay);
-    if (ds.rv) {
-        notify_rv_start(tid, train);
-    } else {
-        notify_stop(tid, train);
-    }
-    Destroy();
-}
-
-void __attribute__((noreturn)) task_notify_stopped(int delay, int train){
-    int tid = WhoIs(NAME_TRAIN_STATE);
-    Delay(delay);
-    notify_stopped(tid, train);
-    Destroy();
-}
-
-static inline void trainserver_begin_reverse(ActiveRoute * restrict ar, Train * restrict train, int delay) {
-    DelayStop ds = {.delay = delay, .rv = 1};
-    CreateWith2Args(PRIORITY_NOTIFIER, &task_delay_stop, ds.data, train->num);
-    ar->reversing = 1;
 }
 
 int NotifyTrainSpeed(int trainstatetid, TrainData data) {
@@ -204,7 +155,7 @@ TrackPosition GetTrainPosition(int trainstatetid, int train) {
     return tpu.tp;
 }
 
-void init_train_state(TrainState *ts) {
+void __attribute__((nonnull)) init_train_state(TrainState *ts) {
     ts->total_trains = 0;
     Train init_train = TRAIN_INIT;
     Reservation init_reservation = {0, 0};
@@ -223,7 +174,56 @@ void init_train_state(TrainState *ts) {
     ts->reservations = init_reservation;
 }
 
-static inline int get_active_train_from_sensor(TrainState *ts, const int sensor, int *distance, int rev_penalty) {
+void __attribute__((noreturn)) task_notify_rv_timeout(int delay, int tr){
+    int tid = WhoIs(NAME_TRAIN_STATE);
+    Delay(delay);
+    notify_rv_timeout(tid, tr);
+    Destroy();
+}
+
+void __attribute__((noreturn)) task_delay_reaccel(int speed, int train){
+    int tid = WhoIs(NAME_COMMANDSERVER);
+    Delay(20);
+    Command c = {COMMAND_TR, speed, .arg2=train};
+    SendCommand(tid, c);
+    Destroy();
+}
+
+typedef union delaystop{
+    int data;
+    struct {
+        int delay: 16;
+        int rv: 2;
+    };
+
+} DelayStop;
+
+void __attribute__((noreturn)) task_delay_stop(int data, int train){
+    int tid = WhoIs(NAME_TRAIN_STATE);
+    DelayStop ds = {.data = data};
+    Delay(ds.delay);
+    if (ds.rv) {
+        notify_rv_start(tid, train);
+    } else {
+        notify_stop(tid, train);
+    }
+    Destroy();
+}
+
+void __attribute__((noreturn)) task_notify_stopped(int delay, int train){
+    int tid = WhoIs(NAME_TRAIN_STATE);
+    Delay(delay);
+    notify_stopped(tid, train);
+    Destroy();
+}
+
+static inline void __attribute__((nonnull)) trainserver_begin_reverse(ActiveRoute * restrict ar, Train * restrict train, int delay) {
+    DelayStop ds = {.delay = delay, .rv = 1};
+    CreateWith2Args(PRIORITY_NOTIFIER, &task_delay_stop, ds.data, train->num);
+    ar->reversing = 1;
+}
+
+static inline int __attribute__((nonnull, warn_unused_result)) get_active_train_from_sensor(TrainState *ts, const int sensor, int *distance, int rev_penalty) {
     int min_dist = INT_MAX;
     int train = 0;
     const track_node *d = &track[SENSOR_TO_NODE(sensor)];
@@ -244,10 +244,10 @@ static inline int get_active_train_from_sensor(TrainState *ts, const int sensor,
     return train;
 }
 
-static int ar_stop(TerminalCourier*, ActiveRoute*, Train*);
+static int ar_stop(TerminalCourier*, ActiveRoute*, Train*) __attribute__((nonnull));
 static void task_train_printer(int);
 
-static void ts_exec_step(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Train * restrict train, int cmdtid, int distance_to_stop, const char * sig) {
+static void __attribute__((nonnull)) ts_exec_step(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Train * restrict train, int cmdtid, int distance_to_stop, const char * sig) {
     // do current step:
     RouteCommand rc = ar->route.rcs[ar->idx_resrv];
     const track_node *cnode = rc_to_track_node(rc, sig);
@@ -302,7 +302,7 @@ static void ts_exec_step(TerminalCourier * restrict tc, ActiveRoute * restrict a
     }
 }
 
-static inline int get_resrv_dist(const ActiveRoute * restrict ar, int idx, const track_node *start, int stopping_distance) {
+static inline int __attribute__((nonnull, warn_unused_result)) get_resrv_dist(const ActiveRoute * restrict ar, int idx, const track_node *start, int stopping_distance) {
     ASSERT_VALID_TRACK(start);
     int cur_dist = 0, total_dist = 0;
     const track_node *resrv_end = start;
@@ -343,7 +343,7 @@ static inline int ts_notify_terminal_buffer(int tstid, TerminalReq * restrict tr
     return r;
 }
 
-static inline void handle_navigate(TerminalCourier * restrict tc, TrainState *ts, TrainStateMessage * restrict tm, int trackstate_tid, int tid) {
+static inline void __attribute__((nonnull)) handle_navigate(TerminalCourier * restrict tc, TrainState *ts, TrainStateMessage * restrict tm, int trackstate_tid, int tid) {
     int object = tm->nav_req.position.object;
     int distance_past = tm->nav_req.position.distance_past;
     int tr = tm->nav_req.train;
@@ -405,7 +405,7 @@ static inline void handle_navigate(TerminalCourier * restrict tc, TrainState *ts
     tc_send(tc, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING, 0);
 }
 
-static inline void train_on_sensor_event(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Train * restrict train, int event_time, int distance) {
+static inline void __attribute__((nonnull)) train_on_sensor_event(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Train * restrict train, int event_time, int distance) {
     if (train->last_sensor < 0) {
         return;
     }
@@ -432,7 +432,7 @@ static inline void train_on_sensor_event(TerminalCourier * restrict tc, ActiveRo
     tc_send(tc, TERMINAL_VELOCITY_DEBUG, train->velocity[train->speed], acceleration);
 }
 
-static inline void on_sensor_event_free_track(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Reservation * restrict reservations, Train * restrict train, int sensor) {
+static inline void __attribute__((nonnull)) on_sensor_event_free_track(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Reservation * restrict reservations, Train * restrict train, int sensor) {
     ASSERT(train->last_sensor != sensor, "hit same sensor twice?! sensor = %d, train = %d", sensor, train->num);
     //TODO: free when we're past the sensor, not when we hit it
     free_track(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(train->last_sensor)], &track[SENSOR_TO_NODE(sensor)], reservations);
@@ -441,7 +441,7 @@ static inline void on_sensor_event_free_track(TerminalCourier * restrict tc, Act
     tc_send(tc, TERMINAL_PRINT_RESRV2, reservations->bits_high & 0xFFFFFFFF, (reservations->bits_high >> 32) & 0xFFFFFFFF);
 }
 
-static inline void update_cur_pos_idx(ActiveRoute * restrict ar, int sensor) {
+static inline void __attribute__((nonnull)) update_cur_pos_idx(ActiveRoute * restrict ar, int sensor) {
     int dummy;
     const track_node *cur_node = &track[SENSOR_TO_NODE(ar->last_handled_sensor)];
     while (ar->last_handled_sensor >= 0 && ar->last_handled_sensor != sensor){
@@ -452,7 +452,7 @@ static inline void update_cur_pos_idx(ActiveRoute * restrict ar, int sensor) {
     ar->last_handled_sensor = sensor;
 }
 
-static inline void activeroute_recalculate_distances(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Reservation * restrict reservations, int sensor, int distance) {
+static inline void __attribute__((nonnull)) activeroute_recalculate_distances(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Reservation * restrict reservations, int sensor, int distance) {
     ASSERT(distance != 0, "distance between last sensor pair shouldn't be 0");
     // recalculate next step distance and remaining distance every time
     if (ACTIVE_ROUTE_DONE_ACTIONS(ar)) {
@@ -472,7 +472,7 @@ static inline void activeroute_recalculate_distances(TerminalCourier * restrict 
     tc_send(tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
 }
 
-static int activeroute_distance_to_next_stop(ActiveRoute *ar, track_node *cnode, int idx) {
+static int __attribute__((nonnull, warn_unused_result)) activeroute_distance_to_next_stop(ActiveRoute *ar, track_node *cnode, int idx) {
     const track_node *n = cnode;
     int distance = 0;
     const track_edge *e;
@@ -488,7 +488,7 @@ static int activeroute_distance_to_next_stop(ActiveRoute *ar, track_node *cnode,
     return distance;
 }
 
-static inline int ar_stop(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Train * restrict train) {
+static inline int __attribute__((nonnull)) ar_stop(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Train * restrict train) {
     // Figure out how long we need to wait:
     int stopdelay = calc_reverse_time_from_velocity(train->velocity[train->speed], ar->remaining_distance, train->stopping_distance[train->speed]);
     DelayStop ds = {.delay = stopdelay, .rv = 0};
@@ -498,7 +498,7 @@ static inline int ar_stop(TerminalCourier * restrict tc, ActiveRoute * restrict 
     return 999999;
 }
 
-static inline void activeroute_exec_steps(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Reservation * restrict reservations, Train * restrict train, int resrv_dist, int cmdtid) {
+static inline void __attribute__((nonnull)) activeroute_exec_steps(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Reservation * restrict reservations, Train * restrict train, int resrv_dist, int cmdtid) {
     const track_node *resrv_start;
     const track_node *resrv_end = rc_to_track_node(ar->route.rcs[ar->idx_resrv], "resrv_start");
     //we assign resrv_end to resrv_start first thing in the loop
@@ -534,7 +534,7 @@ static inline void activeroute_exec_steps(TerminalCourier * restrict tc, ActiveR
     tc_send(tc, TERMINAL_PRINT_RESRV2, reservations->bits_high & 0xFFFFFFFF, (reservations->bits_high >> 32) & 0xFFFFFFFF);
 }
 
-static inline void activeroute_on_sensor_event(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Reservation * restrict reservations, Train * restrict train, int sensor, int distance, int cmdtid){
+static inline void __attribute__((nonnull)) activeroute_on_sensor_event(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Reservation * restrict reservations, Train * restrict train, int sensor, int distance, int cmdtid){
     activeroute_recalculate_distances(tc, ar, reservations, sensor, distance);
 
     int resrv_dist = get_resrv_dist(ar, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], train->stopping_distance[train->speed]);
@@ -552,7 +552,7 @@ static inline void activeroute_on_sensor_event(TerminalCourier * restrict tc, Ac
     }
 }
 
-static inline void handle_sensor_event(TerminalCourier * restrict tc, TrainState *ts, TrainStateMessage * restrict tm, int cmdtid, int tid) {
+static inline void __attribute__((nonnull)) handle_sensor_event(TerminalCourier * restrict tc, TrainState *ts, TrainStateMessage * restrict tm, int cmdtid, int tid) {
     ReplyMessage rm = {MESSAGE_REPLY, 0};
     Reply(tid, &rm, sizeof(rm)); 
     if (unlikely(ts->total_trains <= 0))
@@ -585,7 +585,7 @@ static inline void handle_sensor_event(TerminalCourier * restrict tc, TrainState
     ASSERT(0 <= train->last_sensor && train->last_sensor <= TRACK_MAX, "invalid last sensor for train %d: %d", train->num, train->last_sensor);
 }
 
-static inline void add_new_train(TrainState *ts, NewTrain data) {
+static inline void __attribute__((nonnull)) add_new_train(TrainState *ts, NewTrain data) {
     ASSERT(ts->total_trains >= 0, "Invalid total trains: %d", ts->total_trains);
 
     ts->active_train_map[data.train] = ts->total_trains;
