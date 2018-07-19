@@ -11,8 +11,8 @@
 
 #define STATE_TO_DIR(s) ((s) == SWITCH_STRAIGHT ? DIR_STRAIGHT : DIR_CURVED)
 
-#define SWCLAMP(c) ((c) > 18 ? (c) - 134 : (c))
-#define SWUNCLAMP(c) ((c) > 18 ? (c) + 134 : (c))
+#define SWCLAMP(c) ((c) > 32 ? (c) - 134 : (c))
+#define SWUNCLAMP(c) ((c) > 32 ? (c) + 134 : (c))
 #define SW3_COMPLEMENT(c) ((((c) - 1) ^ 1) + 1)
 
 typedef enum switchstate{

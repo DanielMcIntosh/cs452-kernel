@@ -215,6 +215,7 @@ void init_train_state(TrainState *ts) {
     for (int i = 0; i < MAX_CONCURRENT_TRAINS; i++) {
         ts->active_trains[i] = init_train;
         ts->active_routes[i].stopped = 1;
+        ts->active_routes[i].end_node = -1;
         ts->active_routes[i].last_handled_sensor = -1;
     }
 
@@ -346,8 +347,12 @@ static inline void handle_navigate(TrainState * restrict ts, TerminalCourier * r
     int object = tm->nav_req.position.object;
     int distance_past = tm->nav_req.position.distance_past;
     int tr = tm->nav_req.train;
+    ASSERT(0 <= ts->active_train_map[tr] && ts->active_train_map[tr] < MAX_CONCURRENT_TRAINS, "Invalid active train: %d", ts->active_train_map[tr]);
+
     Train *train = TRAIN(ts, tr);
     ReplyMessage rm = {MESSAGE_REPLY, 0};
+
+    ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor for train %d: %d", tr, train->last_sensor);
 
     int min_dist, rev_penalty;
     if (train->speed == 0){
@@ -360,7 +365,6 @@ static inline void handle_navigate(TrainState * restrict ts, TerminalCourier * r
         rev_penalty = 2*train->stopping_distance[train->speed];
     }
 
-    ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor for train %d: %d", tr, train->last_sensor);
     RouteRequest req = {
         .reservations = ts->reservations, // TODO let a train run over its own reservations
         .next = train->last_sensor, //train->next_sensor,
@@ -390,7 +394,6 @@ static inline void handle_navigate(TrainState * restrict ts, TerminalCourier * r
         ar.reversing = 0;
         Position_HandleAccel(&train->pos, &ar.route, Time(), 0, 0);
     }
-    ASSERT(0 <= ts->active_train_map[tr] && ts->active_train_map[tr] < MAX_CONCURRENT_TRAINS, "Invalid active train: %d", ts->active_train_map[tr]);
     ts->active_routes[ts->active_train_map[tr]] = ar;
 
     for (int i = 0; i < MAX_ROUTE_COMMAND && ar.route.rcs[i].a != ACTION_NONE; i++){
@@ -432,6 +435,26 @@ static void train_on_sensor_event(TrainState *restrict ts, Train * restrict trai
     ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor for train %d: %d", tr, train->last_sensor);
 }
 
+static inline void on_sensor_event_free_track(ActiveRoute * restrict ar, Train * restrict train, TrainState * restrict ts, TerminalCourier * restrict tc, int sensor) {
+    ASSERT(train->last_sensor != sensor, "hit same sensor twice?! sensor = %d, train = %d", sensor, train->num);
+    //TODO: free when we're past the sensor, not when we hit it
+    free_track(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(train->last_sensor)], &track[SENSOR_TO_NODE(sensor)], &ts->reservations);
+
+    tc_send(tc, TERMINAL_PRINT_RESRV1, ts->reservations.bits_low & 0xFFFFFFFF, (ts->reservations.bits_low >> 32) & 0xFFFFFFFF);
+    tc_send(tc, TERMINAL_PRINT_RESRV2, ts->reservations.bits_high & 0xFFFFFFFF, (ts->reservations.bits_high >> 32) & 0xFFFFFFFF);
+}
+
+static inline void update_cur_pos_idx(ActiveRoute * restrict ar, int sensor, int * restrict dist_to_next_snsr) {
+    // update cur_pos_idx
+    const track_node *cur_node = &track[SENSOR_TO_NODE(ar->last_handled_sensor)];
+    while (ar->last_handled_sensor >= 0 && ar->last_handled_sensor != sensor){
+        cur_node = next_sensor_on_route(&ar->route, &ar->cur_pos_idx, cur_node, dist_to_next_snsr, "update cur_pos_idx");
+        ASSERT(cur_node != NULL, "couldn't find the next sensor!");
+        ar->last_handled_sensor = cur_node->num;
+    }
+    ar->last_handled_sensor = sensor;
+}
+
 static inline void activeroute_recalculate_distances(ActiveRoute * restrict ar, TrainState * restrict ts, TerminalCourier * restrict tc, int sensor, int distance) {
     ASSERT(distance != 0, "distance between last sensor pair shouldn't be 0");
     // recalculate next step distance and remaining distance every time
@@ -442,7 +465,7 @@ static inline void activeroute_recalculate_distances(ActiveRoute * restrict ar, 
         ar->next_step_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[ar->idx_resrv], "ar next step recalculate rc2tn"), "ar next step recalculate");
         //have to delay initialization of next step distance until we hit the next sensor, since that's where the route actually starts
         if (ar->idx_resrv == 0 && RESERVE_TRACK) {
-            bool success = reserve_track(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[0], "init reservations"), &ts->reservations);
+            bool success = reserve_track(&ar->route, ar->idx_resrv, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[0], "init reservations"), &ts->reservations, "init resrv_track");
             if (unlikely(!success)) {
                 PANIC("FIRST step already reservered!");
             }
@@ -497,7 +520,7 @@ static void activeroute_exec_steps(ActiveRoute * restrict ar, TrainState * restr
         //todo will fail after first sensor right now because we've already reserved some of this
         //Therefore, we currently ignore whether we actually could reserve track
         if (RESERVE_TRACK) {
-            bool resrv_successful = reserve_track(&ar->route, ar->idx_resrv, resrv_start, resrv_end, &ts->reservations);
+            bool resrv_successful = reserve_track(&ar->route, ar->idx_resrv, resrv_start, resrv_end, &ts->reservations, "main reserve_track");
             if (!resrv_successful) {
                 break;
             }
@@ -514,26 +537,7 @@ static void activeroute_exec_steps(ActiveRoute * restrict ar, TrainState * restr
     tc_send(tc, TERMINAL_PRINT_RESRV2, ts->reservations.bits_high & 0xFFFFFFFF, (ts->reservations.bits_high >> 32) & 0xFFFFFFFF);
 }
 
-static inline void activeroute_on_sensor_event(ActiveRoute * restrict ar, Train * restrict train, TrainState * restrict ts, TerminalCourier * restrict tc, int sensor, int distance, int tr, int cmdtid){
-    int dist_to_next_snsr = 0;
-
-    if (likely(ar->last_handled_sensor != -1)) {
-        //TODO: free when we're past the sensor, not when we hit it
-        free_track(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(ar->last_handled_sensor)], &track[SENSOR_TO_NODE(sensor)], &ts->reservations);
-
-        tc_send(tc, TERMINAL_PRINT_RESRV1, ts->reservations.bits_low & 0xFFFFFFFF, (ts->reservations.bits_low >> 32) & 0xFFFFFFFF);
-        tc_send(tc, TERMINAL_PRINT_RESRV2, ts->reservations.bits_high & 0xFFFFFFFF, (ts->reservations.bits_high >> 32) & 0xFFFFFFFF);
-    }
-
-    if (ACTIVE_ROUTE_COMPLETE(ar) || ar->reversing)
-        return;
-
-    // update cur_pos_idx
-    while (ar->last_handled_sensor != -1 && ar->last_handled_sensor != sensor){
-        ar->last_handled_sensor =  next_sensor_on_route(&ar->route, &ar->cur_pos_idx, &track[SENSOR_TO_NODE(ar->last_handled_sensor)], &dist_to_next_snsr, "update cur_pos_idx")->num;
-    }
-    ar->last_handled_sensor = sensor;
-
+static inline void activeroute_on_sensor_event(ActiveRoute * restrict ar, Train * restrict train, TrainState * restrict ts, TerminalCourier * restrict tc, int sensor, int distance, int tr, int cmdtid, int dist_to_next_snsr){
     activeroute_recalculate_distances(ar, ts, tc, sensor, distance);
 
     int resrv_dist = get_resrv_dist(ar, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], train->stopping_distance[train->speed]);
@@ -563,14 +567,25 @@ static inline void handle_sensor_event(TrainState * restrict ts, TerminalCourier
     ActiveRoute *ar = &(ts->active_routes[tr]);
 
     train_on_sensor_event(ts, train, tc, sensor, event_time, distance, tr);
-    activeroute_on_sensor_event(ar, train, ts, tc, sensor, distance, tr, cmdtid);
+
+    if (likely(ar->end_node >= 0 && !(ar->reversing))) {
+        on_sensor_event_free_track(ar, train, ts, tc, sensor);
+    }
+
+    //TODO investigate whether this is correct -- i think this might be set as the distance between the
+    // previous two sensors, and used as though it is the distance between the next two sensors
+    int dist_to_next_snsr = 0;
+    if (!ACTIVE_ROUTE_COMPLETE(ar) && !(ar->reversing)) {
+        update_cur_pos_idx(ar, sensor, &dist_to_next_snsr);
+        activeroute_on_sensor_event(ar, train, ts, tc, sensor, distance, tr, cmdtid, dist_to_next_snsr);
+    }
 
     Position_HandleSensorHit(&train->pos, &track[SENSOR_TO_NODE(sensor)], event_time, ar->cur_pos_idx);
 
 
     train->last_sensor = sensor;
     train->last_sensor_time = event_time;
-    ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor for train %d: %d", train->num, train->last_sensor);
+    ASSERT(0 <= train->last_sensor && train->last_sensor <= TRACK_MAX, "invalid last sensor for train %d: %d", train->num, train->last_sensor);
 }
 
 static inline void add_new_train(TrainState * restrict ts, NewTrain data) {

@@ -335,17 +335,22 @@ static inline void remove_from_mask(const track_node *n, Reservation * restrict 
 //*/
 
 //EXclusive of start, but INclusive of end
-bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations) {
-    ASSERT_VALID_TRACK(start);
+bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations, const char * restrict sig) {
+    ASSERT_VALID_TRACK_SIG(start, sig);
     //in theory should handle end == null just fine by reserving to the end of the route, but put this here anyways
-    ASSERT_VALID_TRACK(end);
+    ASSERT_VALID_TRACK_SIG(end, sig);
 
     Reservation mask = RESERVATION_INIT;
     add_to_mask(end, &mask);
 
     const track_node *n = start;
+    const track_edge *e;
     while (n != end && n != NULL) {
-        n = next_edge_on_route(route, &idx, n, "reserve_track")->dest;
+        e = next_edge_on_route(route, &idx, n, sig);
+        if (e == NULL) {
+            return FALSE;
+        }
+        n = e->dest;
 
         add_to_mask(n, &mask);
     }
@@ -369,9 +374,12 @@ void free_track(const Route *route, int idx, const track_node *start, const trac
 
     Reservation mask = RESERVATION_INIT;
     const track_node *n = start;
+    const track_edge *e;
     while (n != end && n != NULL) {
         add_to_mask(n, &mask);
-        n = next_edge_on_route(route, &idx, n, "reserve_track")->dest;
+        e = next_edge_on_route(route, &idx, n, "free_track");
+        ASSERT(e != NULL, "tried to free track past end of given route. start = %s, end = %s, n = %s, idx = %d", start->name, end->name, n->name, idx);
+        n = e->dest;
     }
     ASSERT(n == end, "While Loop broken early");
 
