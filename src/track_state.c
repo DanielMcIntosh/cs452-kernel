@@ -39,6 +39,7 @@ typedef struct tsmessage{
         SwitchData switch_data;
         RouteRequest route_request;
         ParamData param_data;
+        FdistReq fdist_request;
     };
 } TrackStateMessage;
 
@@ -53,49 +54,50 @@ void init_track_state(TrackState *ts) {
     }
 }
 
-static track_node* predict_next_sensor(const SwitchState * restrict ts, const track_node *last_sensor, SwitchState * restrict path, int * restrict distance) {
+static const track_edge * predict_next_edge(const SwitchState * restrict ts, const track_node *prev) {
+    const track_edge *e;
+    switch (prev->type) {
+    case (NODE_BRANCH):
+    {
+        e = &prev->edge[STATE_TO_DIR(ts[SWCLAMP(prev->num)])];
+        break;
+    }
+    case (NODE_SENSOR):
+    case (NODE_ENTER):
+    case (NODE_MERGE):
+    {
+        e = &prev->edge[DIR_AHEAD];
+        break;
+    }
+    case (NODE_EXIT):
+    {
+        e = NULL;
+        break;
+    }
+    default:
+    {
+        PANIC("in: predict_next_sensor - INVALID TRACK NODE TYPE: %d", prev->type);
+    }
+    }
+
+    return e;
+}
+
+static track_node* predict_next_sensor(const SwitchState * restrict ts, const track_node *last_sensor, int * restrict distance) {
     // basic plan for this: linked list search: follow state given by TrackState
     // Stop when another sensor is found
 
     track_node *n = last_sensor->edge[DIR_AHEAD].dest;
     *distance = last_sensor->edge[DIR_AHEAD].dist;
-    track_edge *e;
+    
+    const track_edge *e;
     while (n != NULL && n->type != NODE_SENSOR) {
-        switch (n->type) {
-        case (NODE_BRANCH):
-        {
-            //ASSERT(!(path &&path->merges[SWCLAMP(n->num)].state != SWITCH_UNKNOWN && path->switches[SWCLAMP(n->num)].state != SWITCH_UNKNOWN), "path covers branch & merge?");
-            if (path && path[SWCLAMP(n->num)] != SWITCH_UNKNOWN) {
-                e = &n->edge[STATE_TO_DIR(path[SWCLAMP(n->num)])];
-            }
-            else {
-                e = &n->edge[STATE_TO_DIR(ts[SWCLAMP(n->num)])];
-                path[SWCLAMP(n->num)] = ts[SWCLAMP(n->num)];
-            }
-
-            *distance += e->dist;
-            n = e->dest;
-            break;
-        }
-        case (NODE_ENTER):
-        case (NODE_MERGE):
-        {
-            *distance += n->edge[DIR_AHEAD].dist;
-            n = n->edge[DIR_AHEAD].dest;
-            break;
-        }
-        case (NODE_EXIT):
-        {
-            return NULL;
-        }
-        default:
-        {
-            PANIC("in: predict_next_sensor - INVALID TRACK NODE TYPE: %d", n->type);
-        }
-        }
+        e = predict_next_edge(ts, n);
+        ASSERT(e != NULL, "NULL edge predicted ahead");
+        *distance += e->dist;
+        n = e->dest;
     }
     ASSERT(n == NULL || n->type == NODE_SENSOR, "While Loop broken early");
-
     return n;
 }
 /*
@@ -115,21 +117,25 @@ static int reverse_distance_from_node(const Switch * restrict ts, const track_no
     return 0;
 }
 
-static int forward_distance_from_node(const SwitchState * restrict ts, const track_node *destination, int distance, SwitchState * restrict path, int * restrict wakeup_sensor, int * restrict dist_after_sensor) {
+*/
+static int forward_distance_from_node(const SwitchState * restrict ts, const track_node *destination, int distance, int * restrict wakeup_sensor, int * restrict dist_after_sensor) {
     ASSERT(distance >= 0, "Cannot forward find negative distance");
     const track_node * restrict next_sensor = destination;
+    const track_edge *e;
     int tdist = 0, last_tdist = 0, cdist;
     while (tdist < distance) {
-        *wakeup_sensor = next_sensor->num;
+        *wakeup_sensor = TRACK_NODE_TO_INDEX(next_sensor);
         last_tdist = tdist;
-        next_sensor = predict_next_sensor(ts, next_sensor, path, &cdist);
-        tdist += cdist;
+        e = predict_next_edge(ts, next_sensor);
+        ASSERT(e != NULL, "NULL edge predicted ahead");
+        tdist += e->dist;
+        next_sensor = e->dest;
     }
     cdist = distance - last_tdist; // remaining distance (in mm)
     *dist_after_sensor = cdist;
     return 0;
 }
-*/
+//*/
 
 static inline int sendTrackState(int trackstatetid, const TrackStateMessage *msg) {
     ReplyMessage rm;
@@ -180,6 +186,16 @@ int GetShort(int trackstatetid, int distance, ShortMessage *sm) {
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = SHORT, {.data = distance}};
     int r = Send(trackstatetid, &msg, sizeof(msg), sm, sizeof(*sm));
     return (r >= 0 ? 0 : -1);
+}
+
+TrackPosition GetFdist(int trackstatetid, FdistReq fdr){
+    TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = FDIST, {.fdist_request = fdr}};
+    ReplyMessage rm;
+    int r = Send(trackstatetid, &msg, sizeof(msg), &rm, sizeof(rm));
+    TrackPosition tp = {0,0};
+    if (r < 0) return tp;
+    TrackPositionUnion tpu = {.bytes = rm.ret};
+    return tpu.tp;
 }
 
 void __attribute__((noreturn)) task_track_state() {
@@ -238,7 +254,7 @@ void __attribute__((noreturn)) task_track_state() {
             Reservation reservations = tm.route_request.reservations;
 
             int __attribute__((unused)) distance;
-            const track_node *tmp = predict_next_sensor(ts.switches, &track[prev], NULL, &distance);
+            const track_node *tmp = predict_next_sensor(ts.switches, &track[prev], &distance);
             ASSERT(tmp != NULL, "next sensor null!");
             int next = tmp->num;
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 208, next);
@@ -266,6 +282,22 @@ void __attribute__((noreturn)) task_track_state() {
             ASSERT(distance >= 0 && distance < NUM_SHORTS, "invalid short move");
             ShortMessage sm = {short_speed[distance], short_delay[distance]};
             Reply(tid, &sm, sizeof(sm));
+            break;
+        }
+        case (FDIST):
+        {
+            FdistReq fdr = tm.fdist_request;
+            int node = 0, distance = 0;
+            //PANIC("WHY __-__ %s (%d), %d", track[fdr.cnode].name, fdr.cnode, fdr.distance);
+            int err = forward_distance_from_node(ts.switches, &track[fdr.cnode], fdr.distance, &node, &distance);
+            if (err < 0) {
+                rm.ret = -1;
+                Reply(tid, &rm, sizeof(rm));
+                break;
+            }
+            TrackPositionUnion tpu = {.tp = {node, distance}};
+            rm.ret = tpu.bytes;
+            Reply(tid, &rm, sizeof(rm));
             break;
         }
         case (NOTIFY_SENSOR_DATA):

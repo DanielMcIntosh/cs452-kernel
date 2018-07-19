@@ -5,6 +5,7 @@
 #include <syscall.h>
 #include <track.h>
 #include <position.h>
+#include <name.h>
 
 /* Notes:
  * This file uses the kinematics equations associated to motion with constant acceleration.
@@ -25,16 +26,17 @@ void Position_HandleSensorHit(Position* p, track_node *snsr, int time, int new_r
     p->last_route_idx = new_route_idx;
 }
 
-void Position_HandleStop(Position *p, Route *r, int idx_new, int time) {
+void Position_HandleStop(Position *p, int idx_new, int time) {
     ASSERT(p->state == PSTATE_DECEL, "Cannot stop without first decelerating.");
     //int dt = time - p->last_update_time;
     //int distance = p->millis_off_last_node + p->v * dt + (1 / 2) * p->a * dt * dt;
     p->state = PSTATE_STOPPED;
     int distance = p->millis_off_stop_end;
-    int idx = p->last_route_idx;
-    // TODO this will totally break with reversing if you reverse onto a branch?
-    p->last_known_node = forward_dist_on_route_no_extra(r, &idx, p->stop_end_pos, &distance, "handle stop");
-    p->millis_off_last_node = distance;
+    FdistReq frq = {TRACK_NODE_TO_INDEX(p->stop_end_pos), distance};
+    TrackPosition fdist = GetFdist(WhoIs(NAME_TRACK_STATE), frq);
+    p->last_known_node = &track[fdist.object];
+    //PANIC("::: %s (%d) + %d -> %s + %d", p->stop_end_pos->name, TRACK_NODE_TO_INDEX(p->stop_end_pos), distance, p->last_known_node->name, fdist.distance_past);
+    p->millis_off_last_node = fdist.distance_past;
     p->last_update_time = time;
     p->last_route_idx = idx_new;
     p->v = 0;
@@ -77,11 +79,16 @@ TrackPosition Position_CalculateNow(Position *p, const Route *r, int time) {
     int distance = p->millis_off_last_node + ((p->state != PSTATE_STOPPED) ? p->v * (time - p->last_update_time) / VELOCITY_PRECISION : 0);
     int idx = p->last_route_idx, object = TRACK_NODE_TO_INDEX(p->last_known_node);
     // TODO this will totally break if your position predicts ahead too far
-    if (r != NULL) {
+    if (r != NULL && !(p->state == PSTATE_STOPPED)) {
         const track_node *tn = forward_dist_on_route_no_extra(r, &idx, p->last_known_node, &distance, "position calculateion");
         //ASSERT(tn != NULL, "Null TrackNode");
         object = TRACK_NODE_TO_INDEX(tn);
     }
     TrackPosition tp = {.object = object, .distance_past = distance};
     return tp;
+}
+
+void Position_Reverse(Position *p){
+    p->millis_off_last_node *= -1;
+    p->last_known_node = p->last_known_node->reverse;
 }

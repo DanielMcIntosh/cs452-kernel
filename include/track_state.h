@@ -28,7 +28,7 @@
 
 // TODO is there a nicer way to do this?
 #define TRACK_NODE_TO_INDEX(n) \
-    (n->type == NODE_SENSOR ? SENSOR_TO_NODE(n->num) : \
+    (n->type == NODE_SENSOR ? SENSOR_TO_NODE(n->num)  : \
      (n->type == NODE_BRANCH ? SWITCH_TO_NODE(n->num) : \
       (n->type == NODE_MERGE ? MERGE_TO_NODE(n->num) : \
        (n->type == NODE_ENTER ? ENTER_TO_NODE(n->num) : \
@@ -69,6 +69,11 @@ typedef struct paramdata{
     const int value;
 } __attribute__((packed)) ParamData;
 
+typedef struct fdistreq {
+    unsigned int cnode: 8;
+    unsigned int distance: 16;
+} __attribute__((packed)) FdistReq;
+
 typedef struct routeresult{
     MessageType type;
     Route route;
@@ -87,6 +92,7 @@ typedef enum trkstrequest{
     SENSOR,
     ROUTE,
     SHORT,
+    FDIST,
 
     NOTIFY_SENSOR_DATA,
     NOTIFY_SWITCH,
@@ -105,5 +111,6 @@ int NotifyParam(int trackstatetid, ParamData data);
 int GetSwitchState(int trackstatetid, int sw);
 int GetRoute(int trackstatetid, RouteRequest req, Route *res);
 int GetShort(int trackstatetid, int distance, ShortMessage *sm);
+TrackPosition GetFdist(int trackstatetid, FdistReq fdr);
 
 #endif

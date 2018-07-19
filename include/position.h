@@ -27,12 +27,13 @@ typedef struct tposition {
 
 #define POSITION_INIT {0, 0, 0, 0, 0, 0, 0, 0, 0}
 
-void Position_HandleStop(Position *p, Route *r, int idx, int time);
+void Position_HandleStop(Position *p, int idx, int time);
 void Position_HandleAccel(Position *p, const Route *r, int time, int current_velocity, int a);
 void Position_HandleDecel(Position *p, const Route *r, int time, int current_velocity, int a);
 void Position_HandleBeginStop(Position *p, const Route *r, int time, const track_node * stop_end_pos, int millis_off_stop_end);
 void Position_HandleConstVelo(Position *p, Route *r, int time, int current_velocity);
 void Position_HandleSensorHit(Position* p, track_node *snsr, int time, int new_route_idx);
+void Position_Reverse(Position *p);
 TrackPosition Position_CalculateNow(Position *p, const Route *r, int time);
 
 #endif

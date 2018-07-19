@@ -610,7 +610,7 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
     char cb_terminal_buf[CB_TERMINAL_BUF_SIZE];
     circlebuffer_t cb_terminal;
     cb_init(&cb_terminal, cb_terminal_buf, sizeof(cb_terminal_buf));
-    Terminal t = {cb_terminal, TERMINAL_INPUT_BASE_LINE, TERMINAL_INPUT_BASE_COL, SENSOR_LINE_BASE, 0, 0, 0, 0};
+    Terminal t = {cb_terminal, TERMINAL_INPUT_BASE_LINE, TERMINAL_INPUT_BASE_COL, SENSOR_LINE_BASE, 0, 1, 1, 0};
     int tid, err; char c;
     TerminalMessage tm = {0, 0, 0, 0};
     ReplyMessage rm = {MESSAGE_REPLY, 0};
@@ -789,7 +789,7 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
             t.dbg2_col += 2;
             if (t.dbg2_col > 97) {
                 //cb_write_string(&t.output, "\n");
-                t.dbg2_col = 0;
+                t.dbg2_col = 1;
             }
             cb_write_string(&t.output, "\0338");
             break;
@@ -844,7 +844,7 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
             t.pos_col++;
             t.pos_col += cb_write_number(&t.output, dist, 10);
             if (t.pos_col > 97) {
-                t.pos_col = 0;
+                t.pos_col = 1;
             }
             cb_write_string(&t.output, "\0338");
             break;

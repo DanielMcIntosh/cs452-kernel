@@ -132,7 +132,7 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
             }
             else {
                 // if we're in the middle, our next node is not cn->reverse, but SW3_COMPLEMENT(cn->num)
-                rev = &track[SWITCH_TO_NODE(SW3_COMPLEMENT(cn->num))];
+                rev = track[MERGE_TO_NODE(SW3_COMPLEMENT(cn->num))].reverse;
             }
             bfs_add_node(&mh, &freeQ, &freeQTail, &route, idx, distance, cn->num, rev, ACTION_RV, rev_penalty);
         }
@@ -188,9 +188,9 @@ inline const track_edge *next_edge_on_route(const Route *route, int * restrict i
         if (route->rcs[*idx].swmr == SWCLAMP(n->num) && route->rcs[*idx].a == ACTION_RV) {
             *idx+=1;
             // TODO BIG HACK
-            if (n->edge[DIR_AHEAD].dist < 300) {
-                return n->edge[DIR_AHEAD].dest->edge[DIR_AHEAD].reverse;
-            }
+            //if (n->edge[DIR_AHEAD].dist < 300) {
+            //    return n->edge[DIR_AHEAD].dest->edge[DIR_AHEAD].reverse;
+            //}
             return n->edge[DIR_AHEAD].reverse;
         }
         FALLTHROUGH;

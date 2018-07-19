@@ -141,7 +141,7 @@ void __attribute__((noreturn)) task_delay_stop(int data, int train){
     Destroy();
 }
 
-void task_notify_stopped(int delay, int train){
+void __attribute__((noreturn)) task_notify_stopped(int delay, int train){
     int tid = WhoIs(NAME_TRAIN_STATE);
     Delay(delay);
     notify_stopped(tid, train);
@@ -451,15 +451,18 @@ static inline void activeroute_recalculate_distances(ActiveRoute * restrict ar, 
     tc_send(tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
 }
 
-static int activeroute_distance_to_next_stop(ActiveRoute *ar, track_node *cnode, int *idx) {
+static int activeroute_distance_to_next_stop(ActiveRoute *ar, track_node *cnode, int idx) {
     const track_node *n = cnode;
     int distance = 0;
     const track_edge *e;
-    while (ar->route.rcs[*idx].a != ACTION_NONE && ar->route.rcs[*idx].a != ACTION_RV){
-        e = next_edge_on_route(&(ar->route), idx, n, "Distance to next stop");
+    while (ar->route.rcs[idx].a != ACTION_NONE && ar->route.rcs[idx].a != ACTION_RV){
+        e = next_edge_on_route(&(ar->route), &idx, n, "Distance to next stop");
         ASSERT(e != NULL, "Should not be able to get null edge without ACTION_NONE or ACTION_RV");
         distance += e->dist;
         n = e->dest;
+    }
+    if (ar->route.rcs[idx].a == ACTION_RV) {
+        distance += 350; // TODO 
     }
     return distance;
 }
@@ -734,8 +737,9 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             ActiveRoute *ar = &(ts.active_routes[activetrain]);
             Train *train = &(ts.active_trains[activetrain]);
 
-            Position_HandleStop(&train->pos, &ts.active_routes[activetrain].route, ts.active_routes[activetrain].cur_pos_idx, Time());
+            Position_HandleStop(&train->pos, ts.active_routes[activetrain].cur_pos_idx + 1, Time());
             ASSERT(train->pos.state == PSTATE_STOPPED, "cannot reverse when not yet stopped, %d | %d", train->pos.state, activetrain);
+            Position_Reverse(&train->pos);
 
             Command c = {COMMAND_TR, 15, {.arg2 = train->num}};
             SendCommand(cmdtid, c);
@@ -743,10 +747,20 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             // also, find the distance we are past said current node (same deal)
             // then, find the distance from that to the next stop on the route.
             // then, use that to decide if we need to use a short move or a regular move
+             
+            int time = Time();
+            TrackPosition tp = Position_CalculateNow(&train->pos, &ts.active_routes[activetrain].route, time);
+            track_node *rvn = &track[tp.object];
+            tc_send(&tc, TERMINAL_ROUTE_DBG2, 134, TRACK_NODE_TO_INDEX(rvn));
+            //Delay(30);
+            int dist = activeroute_distance_to_next_stop(ar, rvn, ar->cur_pos_idx + 1); //TODO
+
+            tc_send(&tc, TERMINAL_ROUTE_DBG2, 133, dist);
+
             ar->reversing = 0;
             CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, NAV_SPEED, train->num); // TODO number
             train->speed = NAV_SPEED;
-            int time = Time();
+
             Position_HandleAccel(&train->pos, &ar->route, time, train->velocity[train->speed]/2, 0);
             tc_send(&tc, TERMINAL_FLAGS_UNSET, STATUS_FLAG_REVERSING, 0);
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 206, ar->route.rcs[ar->idx_resrv].swmr);
@@ -765,6 +779,7 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             // TODO not convinced I like this method of doing things
             int time = Time();
             TrackPosition tp = Position_CalculateNow(&tr->pos, &ts.active_routes[activetrain].route, time);
+            ASSERT(tr->speed == NAV_SPEED, "incorrect speed");
             Position_HandleBeginStop(&tr->pos, &ts.active_routes[activetrain].route, time, &track[tp.object], tp.distance_past + tr->stopping_distance[tr->speed]);
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 212, train);
             CreateWith2Args(PRIORITY_LOW, &task_notify_rv_timeout, calc_reverse_time(&ts, activetrain), activetrain);
@@ -790,7 +805,7 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             int train = tm.data;
             int activetrain = ts.active_train_map[train];
             Train *tr = TRAIN(&ts, train);
-            Position_HandleStop(&tr->pos, &ts.active_routes[activetrain].route, ts.active_routes[activetrain].cur_pos_idx, Time());
+            Position_HandleStop(&tr->pos, ts.active_routes[activetrain].cur_pos_idx, Time());
             break;
         }
         case (TRAIN_STATE_NOTIFY_TERMINAL_COURIER):
