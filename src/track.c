@@ -298,6 +298,12 @@ int distance_to_on_route(const Route *route, int idx, const track_node *from, co
     return (unlikely(n == NULL)) ? -1 : distance;
 }
 
+int __attribute__((warn_unused_result)) get_dist_to_nxt_sensor(const Route *route, int idx, const track_node *cur_sensor, const char * restrict sig) {
+    int res;
+    next_sensor_on_route(route, &idx, cur_sensor, &res, sig);
+    return res;
+}
+
 static inline void add_to_mask(const track_node *n, Reservation * restrict mask) {
     int ind = TRACK_NODE_TO_INDEX(n);
     if (ind < 64) {

@@ -50,6 +50,8 @@ const track_node *forward_dist_on_route(const Route *route, int * restrict idx, 
 
 int distance_to_on_route(const Route *route, int idx, const track_node *from, const track_node *to, const char * restrict sig);
 
+int get_dist_to_nxt_sensor(const Route *route, int idx, const track_node *cur_sensor, const char * restrict sig) __attribute__((warn_unused_result));
+
 //EXclusive of start, but INclusive of end. When start == end, reserves end (and therefore start)
 bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations, const char * restrict sig);
 //INclusive of start, but EXclusive of end. When start == end, doesn't free anything

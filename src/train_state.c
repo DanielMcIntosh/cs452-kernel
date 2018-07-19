@@ -439,11 +439,11 @@ static inline void on_sensor_event_free_track(TerminalCourier * restrict tc, Act
     tc_send(tc, TERMINAL_PRINT_RESRV2, reservations->bits_high & 0xFFFFFFFF, (reservations->bits_high >> 32) & 0xFFFFFFFF);
 }
 
-static inline void update_cur_pos_idx(ActiveRoute * restrict ar, int sensor, int * restrict dist_to_next_snsr) {
-    // update cur_pos_idx
+static inline void update_cur_pos_idx(ActiveRoute * restrict ar, int sensor) {
+    int dummy;
     const track_node *cur_node = &track[SENSOR_TO_NODE(ar->last_handled_sensor)];
     while (ar->last_handled_sensor >= 0 && ar->last_handled_sensor != sensor){
-        cur_node = next_sensor_on_route(&ar->route, &ar->cur_pos_idx, cur_node, dist_to_next_snsr, "update cur_pos_idx");
+        cur_node = next_sensor_on_route(&ar->route, &ar->cur_pos_idx, cur_node, &dummy, "update cur_pos_idx");
         ASSERT(cur_node != NULL, "couldn't find the next sensor!");
         ar->last_handled_sensor = cur_node->num;
     }
@@ -532,12 +532,14 @@ static inline void activeroute_exec_steps(TerminalCourier * restrict tc, ActiveR
     tc_send(tc, TERMINAL_PRINT_RESRV2, reservations->bits_high & 0xFFFFFFFF, (reservations->bits_high >> 32) & 0xFFFFFFFF);
 }
 
-static inline void activeroute_on_sensor_event(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Reservation * restrict reservations, Train * restrict train, int sensor, int distance, int cmdtid, int dist_to_next_snsr){
+static inline void activeroute_on_sensor_event(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Reservation * restrict reservations, Train * restrict train, int sensor, int distance, int cmdtid){
     activeroute_recalculate_distances(tc, ar, reservations, sensor, distance);
 
     int resrv_dist = get_resrv_dist(ar, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], train->stopping_distance[train->speed]);
 
     //ASSERT(resrv_dist > ar->next_step_distance, "Resrv dist too small: resrv_dist = %d, sensor = %s, idx_resrv = %d, next_step_distance = %d", resrv_dist, track[SENSOR_TO_NODE(sensor)].name, ar->idx_resrv, ar->next_step_distance);
+
+    int dist_to_next_snsr = get_dist_to_nxt_sensor(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(ar->last_handled_sensor)], "sensor event - dist_to_next_snsr");
 
     if (ACTIVE_ROUTE_SHOULD_STOP(ar, train, dist_to_next_snsr)) {
         resrv_dist = ar_stop(tc, ar, train);
@@ -568,12 +570,9 @@ static inline void handle_sensor_event(TerminalCourier * restrict tc, TrainState
         on_sensor_event_free_track(tc, ar, reservations, train, sensor);
     }
 
-    //TODO investigate whether this is correct -- i think this might be set as the distance between the
-    // previous two sensors, and used as though it is the distance between the next two sensors
-    int dist_to_next_snsr = 0;
     if (!ACTIVE_ROUTE_COMPLETE(ar) && !(ar->reversing)) {
-        update_cur_pos_idx(ar, sensor, &dist_to_next_snsr);
-        activeroute_on_sensor_event(tc, ar, reservations, train, sensor, distance, cmdtid, dist_to_next_snsr);
+        update_cur_pos_idx(ar, sensor);
+        activeroute_on_sensor_event(tc, ar, reservations, train, sensor, distance, cmdtid);
     }
 
     Position_HandleSensorHit(&train->pos, &track[SENSOR_TO_NODE(sensor)], event_time, ar->cur_pos_idx);
