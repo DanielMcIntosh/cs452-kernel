@@ -375,10 +375,12 @@ static inline void handle_navigate(TrainState * restrict ts, TerminalCourier * r
     }
 
     ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor for train %d: %d", tr, train->last_sensor);
+    int time = Time();
+    TrackPosition tp = Position_CalculateNow(&train->pos, NULL, time);
     RouteRequest req = {
         .reservations = ts->reservations,
-        .next = train->last_sensor, //train->next_sensor,
-        .prev = train->last_sensor,
+        .next = tp.object, //train->last_sensor, //train->next_sensor,
+        .prev = tp.object, //train->last_sensor,
         .end = object,
         .min_dist = min_dist,
         .rev_penalty = rev_penalty
@@ -819,6 +821,8 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 133, dist);
 
             if (dist < 1000 && ALLOW_SHORTS){
+                if (ar->route.rcs[idx].a != ACTION_RV)  // TODO idx sanitization
+                    ar->reversing = 0;
                 ar_short_move(&ts, ar, train, &tc, dist, idx, activetrain, cmdtid);
             } else {
                 ar->reversing = 0;
@@ -843,10 +847,10 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             Command c = {COMMAND_TR, 0, .arg2 = train};
             SendCommand(cmdtid, c);
             // figure out end position:
-            // TODO not convinced I like this method of doing things
             int time = Time();
             ASSERT(tr->speed == NAV_SPEED, "incorrect speed");
-            Position_HandleBeginStop(&tr->pos, &ts.active_routes[activetrain].route, time, &track[stoppos], distance); // TODO this is wrong for short moves
+            //PANIC("%d %s %d", stoppos, track[stoppos].name, distance);
+            Position_HandleBeginStop(&tr->pos, &ts.active_routes[activetrain].route, time, &track[stoppos], distance);
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 212, train);
             CreateWith2Args(PRIORITY_LOW, &task_notify_rv_timeout, calc_reverse_time(&ts, activetrain), activetrain);
             ts.active_trains[activetrain].speed = 0;
@@ -863,6 +867,7 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             Command c = {COMMAND_TR, 0, .arg2=train};
             SendCommand(cmdtid, c);
             Position_HandleBeginStop(&tr->pos, &ar->route, Time(), &track[stoppos], distance);
+
             CreateWith2Args(PRIORITY_LOW, &task_notify_stopped, calc_reverse_time(&ts, activetrain), train);
             break;
         }

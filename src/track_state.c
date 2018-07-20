@@ -122,6 +122,7 @@ static int forward_distance_from_node(const SwitchState * restrict ts, const tra
     ASSERT(distance >= 0, "Cannot forward find negative distance");
     const track_node * restrict next_sensor = destination;
     const track_edge *e;
+    *wakeup_sensor = TRACK_NODE_TO_INDEX(next_sensor);
     int tdist = 0, last_tdist = 0, cdist;
     while (tdist < distance) {
         *wakeup_sensor = TRACK_NODE_TO_INDEX(next_sensor);
