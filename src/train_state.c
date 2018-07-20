@@ -18,9 +18,14 @@
 #define SHORT_COEFF_PRECISION 10000
 #define ZERO_ACCEL_TOLERANCE 2000
 
-
 #define TRAIN(ts, tr) (&((ts)->active_trains[(ts)->active_train_map[(tr)]]))
 #define ACTIVE_ROUTE(ts, tr) (&((ts)->active_routes[(ts)->active_train_map[(tr)]]))
+
+typedef enum {
+    REV_NOT_REVERSING,
+    REV_BEFORE_MERGE,
+    REV_AFTER_MERGE
+} ReversingState;
 typedef struct active_route{
     Route route;
     int end_node;
@@ -31,7 +36,7 @@ typedef struct active_route{
     int idx_resrv;
     int cur_pos_idx;
     int stopped;
-    int reversing;
+    ReversingState rev_state;
     int last_handled_sensor;
 } ActiveRoute;
 #define ACTIVE_ROUTE_INIT {ROUTE_INIT, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
@@ -39,8 +44,8 @@ typedef struct active_route{
 #define ACTIVE_ROUTE_DONE_ACTIONS(ar) ((ar)->route.rcs[(ar)->idx_resrv].a == ACTION_NONE)
 #define ACTIVE_ROUTE_COMPLETE(ar) ((ACTIVE_ROUTE_DONE_ACTIONS(ar) && (ar)->stopped))
 #define ACTIVE_ROUTE_SHOULD_STOP(ar, train, dist_to_next_snsr) ((dist_to_next_snsr + (train)->stopping_distance[(train)->speed] >= (ar)->remaining_distance && !(ar)->stopped))
-#define ACTIVE_ROUTE_NEXT_STEP_RV_IN_RANGE(ar, train, d)  (((ar)->route.rcs[(ar)->cur_pos_idx].a == ACTION_RV) && ((d) + (train)->stopping_distance[(train)->speed] <= (ar)->next_step_distance) && (!(ar)->reversing))
-#define ACTIVE_ROUTE_NEXT_STEP_RV(ar)  (((ar)->route.rcs[(ar)->cur_pos_idx].a == ACTION_RV) && (!(ar)->reversing))
+#define ACTIVE_ROUTE_NEXT_STEP_RV_IN_RANGE(ar, train, d)  (((ar)->route.rcs[(ar)->cur_pos_idx].a == ACTION_RV) && ((d) + (train)->stopping_distance[(train)->speed] <= (ar)->next_step_distance) && ((ar)->rev_state == REV_NOT_REVERSING))
+#define ACTIVE_ROUTE_NEXT_STEP_RV(ar)  (((ar)->route.rcs[(ar)->cur_pos_idx].a == ACTION_RV) && ((ar)->rev_state == REV_NOT_REVERSING))
 #define ACTIVE_ROUTE_SHOULD_PERFORM_ACTION(ar, resrv_dist, nxt_step_rv_in_range) (((ar)->next_step_distance <= (resrv_dist) || nxt_step_rv_in_range) && !ACTIVE_ROUTE_DONE_ACTIONS(ar))
 
 typedef struct train_state{
@@ -220,19 +225,18 @@ void __attribute__((noreturn)) task_notify_stopped(int delay, int train){
 static inline void __attribute__((nonnull)) trainserver_begin_reverse(ActiveRoute * restrict ar, Train * restrict train, int delay) {
     DelayStop ds = {.delay = delay, .rv = 1};
     CreateWith2Args(PRIORITY_NOTIFIER, &task_delay_stop, ds.data, train->num);
-    ar->reversing = 1;
+    ar->rev_state = REV_BEFORE_MERGE;
 }
 
-static inline int __attribute__((nonnull, warn_unused_result)) get_active_train_from_sensor(TrainState *ts, const int sensor, int *distance, int rev_penalty) {
+static inline int __attribute__((nonnull, warn_unused_result)) get_active_train_from_sensor(TrainState *ts, const track_node *sensor_node, int *distance, int rev_penalty) {
     int min_dist = INT_MAX;
     int train = 0;
-    const track_node *d = &track[SENSOR_TO_NODE(sensor)];
     Reservation resrv = {0, 0};
     for (int i = 0; i < ts->total_trains; ++i) {
         const track_node *n = &track[ts->active_trains[i].last_sensor];
 
         Route r = ROUTE_INIT;
-        int cur_dist = find_path_between_nodes(&resrv, 1, rev_penalty, n, d, &r);
+        int cur_dist = find_path_between_nodes(&resrv, 1, rev_penalty, n, sensor_node, &r);
         //TODO notify track_state of any switches we would have to have taken, incase a switch wasn't in the expected state
         if (cur_dist < min_dist) {
             min_dist = cur_dist;
@@ -267,16 +271,16 @@ static void __attribute__((nonnull)) ts_exec_step(TerminalCourier * restrict tc,
         case (ACTION_RV):
         {
             //*
-            if (ar->reversing) {
+            if (ar->rev_state != REV_NOT_REVERSING) {
                 ar->next_step_distance = 99999;
                 return; // TODO this isn't quite right
             }
             //*/
-            ASSERT(!ar->reversing, "CANNOT EXECUTE RV WHEN ROUTE IS ALREADY REVERSING");
+            ASSERT(ar->rev_state == REV_NOT_REVERSING, "CANNOT EXECUTE RV WHEN ROUTE IS ALREADY REVERSING");
             int delay = calc_reverse_time_from_velocity(train->velocity[train->speed], distance_to_stop, train->stopping_distance[train->speed]);
             trainserver_begin_reverse(ar, train, delay);
             cnode = &track[MERGE_TO_NODE(rc.swmr)];
-            ar->reversing = 1;
+            ar->rev_state = REV_BEFORE_MERGE;
             break;
         }
         case (ACTION_NONE):
@@ -389,10 +393,10 @@ static inline void __attribute__((nonnull)) handle_navigate(TerminalCourier * re
     if (route.reverse != 0) { // TODO
         //tc_send(&tc, TERMINAL_ROUTE_DBG2, 215, ts.active_train_map[tr]);
         trainserver_begin_reverse(ar_old, train, 0);
-        ar_new.reversing = 1;
+        ar_new.rev_state = REV_BEFORE_MERGE;
     } else {
         CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, NAV_SPEED, train->num); // TODO number
-        ar_new.reversing = 0;
+        ar_new.rev_state = REV_NOT_REVERSING;
         Position_HandleAccel(&train->pos, &ar_new.route, Time(), 0, 0);
     }
     *ar_old = ar_new;
@@ -401,7 +405,7 @@ static inline void __attribute__((nonnull)) handle_navigate(TerminalCourier * re
         tc_send(tc, TERMINAL_ROUTE_DBG, ar_new.route.rcs[i].swmr, ar_new.route.rcs[i].a);
     }
     //tc_send(&tc, TERMINAL_ROUTE_DBG2, 211, route.reverse);
-    //tc_send(&tc, TERMINAL_ROUTE_DBG2, 214, ar_new.reversing);
+    //tc_send(&tc, TERMINAL_ROUTE_DBG2, 214, ar_new.rev_state);
     tc_send(tc, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING, 0);
 }
 
@@ -432,13 +436,28 @@ static inline void __attribute__((nonnull)) train_on_sensor_event(TerminalCourie
     tc_send(tc, TERMINAL_VELOCITY_DEBUG, train->velocity[train->speed], acceleration);
 }
 
-static inline void __attribute__((nonnull)) on_sensor_event_free_track(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Reservation * restrict reservations, Train * restrict train, int sensor) {
-    ASSERT(train->last_sensor != sensor, "hit same sensor twice?! sensor = %d, train = %d", sensor, train->num);
-    //TODO: free when we're past the sensor, not when we hit it
-    free_track(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(train->last_sensor)], &track[SENSOR_TO_NODE(sensor)], reservations);
+//NOTE: called both when a sensor is hit, and when we reach the end of a route
+//SORT OF SKETCHY because the only reason we can do this is that ACTIVE_ROUTE_NEXT_STEP_RV() returns false at the end of a route
+static inline void __attribute__((nonnull)) free_track_and_print(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Reservation * restrict reservations, Train * restrict train, const track_node *free_end) {
+    const track_node *free_start = &track[SENSOR_TO_NODE(train->last_sensor)];
+    ASSERT(free_start != free_end, "hit same sensor twice?! free_start = %s, free_end = %s, train = %d", free_start->name, free_end->name, train->num);
 
-    tc_send(tc, TERMINAL_PRINT_RESRV1, reservations->bits_low & 0xFFFFFFFF, (reservations->bits_low >> 32) & 0xFFFFFFFF);
-    tc_send(tc, TERMINAL_PRINT_RESRV2, reservations->bits_high & 0xFFFFFFFF, (reservations->bits_high >> 32) & 0xFFFFFFFF);
+    if (ACTIVE_ROUTE_NEXT_STEP_RV(ar)) {
+        //REMINDER: as per above comment, THIS WILL BREAK if it runs at the end of a route, since there is no next merge/switch
+        const track_node *merge = rc_to_track_node(ar->route.rcs[ar->cur_pos_idx], "find merge for free_track");
+        int dist_to_merge = distance_to_on_route(&ar->route, ar->cur_pos_idx, free_start, merge, "dist_to_merge for free_track");
+        int dist_to_snsr = get_dist_to_nxt_sensor(&ar->route, ar->cur_pos_idx, free_start, "dist_to_snsr for free_track");
+        if (dist_to_merge < dist_to_snsr) {
+            free_end = merge;
+            ar->rev_state = REV_AFTER_MERGE;
+        }
+    }
+
+    //TODO: free when we're past the sensor, not when we hit it
+    free_track(&ar->route, ar->cur_pos_idx, free_start, free_end, reservations);
+
+    tc_send(tc, TERMINAL_PRINT_RESRV1, reservations->bits_low & 0xFFFFFFFFULL, (reservations->bits_low >> 32) & 0xFFFFFFFFULL);
+    tc_send(tc, TERMINAL_PRINT_RESRV2, reservations->bits_high & 0xFFFFFFFFULL, (reservations->bits_high >> 32) & 0xFFFFFFFFULL);
 }
 
 static inline void __attribute__((nonnull)) update_cur_pos_idx(ActiveRoute * restrict ar, int sensor) {
@@ -530,8 +549,8 @@ static inline void __attribute__((nonnull)) activeroute_exec_steps(TerminalCouri
     }
 
     tc_send(tc, TERMINAL_ROUTE_DBG2, 261, resrv_end->num);
-    tc_send(tc, TERMINAL_PRINT_RESRV1, reservations->bits_low & 0xFFFFFFFF, (reservations->bits_low >> 32) & 0xFFFFFFFF);
-    tc_send(tc, TERMINAL_PRINT_RESRV2, reservations->bits_high & 0xFFFFFFFF, (reservations->bits_high >> 32) & 0xFFFFFFFF);
+    tc_send(tc, TERMINAL_PRINT_RESRV1, reservations->bits_low & 0xFFFFFFFFULL, (reservations->bits_low >> 32) & 0xFFFFFFFFULL);
+    tc_send(tc, TERMINAL_PRINT_RESRV2, reservations->bits_high & 0xFFFFFFFFULL, (reservations->bits_high >> 32) & 0xFFFFFFFFULL);
 }
 
 static inline void __attribute__((nonnull)) activeroute_on_sensor_event(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Reservation * restrict reservations, Train * restrict train, int sensor, int distance, int cmdtid){
@@ -559,7 +578,8 @@ static inline void __attribute__((nonnull)) handle_sensor_event(TerminalCourier 
         return;
 
     int sensor = tm->sensor_event.sensor, event_time = tm->sensor_event.time, distance;
-    int tr = get_active_train_from_sensor(ts, sensor, &distance, 1600); // TODO REV PENALTY
+    const track_node *sensor_node = &track[SENSOR_TO_NODE(sensor)];
+    int tr = get_active_train_from_sensor(ts, sensor_node, &distance, 1600); // TODO REV PENALTY
     ASSERT(tr >= 0, "Could not find which train hit sensor");
 
     Train *train = &(ts->active_trains[tr]);
@@ -568,16 +588,17 @@ static inline void __attribute__((nonnull)) handle_sensor_event(TerminalCourier 
 
     train_on_sensor_event(tc, ar, train, event_time, distance);
 
-    if (likely(ar->end_node >= 0 && !(ar->reversing))) {
-        on_sensor_event_free_track(tc, ar, reservations, train, sensor);
+    //we've been given a nav command at some point
+    if (RESERVE_TRACK && likely(ar->end_node >= 0) && ar->rev_state != REV_AFTER_MERGE) {
+        free_track_and_print(tc, ar, reservations, train, sensor_node);
     }
 
-    if (!ACTIVE_ROUTE_COMPLETE(ar) && !(ar->reversing)) {
+    if (!ACTIVE_ROUTE_COMPLETE(ar) && (ar->rev_state == REV_NOT_REVERSING)) {
         update_cur_pos_idx(ar, sensor);
         activeroute_on_sensor_event(tc, ar, reservations, train, sensor, distance, cmdtid);
     }
 
-    Position_HandleSensorHit(&train->pos, &track[SENSOR_TO_NODE(sensor)], event_time, ar->cur_pos_idx);
+    Position_HandleSensorHit(&train->pos, sensor_node, event_time, ar->cur_pos_idx);
 
 
     train->last_sensor = sensor;
@@ -739,11 +760,12 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
         case (NOTIFY_RESERVATION):
         {
             Reply(tid, &rm, sizeof(rm));
-            if (tm.data < 64) {
-                ts.reservations.bits_low ^= 0x1ULL << tm.data;
-            } else {
-                ts.reservations.bits_high ^= 0x1ULL << (tm.data - 64);
+            int object = tm.data;
+            bool success = reserve_track(NULL, 0, &track[object], &track[object], &(ts.reservations), "drop track");
+            if (!success) {
+                free_track(NULL, 0, &track[object], &track[object], &(ts.reservations));
             }
+
             tc_send(&tc, TERMINAL_PRINT_RESRV1, ts.reservations.bits_low & 0xFFFFFFFFULL, (ts.reservations.bits_low >> 32) & 0xFFFFFFFFULL);
             tc_send(&tc, TERMINAL_PRINT_RESRV2, ts.reservations.bits_high & 0xFFFFFFFFULL, (ts.reservations.bits_high >> 32) & 0xFFFFFFFFULL);
             break;
@@ -780,7 +802,7 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
 
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 133, dist);
 
-            ar->reversing = 0;
+            ar->rev_state = REV_NOT_REVERSING;
             CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, NAV_SPEED, train->num); // TODO number
             train->speed = NAV_SPEED;
 
@@ -829,6 +851,7 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             int tr = tm.data;
             Train *train = TRAIN(&ts, tr);
             ActiveRoute *ar = ACTIVE_ROUTE(&ts, tr);
+            free_track_and_print(&tc, ar, &(ts.reservations), train, train->pos.stop_end_pos);
             Position_HandleStop(&train->pos, ar->cur_pos_idx, Time());
             break;
         }

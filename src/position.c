@@ -12,7 +12,7 @@
  * It could instead use the kinematics equations associated to motion with constant jerk
  */
 
-void Position_HandleSensorHit(Position* p, track_node *snsr, int time, int new_route_idx){
+void Position_HandleSensorHit(Position* p, const track_node *snsr, int time, int new_route_idx){
     p->last_known_node = snsr;
     p->millis_off_last_node = 0;
     /*
