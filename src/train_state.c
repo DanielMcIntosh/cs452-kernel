@@ -40,7 +40,7 @@ typedef struct active_route{
 #define ACTIVE_ROUTE_SHOULD_STOP(ar, train, dist_to_next_snsr) ((dist_to_next_snsr + (train)->stopping_distance[(train)->speed] >= (ar)->remaining_distance && !(ar)->stopped))
 #define ACTIVE_ROUTE_NEXT_STEP_RV_IN_RANGE(ar, train, d)  (((ar)->route.rcs[(ar)->cur_pos_idx].a == ACTION_RV) && ((d) + (train)->stopping_distance[(train)->speed] <= (ar)->next_step_distance) && (!(ar)->reversing))
 #define ACTIVE_ROUTE_NEXT_STEP_RV(ar)  (((ar)->route.rcs[(ar)->cur_pos_idx].a == ACTION_RV) && (!(ar)->reversing))
-#define ACTIVE_ROUTE_SHOULD_PERFORM_ACTION(ar, resrv_dist, nxt_step_rv_in_range) (((ar)->next_step_distance <= (resrv_dist) || nxt_step_rv_in_range) && !ACTIVE_ROUTE_DONE_ACTIONS(ar))
+#define ACTIVE_ROUTE_SHOULD_PERFORM_ACTION(ar, resrv_dist) ((ar)->next_step_distance <= (resrv_dist) && !ACTIVE_ROUTE_DONE_ACTIONS(ar))
 
 typedef struct train_state{
     int total_trains;
@@ -52,6 +52,22 @@ typedef struct train_state{
 
 #define TRAIN_STATE_INIT {0, {0}, {TRAIN_INIT}, RESERVATION_INIT, {ACTIVE_ROUTE_INIT}}
 
+typedef union delaystop{
+    int data;
+    struct {
+        unsigned int delay: 13;
+        unsigned int rv: 1;
+        unsigned int stoppos: 8;
+        unsigned int distance_past: 10;
+    };
+} DelayStop;
+
+typedef struct stopdata {
+    unsigned int train: 8;
+    unsigned int stoppos: 8;
+    unsigned int distance_past: 10;
+} StopData;
+
 typedef struct tsmessage{
     const MessageType type;
     const TrainStateRequest request;
@@ -60,6 +76,7 @@ typedef struct tsmessage{
         TrainData train_data;
         CalData cal_data;
         NewTrain new_train;
+        StopData stop_data;
         SensorEvent sensor_event;
         NavigateRequest nav_req;
     };
@@ -82,7 +99,12 @@ int __attribute__((const)) calc_reverse_time_from_velocity(int velocity, int dis
 }
 
 int __attribute__((pure)) calc_short_delay(Train *train, int dist_millis) {
-    return (train->short_delay_coeffs[0] + train->short_delay_coeffs[1] * (dist_millis / 10) + train->short_delay_coeffs[2] * (dist_millis * dist_millis / 100)) / SHORT_COEFF_PRECISION;
+    int c = train->short_delay_coeffs[0], b = train->short_delay_coeffs[1], a = train->short_delay_coeffs[2];
+    int det = b*b - (4 * a * (c - (dist_millis * SHORT_COEFF_PRECISION / 10)));
+    int sqrt = fastintsqrt(det);
+    int time = (-b + sqrt)/ (2*a);
+    ASSERT(time > 0, "invalid time returned in calc_short_delay: %d,  a = %d, b = %d, c = %d, dist_millis = %d, det = %d, sqrt = %d", time, a, b, c, dist_millis, det, sqrt);
+    return time;
 }
 
 int notify_rv_timeout(int trainstatetid, int activetrain) {
@@ -90,13 +112,13 @@ int notify_rv_timeout(int trainstatetid, int activetrain) {
     return sendTrainState(trainstatetid, &msg);
 }
 
-int notify_rv_start(int trainstatetid, int train) {
-    TrainStateMessage msg = {.type = MESSAGE_TRAIN_STATE, .request = NOTIFY_RV_START, .data = train};
+int notify_rv_start(int trainstatetid, StopData data) {
+    TrainStateMessage msg = {.type = MESSAGE_TRAIN_STATE, .request = NOTIFY_RV_START, .stop_data = data};
     return sendTrainState(trainstatetid, &msg);
 }
 
-int notify_stop(int trainstatetid, int train) {
-    TrainStateMessage msg = {.type = MESSAGE_TRAIN_STATE, .request = NOTIFY_STOP, .data = train};
+int notify_stop(int trainstatetid, StopData data) {
+    TrainStateMessage msg = {.type = MESSAGE_TRAIN_STATE, .request = NOTIFY_STOP, .stop_data = data};
     return sendTrainState(trainstatetid, &msg);
 }
 
@@ -120,23 +142,16 @@ void __attribute__((noreturn)) task_delay_reaccel(int speed, int train){
     Destroy();
 }
 
-typedef union delaystop{
-    int data;
-    struct {
-        int delay: 16;
-        int rv: 2;
-    };
-
-} DelayStop;
-
 void __attribute__((noreturn)) task_delay_stop(int data, int train){
     int tid = WhoIs(NAME_TRAIN_STATE);
     DelayStop ds = {.data = data};
     Delay(ds.delay);
-    if (ds.rv) {
-        notify_rv_start(tid, train);
+    StopData sd = {.train = train, .stoppos = ds.stoppos, .distance_past = ds.distance_past};
+    //PANIC("%d %d %d %d %d %d", train, ds.stoppos, ds.distance_past, sd.train, sd.stoppos, sd.distance_past);
+    if (ds.rv != 0) {
+        notify_rv_start(tid, sd);
     } else {
-        notify_stop(tid, train);
+        notify_stop(tid, sd);
     }
     Destroy();
 }
@@ -148,8 +163,8 @@ void __attribute__((noreturn)) task_notify_stopped(int delay, int train){
     Destroy();
 }
 
-static inline void trainserver_begin_reverse(TrainState *ts, int activetrain, int delay) {
-    DelayStop ds = {.delay = delay, .rv = 1};
+static inline void trainserver_begin_reverse(TrainState *ts, int activetrain, int delay, int rvstop, int distance_past) {
+    DelayStop ds = {.delay = delay, .rv = 1, .stoppos = rvstop, .distance_past = distance_past};
     CreateWith2Args(PRIORITY_NOTIFIER, &task_delay_stop, ds.data, ts->active_trains[activetrain].num);
     ts->active_routes[activetrain].reversing = 1;
 }
@@ -272,8 +287,8 @@ static void ts_exec_step(TrainState * restrict ts, TerminalCourier * restrict tc
             //*/
             ASSERT(!ar->reversing, "CANNOT EXECUTE RV WHEN ROUTE IS ALREADY REVERSING");
             int delay = calc_reverse_time_from_velocity(train->velocity[train->speed], distance_to_stop, train->stopping_distance[train->speed]);
-            trainserver_begin_reverse(ts, activetrain, delay);
-            cnode = &track[MERGE_TO_NODE(rc.swmr)];
+            trainserver_begin_reverse(ts, activetrain, delay, MERGE_TO_NODE_NSC(rc.swmr), 350);
+            cnode = &track[MERGE_TO_NODE_NSC(rc.swmr)];
             ar->reversing = 1;
             break;
         }
@@ -361,7 +376,7 @@ static inline void handle_navigate(TrainState * restrict ts, TerminalCourier * r
 
     ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor for train %d: %d", tr, train->last_sensor);
     RouteRequest req = {
-        .reservations = ts->reservations, // TODO let a train run over its own reservations
+        .reservations = ts->reservations,
         .next = train->last_sensor, //train->next_sensor,
         .prev = train->last_sensor,
         .end = object,
@@ -382,7 +397,7 @@ static inline void handle_navigate(TrainState * restrict ts, TerminalCourier * r
     ar.last_handled_sensor = -1;
     if (route.reverse != 0) { // TODO
         //tc_send(&tc, TERMINAL_ROUTE_DBG2, 215, ts.active_train_map[tr]);
-        trainserver_begin_reverse(ts, ts->active_train_map[tr], 0);
+        trainserver_begin_reverse(ts, ts->active_train_map[tr], 0, train->last_sensor, 0);  // TODO reverse starts
         ar.reversing = 1;
     } else {
         CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, NAV_SPEED, train->num); // TODO number
@@ -451,17 +466,17 @@ static inline void activeroute_recalculate_distances(ActiveRoute * restrict ar, 
     tc_send(tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
 }
 
-static int activeroute_distance_to_next_stop(ActiveRoute *ar, track_node *cnode, int idx) {
+static int activeroute_distance_to_next_stop(ActiveRoute *ar, track_node *cnode, int *idx) {
     const track_node *n = cnode;
     int distance = 0;
     const track_edge *e;
-    while (ar->route.rcs[idx].a != ACTION_NONE && ar->route.rcs[idx].a != ACTION_RV){
-        e = next_edge_on_route(&(ar->route), &idx, n, "Distance to next stop");
+    while (ar->route.rcs[*idx].a != ACTION_NONE && ar->route.rcs[*idx].a != ACTION_RV){
+        e = next_edge_on_route(&(ar->route), idx, n, "Distance to next stop");
         ASSERT(e != NULL, "Should not be able to get null edge without ACTION_NONE or ACTION_RV");
         distance += e->dist;
         n = e->dest;
     }
-    if (ar->route.rcs[idx].a == ACTION_RV) {
+    if (ar->route.rcs[*idx].a == ACTION_RV) {
         distance += 350; // TODO 
     }
     return distance;
@@ -470,22 +485,16 @@ static int activeroute_distance_to_next_stop(ActiveRoute *ar, track_node *cnode,
 static int ar_stop(ActiveRoute * restrict ar, Train * restrict train, TerminalCourier * restrict tc) {
     // Figure out how long we need to wait:
     int stopdelay = calc_reverse_time_from_velocity(train->velocity[train->speed], ar->remaining_distance, train->stopping_distance[train->speed]);
-    DelayStop ds = {.delay = stopdelay, .rv = 0};
+    DelayStop ds = {.delay = stopdelay, .rv = 0, .stoppos = ar->end_node, .distance_past = ar->distance_past};
     CreateWith2Args(PRIORITY_NOTIFIER, &task_delay_stop, ds.data, train->num);
     ar->stopped = 1;
     tc_send(tc, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING, 0);
     return 999999;
 }
 
-static void activeroute_exec_steps(ActiveRoute * restrict ar, TrainState * restrict ts, TerminalCourier * restrict tc, int resrv_dist, int tr, int cmdtid) {
-    const track_node *resrv_start;
-    const track_node *resrv_end = rc_to_track_node(ar->route.rcs[ar->idx_resrv], "resrv_start");
-    //we assign resrv_end to resrv_start first thing in the loop
-    tc_send(tc, TERMINAL_ROUTE_DBG2, 260, resrv_end->num);
-    // Perform any actions we need to do:
-    int nxt_step_rv_in_range = ACTIVE_ROUTE_NEXT_STEP_RV(ar), k = 0;
-    while (ACTIVE_ROUTE_SHOULD_PERFORM_ACTION(ar, resrv_dist, nxt_step_rv_in_range))  { // must perform next actio due to proximity directly or bc the reverse will take a while
-        resrv_start = resrv_end;
+static inline bool ar_perform_action(ActiveRoute *restrict ar, TrainState * restrict ts, TerminalCourier * restrict tc, const track_node ** resrv_start, int tr, int cmdtid) {
+        const track_node *resrv_end;
+        bool resrv_successful = TRUE;
 
         if (ar->route.rcs[ar->idx_resrv+1].a != ACTION_NONE) {
             resrv_end = rc_to_track_node(ar->route.rcs[ar->idx_resrv+1], "resrv_end");
@@ -496,19 +505,67 @@ static void activeroute_exec_steps(ActiveRoute * restrict ar, TrainState * restr
         //todo will fail after first sensor right now because we've already reserved some of this
         //Therefore, we currently ignore whether we actually could reserve track
         if (RESERVE_TRACK) {
-            bool resrv_successful = reserve_track(&ar->route, ar->idx_resrv, resrv_start, resrv_end, &ts->reservations);
+            reserve_track(&ar->route, ar->idx_resrv, *resrv_start, resrv_end, &ts->reservations);
             if (!resrv_successful) {
-                break;
+                return resrv_successful;
             }
+            *resrv_start = resrv_end;
         }
 
+        int nxt_step_rv_in_range = ACTIVE_ROUTE_NEXT_STEP_RV(ar);
         ts_exec_step(ts, tc, ar, tr, cmdtid, ar->next_step_distance + (nxt_step_rv_in_range ? 350 : 0), "action loop");
+        return resrv_successful;
+}
 
-        nxt_step_rv_in_range = ACTIVE_ROUTE_NEXT_STEP_RV(ar);
-        ASSERT(k++ < 20, "infinite loop of execs");
+static void ar_short_move(TrainState * restrict ts, ActiveRoute * restrict ar, Train * restrict train, TerminalCourier * restrict tc, int distance, int shortmoveidx, int activetrain, int cmdtid) {
+    // basic idea: do all of the steps between now and the end of the short move.
+    // then, start the train moving at 14
+    // start the server to delay stopping the train
+    // if the short move is a reverse, trigger the reverse start after the delay as well.
+    
+    int k = 0;
+    if (ar->route.rcs[ar->idx_resrv].a != ACTION_NONE) { // no more reservations exist
+        const track_node *resrv_end =  rc_to_track_node(ar->route.rcs[ar->idx_resrv], "resrv_start short move");
+        while (ar->idx_resrv < shortmoveidx){
+            bool resrv_successful = ar_perform_action(ar, ts, tc, &resrv_end, train->num, cmdtid);
+            // resrv_end is updated by this call
+            if (!resrv_successful) 
+                break;
+            ASSERT(k++ < 20, "probably infinite loop");
+        }
     }
 
-    tc_send(tc, TERMINAL_ROUTE_DBG2, 261, resrv_end->num);
+    ar->idx_resrv++; // skip the idx of the short move
+    CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, 14, train->num);
+    train->speed = 14;
+    int shortdelay = calc_short_delay(train, distance);
+
+    DelayStop ds = {.delay = shortdelay, .rv = 0, .stoppos = 0, .distance_past = 350}; // TODO
+    if (ar->route.rcs[shortmoveidx].a == ACTION_RV) {
+        ts->active_routes[activetrain].reversing = 1;
+        ds.rv = 1;
+        ds.stoppos = SWITCH_TO_NODE_NSC(ar->route.rcs[ar->idx_resrv].swmr);
+    } else {
+        tc_send(tc, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING, 0);
+        ds.stoppos = ar->end_node;
+        ds.distance_past = ar->distance_past;
+    }
+    CreateWith2Args(PRIORITY_NOTIFIER, &task_delay_stop, ds.data, train->num);
+}
+
+static void activeroute_exec_steps(ActiveRoute * restrict ar, TrainState * restrict ts, TerminalCourier * restrict tc, int resrv_dist, int tr, int cmdtid) {
+    const track_node *resrv_end = rc_to_track_node(ar->route.rcs[ar->idx_resrv], "resrv_start");
+    //we assign resrv_end to resrv_start first thing in the loop
+    tc_send(tc, TERMINAL_ROUTE_DBG2, 260, resrv_end->num);
+    // Perform any actions we need to do:
+    int k = 0;
+    while (ACTIVE_ROUTE_SHOULD_PERFORM_ACTION(ar, resrv_dist))  { // must perform next actio due to proximity directly or bc the reverse will take a while
+        bool resrv_successful = ar_perform_action(ar, ts, tc, &resrv_end, tr, cmdtid);
+        // rsrv_end is updated by this call
+        if (!resrv_successful) 
+            break;
+        ASSERT(k++ < 20, "infinite loop of execs");
+    }
     tc_send(tc, TERMINAL_PRINT_RESRV1, ts->reservations.bits_low & 0xFFFFFFFF, (ts->reservations.bits_low >> 32) & 0xFFFFFFFF);
     tc_send(tc, TERMINAL_PRINT_RESRV2, ts->reservations.bits_high & 0xFFFFFFFF, (ts->reservations.bits_high >> 32) & 0xFFFFFFFF);
 }
@@ -579,9 +636,13 @@ static inline void add_new_train(TrainState * restrict ts, NewTrain data) {
     ts->active_trains[ts->total_trains].pos.stop_end_pos = NULL;
     ts->active_trains[ts->total_trains].pos.millis_off_stop_end = 0;
 
-    ts->active_trains[ts->total_trains].short_delay_coeffs[0] = 126.3030 * SHORT_COEFF_PRECISION;
-    ts->active_trains[ts->total_trains].short_delay_coeffs[0] = 5.9912 * SHORT_COEFF_PRECISION;
-    ts->active_trains[ts->total_trains].short_delay_coeffs[0] = -0.0394 * SHORT_COEFF_PRECISION;
+    //ts->active_trains[ts->total_trains].short_delay_coeffs[0] = 126.3030 * SHORT_COEFF_PRECISION;
+    //ts->active_trains[ts->total_trains].short_delay_coeffs[0] = 5.9912 * SHORT_COEFF_PRECISION;
+    //ts->active_trains[ts->total_trains].short_delay_coeffs[0] = -0.0394 * SHORT_COEFF_PRECISION;
+    
+    ts->active_trains[ts->total_trains].short_delay_coeffs[0] = 76.5 * SHORT_COEFF_PRECISION;
+    ts->active_trains[ts->total_trains].short_delay_coeffs[1] =(int) ( -0.695 * SHORT_COEFF_PRECISION);
+    ts->active_trains[ts->total_trains].short_delay_coeffs[2] = (int) (0.0019 * SHORT_COEFF_PRECISION); // these are from time -> distance; to calculate later, we invert the function
     
     if (data.train == 58) {
         ts->active_trains[ts->total_trains].stopping_distance[14] = 1150;
@@ -752,14 +813,18 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             TrackPosition tp = Position_CalculateNow(&train->pos, &ts.active_routes[activetrain].route, time);
             track_node *rvn = &track[tp.object];
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 134, TRACK_NODE_TO_INDEX(rvn));
-            //Delay(30);
-            int dist = activeroute_distance_to_next_stop(ar, rvn, ar->cur_pos_idx + 1); //TODO
-
+            int idx = ar->cur_pos_idx + 1;
+            int dist = activeroute_distance_to_next_stop(ar, rvn, &idx); // TODO: curpos is still the one from before the reverse - ought not it to be moved too? not sure how, given last_handled_sensor
+            // I think this will break if there are two short moves in a row
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 133, dist);
 
-            ar->reversing = 0;
-            CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, NAV_SPEED, train->num); // TODO number
-            train->speed = NAV_SPEED;
+            if (dist < 1000 && ALLOW_SHORTS){
+                ar_short_move(&ts, ar, train, &tc, dist, idx, activetrain, cmdtid);
+            } else {
+                ar->reversing = 0;
+                CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, NAV_SPEED, train->num); // TODO number
+                train->speed = NAV_SPEED;
+            }
 
             Position_HandleAccel(&train->pos, &ar->route, time, train->velocity[train->speed]/2, 0);
             tc_send(&tc, TERMINAL_FLAGS_UNSET, STATUS_FLAG_REVERSING, 0);
@@ -769,7 +834,9 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
         case (NOTIFY_RV_START):
         {
             Reply(tid, &rm, sizeof(rm));
-            int train = tm.data;
+            StopData sd = tm.stop_data;
+            int train = sd.train, stoppos = sd.stoppos, distance = sd.distance_past;
+
             int activetrain = ts.active_train_map[train];
             Train *tr = TRAIN(&ts, train);
             tc_send(&tc, TERMINAL_FLAGS_SET, STATUS_FLAG_REVERSING, 0);
@@ -778,9 +845,8 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             // figure out end position:
             // TODO not convinced I like this method of doing things
             int time = Time();
-            TrackPosition tp = Position_CalculateNow(&tr->pos, &ts.active_routes[activetrain].route, time);
             ASSERT(tr->speed == NAV_SPEED, "incorrect speed");
-            Position_HandleBeginStop(&tr->pos, &ts.active_routes[activetrain].route, time, &track[tp.object], tp.distance_past + tr->stopping_distance[tr->speed]);
+            Position_HandleBeginStop(&tr->pos, &ts.active_routes[activetrain].route, time, &track[stoppos], distance); // TODO this is wrong for short moves
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 212, train);
             CreateWith2Args(PRIORITY_LOW, &task_notify_rv_timeout, calc_reverse_time(&ts, activetrain), activetrain);
             ts.active_trains[activetrain].speed = 0;
@@ -789,13 +855,14 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
         case (NOTIFY_STOP):
         {
             Reply(tid, &rm, sizeof(rm));
-            int train = tm.data;
+            StopData sd = tm.stop_data;
+            int train = sd.train, stoppos = sd.stoppos, distance = sd.distance_past;
             int activetrain = ts.active_train_map[train];
             Train *tr = TRAIN(&ts, train);
             ActiveRoute *ar = &ts.active_routes[activetrain];
             Command c = {COMMAND_TR, 0, .arg2=train};
             SendCommand(cmdtid, c);
-            Position_HandleBeginStop(&tr->pos, &ar->route, Time(), &track[ar->end_node], ar->distance_past);
+            Position_HandleBeginStop(&tr->pos, &ar->route, Time(), &track[stoppos], distance);
             CreateWith2Args(PRIORITY_LOW, &task_notify_stopped, calc_reverse_time(&ts, activetrain), train);
             break;
         }
