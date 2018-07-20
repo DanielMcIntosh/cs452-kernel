@@ -315,9 +315,10 @@ static inline void add_to_mask(const track_node *n, Reservation * restrict mask)
             ind = SWCLAMP(n->num) - 1 + 80;
         }
         else if (n->type == NODE_MERGE) {
-            ind = (SWCLAMP(n->num) - 1) + 80 + 22;
+            ind = (SWCLAMP(n->num) - 1) + 80 + NUM_SWITCHES;
         }
         ind -= 64;
+        ASSERT(ind >= 0, "can't have a negative shift! ind = %d, n = %s", ind, n->name);
         mask->bits_high |= 0x1ULL << ind;
     }
 }
@@ -333,7 +334,7 @@ static inline void remove_from_mask(const track_node *n, Reservation * restrict 
             ind = SWCLAMP(n->num) - 1 + 80;
         }
         else if (n->type == NODE_MERGE) {
-            ind = (SWCLAMP(n->num) - 1) + 80 + 22;
+            ind = (SWCLAMP(n->num) - 1) + 80 + NUM_SWITCHES;
         }
         ind -= 64;
         mask->bits_high &= ~(0x1ULL << ind);
@@ -357,6 +358,7 @@ bool reserve_track(const Route *route, int idx, const track_node *start, const t
         if (e == NULL) {
             return FALSE;
         }
+        ASSERT(e->dest != NULL, "about to add NULL to mask! start = %s, end = %s, n = %s, @ %s", start->name, end->name, n->name, sig)
         n = e->dest;
 
         add_to_mask(n, &mask);

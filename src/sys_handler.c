@@ -177,7 +177,7 @@ static inline void handle_await(TD *task, TaskQueue *task_ready_queue){
 static inline void handle_interrupt(TD __attribute__((unused)) *task, TaskQueue *task_ready_queue){
     LOG("HANDLE INTERRUPT\r\n");
     // figure out what interrupt it is
-    unsigned long long IRQStatus = ((unsigned long long) vic1->IRQStatus) | ((unsigned long long)(vic2->IRQStatus) << VIC_SIZE);
+    unsigned long long IRQStatus = ((unsigned long long) ((unsigned int)vic1->IRQStatus)) | ((unsigned long long)((unsigned int)vic2->IRQStatus) << VIC_SIZE);
     Event event;
     for (event = 0; event < NUM_EVENTS; ++event) {
         if ((0x1ULL << IRQ_MAP[event]) & IRQStatus) {

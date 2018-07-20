@@ -24,8 +24,8 @@ typedef union tps {
 
 typedef struct reservation {
     //actually only need 124, but round up to a power of 8 (and conviniently 32)
-    long long bits_low : 64;
-    long long bits_high : 64;    
+    unsigned long long bits_low : 64;
+    unsigned long long bits_high : 64;    
 } __attribute__((packed)) Reservation;
 
 #define RESERVATION_INIT {0, 0}

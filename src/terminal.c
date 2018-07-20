@@ -520,9 +520,9 @@ void __attribute__((noreturn)) task_uart2_courier(int servertid) {
 
 }
 
-static inline void print_styled_string(circlebuffer_t * restrict cb, char * const restrict styled_string, const int flags, const int increment, const int end) {
+static inline void print_styled_string(circlebuffer_t * restrict cb, char * const restrict styled_string, const unsigned int flags, const int increment, const unsigned int end) {
     //append the 'restore cursor' to save a call to cb_write_string
-    for (int i = 1, cur = 2; i < end; i <<= 1, cur += increment) {
+    for (unsigned int i = 1, cur = 2; i < end; i <<= 1, cur += increment) {
         if (flags & i) {
             //attribute 1 = Bright
             styled_string[cur] = '1';
@@ -543,29 +543,33 @@ static inline void print_reservations1(circlebuffer_t * restrict cb, unsigned lo
     cb_write_string(cb, "\033[s\033[H\n\t");
 
     for (int i = 0; i < 4; ++i) {
-        int flags = (reservations >> (i * 16)) & 0xFFFF;
+        unsigned int flags = (reservations >> (i * 16)) & 0xFFFF;
         char str[] = STYLED_RESRV_STRING_1 "\r\n\t";
-        print_styled_string(cb, str, flags, 5, (1 << 16));
+        print_styled_string(cb, str, flags, 5, (0x1U << 16));
     }
     cb_write_string(cb, "\033[u");
 }
 static inline void print_reservations2(circlebuffer_t * restrict cb, unsigned long long reservations) {
     cb_write_string(cb, "\033[s\033[6;77H");
 
-    int flags_snsr = reservations & 0xFFFF;
+    unsigned int flags_snsr = reservations & 0xFFFF;
     char str[] = STYLED_RESRV_STRING_1 "\r\n\t";
-    print_styled_string(cb, str, flags_snsr, 5, (1 << 16));
+    print_styled_string(cb, str, flags_snsr, 5, (0x1U << 16));
 
     for (int i = 0; i < 2; ++i) {
-        int flags = ((reservations >> (16 + 22 * i)) & 0x3FFFF);
-        int flags_3way = ((reservations >> (16 + 18 + 22 * i)) & 0xF);
+        unsigned int flags = ((reservations >> (16 + NUM_SWITCHES * i)) & 0x3FFFF);
+        unsigned int flags_3way = ((reservations >> (16 + 18 + NUM_SWITCHES * i)) & 0xF);
 
         char str2[] = STYLED_RESRV_STRING_2 "\r\n\t";
-        print_styled_string(cb, str2, flags, 5, (1 << 18));
+        print_styled_string(cb, str2, flags, 5, (0x1U << 18));
         char str3[] = STYLED_RESRV_STRING_3 "\r\n\t";
-        print_styled_string(cb, str3, flags_3way, 8, (1 << 4));
+        print_styled_string(cb, str3, flags_3way, 8, (0x1U << 4));
     }
-    cb_write_number(cb, reservations >> 32, 10);
+    cb_write_number(cb, reservations >> 32ULL, 10);
+    cb_write(cb, ' ');
+    cb_write_number(cb, reservations & 0xFFFFFFFFULL, 10);
+    cb_write_string(cb, "\n\r");
+
     cb_write_string(cb, "\033[u");
 }
 
@@ -817,13 +821,13 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
         }
         case(TERMINAL_PRINT_RESRV1):
         {
-            unsigned long long flags = ((unsigned long long)tm.arg1) | (((unsigned long long)tm.arg2) << 32ULL);
+            unsigned long long flags = (unsigned int)tm.arg1 | (((unsigned long long)tm.arg2) << 32ULL);
             print_reservations1(&t.output, flags);
             break;
         }
         case(TERMINAL_PRINT_RESRV2):
         {
-            unsigned long long flags = ((unsigned long long)tm.arg1) | (((unsigned long long)tm.arg2) << 32ULL);
+            unsigned long long flags = (unsigned int)tm.arg1 | (((unsigned long long)tm.arg2) << 32ULL);
             print_reservations2(&t.output, flags);
             break;
         }
