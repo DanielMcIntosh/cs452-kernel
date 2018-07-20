@@ -33,7 +33,11 @@ int kernel_init(){
         "str r0, [r1]\n\t"
         : : :"r0", "r1");
     // Unmask interrupts
-    vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_CLK_3] - 32) | ( 0x1 << (IRQ_MAP[EVENT_UART_1_SEND] - 32)) | (0x1 << (IRQ_MAP[EVENT_UART_1_RCV] - 32)) | (0x1 << (IRQ_MAP[EVENT_UART_2_SEND] - 32)) | (0x1 << (IRQ_MAP[EVENT_UART_2_RCV] - 32));
+    vic2->IntEnable |= 0x1U << (IRQ_MAP[EVENT_CLK_3]        - 32) |
+                      (0x1U << (IRQ_MAP[EVENT_UART_1_SEND]  - 32)) |
+                      (0x1U << (IRQ_MAP[EVENT_UART_1_RCV]   - 32)) |
+                      (0x1U << (IRQ_MAP[EVENT_UART_2_SEND]  - 32)) |
+                      (0x1U << (IRQ_MAP[EVENT_UART_2_RCV]   - 32));
 
     // enable
     uart2->ctrl &= ~UARTEN_MASK;
@@ -49,11 +53,11 @@ TD* schedule(TaskQueue *task_ready_queue){
 #define IDLE_ITERATIONS 2000000
 void __attribute__((noreturn)) task_idle() {
     int i, j = 0;
-    int movingavg = 99;
-    int alpha = 60;
+    unsigned int movingavg = 99;
+    unsigned int alpha = 60;
     FOREVER {
         i = IDLE_ITERATIONS;
-        int time_start = clk4->value_low;        
+        unsigned int time_start = clk4->value_low;        
         __asm__ volatile (
             "idle_loop:\n\t"
             "subs %[i], %[i], #1\n\t"
@@ -63,11 +67,11 @@ void __attribute__((noreturn)) task_idle() {
             "mov %[i], %[j]\n\t"
             "bne idle_loop\n\t"
             : [i] "+r" (i), [j] "+r" (j));
-        int time_end = clk4->value_low;
-        int time_total = time_end - time_start;
-        int percent_idle = 157280 * 100 / time_total;
+        unsigned int time_end = clk4->value_low;
+        unsigned int time_total = time_end - time_start;
+        unsigned int percent_idle = 157280 * 100 / time_total;
         movingavg = MOVING_AVERAGE(percent_idle, movingavg, alpha);
-        StoreValue(VALUE_IDLE, movingavg);
+        StoreValue(VALUE_IDLE, movingavg & 0xFFFF);
     }
 }
 #undef IDLE_ITERATIONS

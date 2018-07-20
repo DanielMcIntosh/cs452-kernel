@@ -19,12 +19,12 @@ void snd_task() {
     //send 1 message just to ensure both tasks are ready
     Send(tid_rcv, msg, sizeof(msg), rsp, sizeof(rsp));
     
-    int time_start = clk4->value_low;
+    unsigned int time_start = clk4->value_low;
     for (int i = 0; i < ITERATIONS; ++i) {
         Send(tid_rcv, msg, sizeof(msg), rsp, sizeof(rsp));
     }
-    int time_end = clk4->value_low;
-    int time_total = time_end - time_start;
+    unsigned int time_end = clk4->value_low;
+    unsigned int time_total = time_end - time_start;
     bwprintf(COM2, "Send Time: %d, Send Avg: %d\r\n", time_total, time_total/ITERATIONS);
 }
 
@@ -43,13 +43,13 @@ void rcv_task() {
     Receive(&tid, msg, sizeof(msg));
     Reply(tid, msg, sizeof(msg));
 
-    int time_start = clk4->value_low;
+    unsigned int time_start = clk4->value_low;
     for (int i = 0; i < ITERATIONS; ++i) {
         Receive(&tid, msg, sizeof(msg));
         Reply(tid, rsp, sizeof(rsp));
     }
-    int time_end = clk4->value_low;
-    int time_total = time_end - time_start;
+    unsigned int time_end = clk4->value_low;
+    unsigned int time_total = time_end - time_start;
     bwprintf(COM2, "Recv Time: %d, Recv Avg: %d\r\n", time_total, time_total/ITERATIONS);
 }
 

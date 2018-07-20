@@ -16,9 +16,9 @@ extern struct vic {
 
 static inline void __attribute__((always_inline)) software_interrupt(int n){
     if (n >= VIC_SIZE)
-        vic2->SoftInt |= 1 << (n - VIC_SIZE);
+        vic2->SoftInt |= 1U << (n - VIC_SIZE);
     else 
-        vic1->SoftInt |= 1 << n;
+        vic1->SoftInt |= 1U << n;
 }
 
 #endif

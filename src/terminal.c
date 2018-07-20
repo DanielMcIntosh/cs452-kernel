@@ -520,7 +520,7 @@ void __attribute__((noreturn)) task_uart2_courier(int servertid) {
 
 }
 
-static inline void print_styled_string(circlebuffer_t * restrict cb, char * const restrict styled_string, const unsigned int flags, const int increment, const unsigned int end) {
+static inline void print_styled_string(circlebuffer_t * restrict cb, char * const restrict styled_string, const unsigned int flags, const unsigned int increment, const unsigned int end) {
     //append the 'restore cursor' to save a call to cb_write_string
     for (unsigned int i = 1, cur = 2; i < end; i <<= 1, cur += increment) {
         if (flags & i) {
@@ -531,7 +531,7 @@ static inline void print_styled_string(circlebuffer_t * restrict cb, char * cons
     ASSERT(cb_write_string(cb, styled_string) == 0, "TERMINAL OUTPUT CB FULL");
 }
 
-static inline void print_status(circlebuffer_t * restrict cb, int status) {
+static inline void print_status(circlebuffer_t * restrict cb, unsigned int status) {
     cb_write_string(cb, "\033[s");
     cursor_to_position(cb, TERMINAL_INPUT_MAX_LINE + 1, 12);
 
@@ -618,7 +618,7 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
     int tid, err; char c;
     TerminalMessage tm = {0, 0, 0, 0};
     ReplyMessage rm = {MESSAGE_REPLY, 0};
-    int status = 0;
+    unsigned int status = 0;
 
     output_base_terminal(&t);
 
@@ -693,14 +693,14 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
         }
         case (TERMINAL_TIME):
         {
-            int time_hundred_millis = tm.arg1, idle = tm.arg2; 
+            unsigned int time_hundred_millis = (unsigned int)tm.arg1, idle = (unsigned int)tm.arg2; 
             
             cb_write_string(&t.output, "\0337\033[H");
-            int m = time_hundred_millis % 10;
+            unsigned int m = time_hundred_millis % 10;
             time_hundred_millis /= 10;
-            int ss = time_hundred_millis % 60;
+            unsigned int ss = time_hundred_millis % 60;
             time_hundred_millis /= 60;
-            int mm = time_hundred_millis;
+            unsigned int mm = time_hundred_millis;
 
             cb_write_fixed_size_number(&t.output, mm, 10, 10);
             cb_write(&t.output, ':');
@@ -800,7 +800,7 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
         }
         case(TERMINAL_FLAGS_SET):
         {
-            int flags = tm.arg1;
+            unsigned int flags = (unsigned int)tm.arg1;
             if (~status & flags)
             {
                 status |= flags;
@@ -811,7 +811,7 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
         }
         case(TERMINAL_FLAGS_UNSET):
         {
-            int flags = tm.arg1;
+            unsigned int flags = (unsigned int)tm.arg1;
             if (status & flags) {
                 status &= ~flags;
 

@@ -83,14 +83,14 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
     fw->r = *r;
     fw->current_node = origin;
     fw->idx = 0;
-    mh_add(&mh, (int) fw, 0);
+    mh_add(&mh, (unsigned long int) fw, 0);
     if (ALLOW_REVERSE_START) {
         BFSNode * rv = q_pop(&freeQ, &freeQTail);
         rv->r = *r;
         rv->r.reverse = 1;
         rv->current_node = origin->reverse;
         rv->idx = 0;
-        mh_add(&mh, (int) rv, rev_penalty);
+        mh_add(&mh, (unsigned long int) rv, rev_penalty);
     }
     bfsnodes[BFS_MH_SIZE-1].next = NULL;
     int k = 0;
