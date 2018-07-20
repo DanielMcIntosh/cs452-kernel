@@ -35,7 +35,7 @@ typedef struct active_route{
 } ActiveRoute;
 #define ACTIVE_ROUTE_INIT {ROUTE_INIT, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
-#define ACTIVE_ROUTE_DONE_ACTIONS(ar) ((ar)->route.rcs[(ar)->idx_resrv].a == ACTION_NONE)
+#define ACTIVE_ROUTE_DONE_ACTIONS(ar) ((ar)->stopped)
 #define ACTIVE_ROUTE_COMPLETE(ar) ((ACTIVE_ROUTE_DONE_ACTIONS(ar) && (ar)->stopped))
 #define ACTIVE_ROUTE_SHOULD_STOP(ar, train, dist_to_next_snsr) ((dist_to_next_snsr + (train)->stopping_distance[(train)->speed] >= (ar)->remaining_distance && !(ar)->stopped))
 #define ACTIVE_ROUTE_NEXT_STEP_RV_IN_RANGE(ar, train, d)  (((ar)->route.rcs[(ar)->cur_pos_idx].a == ACTION_RV) && ((d) + (train)->stopping_distance[(train)->speed] <= (ar)->next_step_distance) && (!(ar)->reversing))
@@ -263,7 +263,7 @@ static void ts_exec_step(TrainState * restrict ts, TerminalCourier * restrict tc
     // do current step:
     RouteCommand rc = ar->route.rcs[ar->idx_resrv];
     Train *train = &(ts->active_trains[activetrain]);
-    const track_node *cnode = rc_to_track_node(rc, sig);
+    const track_node *cnode = rc.a != ACTION_NONE ? rc_to_track_node(rc, sig) : NULL; // It is possible to have an ACTION_NONE when stopping
     switch (rc.a) {
         case (ACTION_STRAIGHT):
         {
@@ -308,6 +308,9 @@ static void ts_exec_step(TrainState * restrict ts, TerminalCourier * restrict tc
         RouteCommand nc = ar->route.rcs[ar->idx_resrv];
         const track_node *nnode = rc_to_track_node(nc, sig);
         ASSERT(nc.swmr >= 0, "invalid swmr: %d\r\n", nc.swmr);
+        ar->next_step_distance += distance_to_on_route(&ar->route, ar->idx_resrv - 1, cnode, nnode, sig);
+    } else if (!ar->stopped && !ar->reversing) {
+        const track_node *nnode = &track[ar->end_node];
         ar->next_step_distance += distance_to_on_route(&ar->route, ar->idx_resrv - 1, cnode, nnode, sig);
     } else {
         ar->next_step_distance = INT_MAX - 10000;
@@ -486,11 +489,13 @@ static int activeroute_distance_to_next_stop(ActiveRoute *ar, track_node *cnode,
 
 static int ar_stop(ActiveRoute * restrict ar, Train * restrict train, TerminalCourier * restrict tc) {
     // Figure out how long we need to wait:
+    //static int k = 0;
     int stopdelay = calc_reverse_time_from_velocity(train->velocity[train->speed], ar->remaining_distance, train->stopping_distance[train->speed]);
     DelayStop ds = {.delay = stopdelay, .rv = 0, .stoppos = ar->end_node, .distance_past = ar->distance_past};
     CreateWith2Args(PRIORITY_NOTIFIER, &task_delay_stop, ds.data, train->num);
     ar->stopped = 1;
     tc_send(tc, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING, 0);
+    ASSERT(FALSE, "%d %d %d %d %d %d %d", ar->remaining_distance, train->stopping_distance[train->speed], train->velocity[train->speed], ds.delay, ds.rv, ds.stoppos, ds.distance_past);
     return 999999;
 }
 
@@ -498,7 +503,7 @@ static inline bool ar_perform_action(ActiveRoute *restrict ar, TrainState * rest
         const track_node *resrv_end;
         bool resrv_successful = TRUE;
 
-        if (ar->route.rcs[ar->idx_resrv+1].a != ACTION_NONE) {
+        if (ar->idx_resrv < MAX_ROUTE_COMMAND && ar->route.rcs[ar->idx_resrv+1].a != ACTION_NONE) {
             resrv_end = rc_to_track_node(ar->route.rcs[ar->idx_resrv+1], "resrv_end");
         }
         else {
@@ -589,9 +594,11 @@ static inline void activeroute_on_sensor_event(ActiveRoute * restrict ar, Train 
 
     //ASSERT(resrv_dist > ar->next_step_distance, "Resrv dist too small: resrv_dist = %d, sensor = %s, idx_resrv = %d, next_step_distance = %d", resrv_dist, track[SENSOR_TO_NODE(sensor)].name, ar->idx_resrv, ar->next_step_distance);
 
-    if (ACTIVE_ROUTE_SHOULD_STOP(ar, train, dist_to_next_snsr)) {
+    /*
+    if (ACTIVE_ROUTE_SHOULD_STOP(ar, train, resrv_dist)) {
         resrv_dist = ar_stop(ar, train, tc);
     }
+    */
 
     if (!ACTIVE_ROUTE_DONE_ACTIONS(ar)) {
         activeroute_exec_steps(ar, ts, tc, resrv_dist, tr, cmdtid);
