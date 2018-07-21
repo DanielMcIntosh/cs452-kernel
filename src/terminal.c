@@ -30,8 +30,7 @@ IDLE: %__  E_D:     STK_AVG:     VELO_PR:      SNSR_NX:                  A: 1234
 #include <message.h>
 #include <clock.h>
 #include <sensor.h>
-#include <track_state.h> 
-#include <train_state.h>
+#include <track.h> 
 
 typedef struct terminalparser {
     circlebuffer_t input;

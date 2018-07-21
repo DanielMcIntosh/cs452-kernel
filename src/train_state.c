@@ -163,7 +163,7 @@ TrackPosition GetTrainPosition(int trainstatetid, int train) {
 void __attribute__((nonnull)) init_train_state(TrainState *ts) {
     ts->total_trains = 0;
     Train init_train = TRAIN_INIT;
-    Reservation init_reservation = {0, 0};
+    Reservation init_reservation = RESERVATION_INIT;
 
     for (int i = 0; i < NUM_TRAINS; ++i) {
         ts->active_train_map[i] = -1;
@@ -231,12 +231,11 @@ static inline void __attribute__((nonnull)) trainserver_begin_reverse(ActiveRout
 static inline int __attribute__((nonnull, warn_unused_result)) get_active_train_from_sensor(TrainState *ts, const track_node *sensor_node, int *distance, int rev_penalty) {
     int min_dist = INT_MAX;
     int train = 0;
-    Reservation resrv = {0, 0};
     for (int i = 0; i < ts->total_trains; ++i) {
         const track_node *n = &track[ts->active_trains[i].last_sensor];
 
         Route r = ROUTE_INIT;
-        int cur_dist = find_path_between_nodes(&resrv, 1, rev_penalty, n, sensor_node, &r);
+        int cur_dist = find_path_between_nodes(NULL, 1, rev_penalty, n, sensor_node, &r);
         //TODO notify track_state of any switches we would have to have taken, incase a switch wasn't in the expected state
         if (cur_dist < min_dist) {
             min_dist = cur_dist;
@@ -371,13 +370,14 @@ static inline void __attribute__((nonnull)) handle_navigate(TerminalCourier * re
     }
 
     RouteRequest req = {
-        .reservations = ts->reservations, // TODO let a train run over its own reservations
         .next = train->last_sensor, //train->next_sensor,
         .prev = train->last_sensor,
         .end = object,
         .min_dist = min_dist,
         .rev_penalty = rev_penalty
     };
+    reservation_to_blockage(&req.blockages, &ts->reservations);
+
     Route route = ROUTE_INIT;
     int distance = GetRoute(trackstate_tid, req, &route);
     rm.ret = distance;
@@ -457,6 +457,7 @@ static inline void __attribute__((nonnull)) free_track_and_print(TerminalCourier
     //OR, reserve end node, and the node after
     free_track(&ar->route, ar->cur_pos_idx, free_start, free_end, reservations, sig);
 
+    //TODO
     tc_send(tc, TERMINAL_PRINT_RESRV1, reservations->bits_low & 0xFFFFFFFFULL, (reservations->bits_low >> 32) & 0xFFFFFFFFULL);
     tc_send(tc, TERMINAL_PRINT_RESRV2, reservations->bits_high & 0xFFFFFFFFULL, (reservations->bits_high >> 32) & 0xFFFFFFFFULL);
 }
@@ -549,6 +550,7 @@ static inline void __attribute__((nonnull)) activeroute_exec_steps(TerminalCouri
     }
 
     tc_send(tc, TERMINAL_ROUTE_DBG2, 261, resrv_end->num);
+    //TODO
     tc_send(tc, TERMINAL_PRINT_RESRV1, reservations->bits_low & 0xFFFFFFFFULL, (reservations->bits_low >> 32) & 0xFFFFFFFFULL);
     tc_send(tc, TERMINAL_PRINT_RESRV2, reservations->bits_high & 0xFFFFFFFFULL, (reservations->bits_high >> 32) & 0xFFFFFFFFULL);
 }
@@ -767,6 +769,7 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
                 free_track(NULL, 0, &track[object], &track[object], &(ts.reservations), "drop command free_track");
             }
 
+            //TODO
             tc_send(&tc, TERMINAL_PRINT_RESRV1, ts.reservations.bits_low & 0xFFFFFFFFULL, (ts.reservations.bits_low >> 32) & 0xFFFFFFFFULL);
             tc_send(&tc, TERMINAL_PRINT_RESRV2, ts.reservations.bits_high & 0xFFFFFFFFULL, (ts.reservations.bits_high >> 32) & 0xFFFFFFFFULL);
             break;

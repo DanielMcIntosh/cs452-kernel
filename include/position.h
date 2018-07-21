@@ -1,6 +1,7 @@
 #include <switch.h>
-#include <track.h>
-#include <train_state.h>
+#include <route.h>
+#include <track_node.h>
+#include <track_position.h>
 
 #ifndef POSITION_H
 #define POSITION_H
@@ -24,7 +25,6 @@ typedef struct tposition {
     const track_node *stop_end_pos;
     int millis_off_stop_end;
 } Position;
-
 #define POSITION_INIT {0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 void Position_HandleStop(Position *p, int idx, int time);
