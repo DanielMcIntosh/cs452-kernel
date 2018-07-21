@@ -519,15 +519,13 @@ void __attribute__((noreturn)) task_uart2_courier(int servertid) {
 
 }
 
-static inline void print_styled_string(circlebuffer_t * restrict cb, char * const restrict styled_string, const unsigned int flags, const unsigned int increment, const unsigned int end) {
+static inline void restylize_string(char * restrict styled_string, unsigned int flags, unsigned int increment, unsigned int start, unsigned int end, char attrib) {
     //append the 'restore cursor' to save a call to cb_write_string
-    for (unsigned int i = 1, cur = 2; i < end; i <<= 1, cur += increment) {
+    for (unsigned int i = 1, cur = start; i < end; i <<= 1, cur += increment) {
         if (flags & i) {
-            //attribute 1 = Bright
-            styled_string[cur] = '1';
+            styled_string[cur] = attrib;
         }
     }
-    ASSERT(cb_write_string(cb, styled_string) == 0, "TERMINAL OUTPUT CB FULL");
 }
 
 static inline void print_status(circlebuffer_t * restrict cb, unsigned int status) {
@@ -535,34 +533,50 @@ static inline void print_status(circlebuffer_t * restrict cb, unsigned int statu
     cursor_to_position(cb, TERMINAL_INPUT_MAX_LINE + 1, 12);
 
     char str[] = STYLED_FLAG_STRING "\033[u";
-    print_styled_string(cb, str, status, 5, STATUS_FLAG_END);
+    //attribute 1 = Bright
+    restylize_string(str, status, 5, 2, STATUS_FLAG_END, '1');
+    ASSERT(cb_write_string(cb, str) == 0, "TERMINAL OUTPUT CB FULL");
 }
 
-static inline void print_reservations1(circlebuffer_t * restrict cb, unsigned long long reservations) {
+static inline void print_reservations1(circlebuffer_t * restrict cb, unsigned long long reservations, int train) {
+    //*
     cb_write_string(cb, "\033[s\033[H\n\t");
 
     for (int i = 0; i < 4; ++i) {
         unsigned int flags = (reservations >> (i * 16)) & 0xFFFF;
         char str[] = STYLED_RESRV_STRING_1 "\r\n\t";
-        print_styled_string(cb, str, flags, 5, (0x1U << 16));
+        restylize_string(str, flags, 6, 3, (0x1U << 16), '1' + train);
+        ASSERT(cb_write_string(cb, str) == 0, "TERMINAL OUTPUT CB FULL");
     }
     cb_write_string(cb, "\033[u");
+    /*/
+    cb_write_string(cb, "\033[s\033[H\n\t");
+
+    for (int i = 0; i < 7; ++i) {
+        cb_write_string(cb, resrv_strs[i]);
+    }
+    cb_write_string(cb, "\033[u");
+    //*/
 }
-static inline void print_reservations2(circlebuffer_t * restrict cb, unsigned long long reservations) {
+static inline void print_reservations2(circlebuffer_t * restrict cb, unsigned long long reservations, int train) {
     cb_write_string(cb, "\033[s\033[6;77H");
 
     unsigned int flags_snsr = reservations & 0xFFFF;
     char str[] = STYLED_RESRV_STRING_1 "\r\n\t";
-    print_styled_string(cb, str, flags_snsr, 5, (0x1U << 16));
+    restylize_string(str, flags_snsr, 6, 3, (0x1U << 16), '1' + train);
+    ASSERT(cb_write_string(cb, str) == 0, "TERMINAL OUTPUT CB FULL");
 
     for (int i = 0; i < 2; ++i) {
         unsigned int flags = ((reservations >> (16 + NUM_SWITCHES * i)) & 0x3FFFF);
         unsigned int flags_3way = ((reservations >> (16 + 18 + NUM_SWITCHES * i)) & 0xF);
 
         char str2[] = STYLED_RESRV_STRING_2 "\r\n\t";
-        print_styled_string(cb, str2, flags, 5, (0x1U << 18));
+        restylize_string(str2, flags, 6, 3, (0x1U << 18), '1' + train);
+        ASSERT(cb_write_string(cb, str2) == 0, "TERMINAL OUTPUT CB FULL");
+
         char str3[] = STYLED_RESRV_STRING_3 "\r\n\t";
-        print_styled_string(cb, str3, flags_3way, 8, (0x1U << 4));
+        restylize_string(str3, flags_3way, 9, 3, (0x1U << 4), '1' + train);
+        ASSERT(cb_write_string(cb, str3) == 0, "TERMINAL OUTPUT CB FULL");
     }
     cb_write_number(cb, reservations >> 32ULL, 10);
     cb_write(cb, ' ');
@@ -618,6 +632,15 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
     TerminalMessage tm = {0, 0, 0, 0};
     ReplyMessage rm = {MESSAGE_REPLY, 0};
     unsigned int status = 0;
+
+    char resrv_a[] = STYLED_RESRV_STRING_1 "\r\n\t";
+    char resrv_b[] = STYLED_RESRV_STRING_1 "\r\n\t";
+    char resrv_c[] = STYLED_RESRV_STRING_1 "\r\n\t";
+    char resrv_d[] = STYLED_RESRV_STRING_1 "\r\n\t";
+    char resrv_e[] = STYLED_RESRV_STRING_1 "\r\n\t";
+    char resrv_br[] = STYLED_RESRV_STRING_2 "\r\n\t" STYLED_RESRV_STRING_3 "\r\n\t";
+    char resrv_mr[] = STYLED_RESRV_STRING_2 "\r\n\t" STYLED_RESRV_STRING_3;
+    char *resrv_str[] = { resrv_a, resrv_b, resrv_c, resrv_d, resrv_e, resrv_br, resrv_mr };
 
     output_base_terminal(&t);
 
@@ -820,16 +843,34 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
         }
         case(TERMINAL_PRINT_RESRV1):
         {
+            int active_train = 0;
             unsigned long long flags = (unsigned int)tm.arg1 | (((unsigned long long)tm.arg2) << 32ULL);
-            print_reservations1(&t.output, flags);
+            print_reservations1(&t.output, flags, active_train);
             break;
         }
         case(TERMINAL_PRINT_RESRV2):
         {
+            int active_train = 1;
             unsigned long long flags = (unsigned int)tm.arg1 | (((unsigned long long)tm.arg2) << 32ULL);
-            print_reservations2(&t.output, flags);
+            print_reservations2(&t.output, flags, active_train);
             break;
         }
+        /*
+        case(TERMINAL_SET_RESRV3):
+        {
+            int active_train = tm.arg1;
+            unsigned int flags = (unsigned int)tm.arg2;
+            print_reservations3(&t.output, active_train, flags);
+            break;
+        }
+        case(TERMINAL_SET_RESRV4):
+        {
+            int active_train = tm.arg1;
+            unsigned int flags = (unsigned int)tm.arg2;
+            print_reservations4(&t.output, active_train, flags);
+            break;
+        }
+        //*/
         case (TERMINAL_POS_DBG):
         {
             int node = tm.arg1;
