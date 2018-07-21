@@ -62,12 +62,12 @@ void position_handle_accdec(Position *p, const Route *r, int time, int current_v
 }
 
 void Position_HandleAccel(Position *p, const Route *r, int time, int current_velocity, int a) {
-    ASSERT(a >= 0, "accel must be positive to accel, %d, %d", a, a / ACCELERATION_PRECISION);
+    ASSERT(a > 0, "accel must be positive to accel, %d, %d", a, a / ACCELERATION_PRECISION);
     return position_handle_accdec(p, r, time, current_velocity, a, PSTATE_ACCEL);
 }
 
 void Position_HandleDecel(Position *p, const Route *r, int time, int current_velocity, int a) {
-    ASSERT(a <= 0, "accel must be negative to decel");
+    ASSERT(a < 0, "accel must be negative to decel: pv %d, cv %d, a %d", p->v, current_velocity, a);
     return position_handle_accdec(p, r, time, current_velocity, a, PSTATE_DECEL);
 }
 
@@ -100,5 +100,8 @@ void Position_Reverse(Position *p){
 }
 
 int __attribute__((pure)) Position_CalculateVelocityNow(Position *p, int time) {
-    return p->v + (p->last_update_time - time) * p->a * VELOCITY_PRECISION / ACCELERATION_PRECISION;
+    ASSERT(time > p->last_update_time, "Can't calculate velocity retrospectively");
+    int velo = p->v + (time - p->last_update_time) * p->a * VELOCITY_PRECISION / ACCELERATION_PRECISION;
+    ASSERT(velo >= 0, "Cannot have negative velocity: velo %d v %d a %d lut %d t %d", velo, p->v, p->a, p->last_update_time, time);
+    return velo;
 }
