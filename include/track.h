@@ -53,9 +53,9 @@ int distance_to_on_route(const Route *route, int idx, const track_node *from, co
 int get_dist_to_nxt_sensor(const Route *route, int idx, const track_node *cur_sensor, const char * restrict sig) __attribute__((warn_unused_result, nonnull));
 
 //EXclusive of start, but INclusive of end. When start == end, reserves end (and therefore start)
-bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations, const char * restrict sig) __attribute__((warn_unused_result, nonnull));
+bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations, const char * restrict sig) __attribute__((warn_unused_result, nonnull (3, 4, 5, 6)));
 //INclusive of start, but EXclusive of end. When start == end, doesn't free anything
-void free_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations) __attribute__((nonnull));
+void free_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations) __attribute__((nonnull (3, 4, 5)));
 
 #endif //_TRACK_H_
 

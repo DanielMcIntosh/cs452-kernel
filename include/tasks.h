@@ -48,6 +48,7 @@ typedef struct taskdesc {
 } TD;
 
 #define TD_arg(t, n) (n == 4 ? t->sp[14] : t->sp[n])
+#define TD_lr(t) (t->sp[13])
 
 typedef struct {
     TD *task_pool;

@@ -51,7 +51,7 @@ static int is_deadlock(TD *sender, TD *receiver) {
             sndr = sndr->rdynext;
             KASSERT(k++ < 200, "definitely an infinite loop");
         }
-   }
+    }
     return 0;
 }
 

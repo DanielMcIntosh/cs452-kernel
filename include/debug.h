@@ -15,7 +15,7 @@
 
 #define KPANIC(...) \
     bwprintf(COM2, __VA_ARGS__);\
-    __asm__("mov pc, #4");
+    __builtin_trap();
 
 #define IS(x) #x
 #define S(x) IS(x) 

@@ -80,7 +80,7 @@ TrackPosition Position_CalculateNow(Position *p, const Route *r, int time) {
     int idx = p->last_route_idx, object = TRACK_NODE_TO_INDEX(p->last_known_node);
     // TODO this will totally break if your position predicts ahead too far
     if (r != NULL && !(p->state == PSTATE_STOPPED)) {
-        const track_node *tn = forward_dist_on_route_no_extra(r, &idx, p->last_known_node, &distance, "position calculateion");
+        const track_node *tn = forward_dist_on_route_no_extra(r, &idx, p->last_known_node, &distance, "position calculation");
         //ASSERT(tn != NULL, "Null TrackNode");
         object = TRACK_NODE_TO_INDEX(tn);
     }

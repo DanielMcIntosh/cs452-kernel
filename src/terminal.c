@@ -608,7 +608,7 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
     CreateWithArgument(PRIORITY_HIGH, &task_terminal_command_parser, mytid);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_uart2_courier, mytid);
     CreateWithArgument(PRIORITY_LOW, &task_clockprinter, mytid);
-    CreateWithArgument(PRIORITY_HIGH, &task_sensor_server, trackstate_tid);
+    CreateWithArgument(PRIORITY_HIGHEST, &task_sensor_server, trackstate_tid);
     CreateWithArgument(PRIORITY_LOW, &task_stack_metric_printer, mytid);
 
     char cb_terminal_buf[CB_TERMINAL_BUF_SIZE];
