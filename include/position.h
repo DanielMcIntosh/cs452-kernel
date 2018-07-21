@@ -35,5 +35,6 @@ void Position_HandleConstVelo(Position *p, Route *r, int time, int current_veloc
 void Position_HandleSensorHit(Position* p, track_node *snsr, int time, int new_route_idx);
 void Position_Reverse(Position *p);
 TrackPosition Position_CalculateNow(Position *p, const Route *r, int time);
+int Position_CalculateVelocityNow(Position *p, int time);
 
 #endif

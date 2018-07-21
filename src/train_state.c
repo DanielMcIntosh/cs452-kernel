@@ -99,6 +99,27 @@ int __attribute__((const)) calc_reverse_time_from_velocity(int velocity, int dis
     return (VELOCITY_PRECISION * (distance_to_stop - stopping_distance) / velocity); 
 }
 
+int __attribute__((const)) calc_stop_time_from_vi_vf_a_d_ds(int vi, int vf, int a, int d, int ds) {
+    // first, calculate portion over which we'll be accelerationg
+    // vf^2 = vi^2 + 2ad -> d = (vi^2 - vf^2)/(2a)
+    int vf2 = vf * vf / VELOCITY_PRECISION;
+    int vi2 = vi * vi / VELOCITY_PRECISION;
+    int deltav_prec = (vf2 - vi2) * (ACCELERATION_PRECISION / VELOCITY_PRECISION);
+    int accel_d = deltav_prec / (2 * a);
+    ASSERT(accel_d >= 0, "cannot be accelerating for negative distance (%d, %d, %d, %d, %d, %d)", vi, vf, a, d, ds, accel_d);
+    //  calc time to do that acceleration
+    //  vf = vi + at -> t = (vf - vi) / a
+    int accel_t = (vf - vi) *(ACCELERATION_PRECISION / VELOCITY_PRECISION) / a;
+    ASSERT(accel_t >= 0, "cannot be accelerating for negative time (%d, %d, %d, %d, %d, %d, %d)", vi, vf, a, d, ds, accel_d, accel_t);
+
+    int const_d = d - accel_d;
+    ASSERT(const_d >= 0, "cannot be at a constant speed for negative distance (%d, %d, %d, %d, %d, %d, %d, %d)", vi, vf, a, d, ds, accel_d, accel_t, const_d);
+    // t = (delta_d / vf)
+    int const_t = (const_d - ds) * VELOCITY_PRECISION / vf;
+    ASSERT(const_t >= 0, "cannot be at a constant speed for negative time (%d, %d, %d, %d, %d, %d, %d, %d, %d)", vi, vf, a, d, ds, accel_d, accel_t, const_d, const_t);
+    return accel_t + const_t;
+}
+
 int __attribute__((pure)) calc_short_delay(Train *train, int dist_millis) {
     int c = train->short_delay_coeffs[0], b = train->short_delay_coeffs[1], a = train->short_delay_coeffs[2];
     int det = b*b - (4 * a * (c - (dist_millis * SHORT_COEFF_PRECISION / 10)));
@@ -108,15 +129,12 @@ int __attribute__((pure)) calc_short_delay(Train *train, int dist_millis) {
     return time;
 }
 
-int __attribute__((const, ATTR_OPTIMIZE("no-reorder-blocks"))) calc_accel_from_vi_vf_d(int vi, int vf, int d, int precision) {
+int __attribute__((const)) calc_accel_from_vi_vf_d(int vi, int vf, int d) {
     // vf^2 = vi^2 + 2ad
     // a = (vi^2 - vf^2)/(2d)
     int vf2 = vf * vf / VELOCITY_PRECISION;
     int vi2 = vi * vi / VELOCITY_PRECISION;
-    int deltav_prec = (vf2 - vi2) * (precision / VELOCITY_PRECISION);
-
-    //PANIC("%d %d %d %d", vf2, vi2, deltav_prec, deltav_prec / (2* d));
-
+    int deltav_prec = (vf2 - vi2) * (ACCELERATION_PRECISION / VELOCITY_PRECISION);
     return deltav_prec / (2 * d);
 }
 
@@ -299,7 +317,14 @@ static void ts_exec_step(TrainState * restrict ts, TerminalCourier * restrict tc
             }
             //*/
             ASSERT(!ar->reversing, "CANNOT EXECUTE RV WHEN ROUTE IS ALREADY REVERSING");
-            int delay = calc_reverse_time_from_velocity(train->velocity[train->speed], distance_to_stop, train->stopping_distance[train->speed]);
+            //int delay = calc_reverse_time_from_velocity(train->velocity[train->speed], distance_to_stop, train->stopping_distance[train->speed]);
+            int time = Time();
+            int vi = Position_CalculateVelocityNow(&train->pos, time);
+            int vf = train->velocity[train->speed];
+            int d = distance_to_stop;
+            int dstp = train->stopping_distance[train->speed];
+            int a = calc_accel_from_vi_vf_d(vi, vf, dstp);
+            int delay = calc_stop_time_from_vi_vf_a_d_ds(vi, vf, a, d, dstp);
             trainserver_begin_reverse(ts, activetrain, delay, MERGE_TO_NODE_NSC(rc.swmr), 350);
             cnode = &track[MERGE_TO_NODE_NSC(rc.swmr)];
             ar->reversing = 1;
@@ -420,7 +445,7 @@ static inline void handle_navigate(TrainState * restrict ts, TerminalCourier * r
     } else {
         CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, NAV_SPEED, train->num); // TODO number
         ar.reversing = 0;
-        Position_HandleAccel(&train->pos, &ar.route, Time(), 0, calc_accel_from_vi_vf_d(0, train->velocity[NAV_SPEED], train->stopping_distance[NAV_SPEED], ACCELERATION_PRECISION));
+        Position_HandleAccel(&train->pos, &ar.route, Time(), 0, calc_accel_from_vi_vf_d(0, train->velocity[NAV_SPEED], train->stopping_distance[NAV_SPEED]));
     }
     ASSERT(0 <= ts->active_train_map[tr] && ts->active_train_map[tr] < MAX_CONCURRENT_TRAINS, "Invalid active train: %d", ts->active_train_map[tr]);
     ts->active_routes[ts->active_train_map[tr]] = ar;
@@ -503,8 +528,16 @@ static int activeroute_distance_to_next_stop(ActiveRoute *ar, track_node *cnode,
 static int ar_stop(ActiveRoute * restrict ar, Train * restrict train, TerminalCourier * restrict tc) {
     // Figure out how long we need to wait:
     //static int k = 0;
-    int stopdelay = calc_reverse_time_from_velocity(train->velocity[train->speed], ar->remaining_distance, train->stopping_distance[train->speed]);
-    if (stopdelay < 0) stopdelay = 0;
+    //int stopdelay = calc_reverse_time_from_velocity(train->velocity[train->speed], ar->remaining_distance, train->stopping_distance[train->speed]);
+    //if (stopdelay < 0) stopdelay = 0;
+    int time = Time();
+    int vi = Position_CalculateVelocityNow(&train->pos, time);
+    int vf = train->velocity[train->speed];
+    int d = ar->remaining_distance;
+    int dstp = train->stopping_distance[train->speed];
+    int a = calc_accel_from_vi_vf_d(vi, vf, dstp);
+    int stopdelay = calc_stop_time_from_vi_vf_a_d_ds(vi, vf, a, d, dstp);
+    ASSERT(stopdelay >= 0, "cannot delay negative time (vi %d vf %d a %d d %d ds %d delay %d", vi, vf, a, d, dstp, stopdelay);
     DelayStop ds = {.delay = stopdelay, .rv = 0, .stoppos = ar->end_node, .distance_past = ar->distance_past};
     CreateWith2Args(PRIORITY_NOTIFIER, &task_delay_stop, ds.data, train->num);
     ar->stopped = 1;
@@ -570,6 +603,7 @@ static void ar_short_move(TrainState * restrict ts, ActiveRoute * restrict ar, T
         tc_send(tc, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING, 0);
         ds.stoppos = ar->end_node;
         ds.distance_past = ar->distance_past;
+        ar->stopped = 1;
     }
     CreateWith2Args(PRIORITY_NOTIFIER, &task_delay_stop, ds.data, train->num);
 }
@@ -870,7 +904,7 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             //PANIC("%d %s %d", stoppos, track[stoppos].name, distance);
             Position_HandleBeginStop(&tr->pos, &ts.active_routes[activetrain].route, time, 
                     &track[stoppos], distance, 
-                    calc_accel_from_vi_vf_d(tr->velocity[tr->speed], 0, tr->stopping_distance[tr->speed], ACCELERATION_PRECISION));
+                    calc_accel_from_vi_vf_d(tr->velocity[tr->speed], 0, tr->stopping_distance[tr->speed]));
 
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 212, train);
             CreateWith2Args(PRIORITY_LOW, &task_notify_rv_timeout, calc_reverse_time(&ts, activetrain), activetrain);
@@ -889,7 +923,7 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             SendCommand(cmdtid, c);
             Position_HandleBeginStop(&tr->pos, &ar->route, Time(), 
                     &track[stoppos], distance,
-                    calc_accel_from_vi_vf_d(tr->velocity[tr->speed], 0, tr->stopping_distance[tr->speed], ACCELERATION_PRECISION));
+                    calc_accel_from_vi_vf_d(tr->velocity[tr->speed], 0, tr->stopping_distance[tr->speed]));
 
             CreateWith2Args(PRIORITY_LOW, &task_notify_stopped, calc_reverse_time(&ts, activetrain), train);
             break;

@@ -98,3 +98,7 @@ void Position_Reverse(Position *p){
     p->millis_off_last_node *= -1;
     p->last_known_node = p->last_known_node->reverse;
 }
+
+int __attribute__((pure)) Position_CalculateVelocityNow(Position *p, int time) {
+    return p->v + (p->last_update_time - time) * p->a * VELOCITY_PRECISION / ACCELERATION_PRECISION;
+}
