@@ -71,5 +71,10 @@ int fastintsqrt(int);
 #define FALLTHROUGH
 #endif
 
+#if __has_attribute(optimize)
+#define ATTR_OPTIMIZE(x) optimize(x)
+#else
+#define ATTR_OPTIMIZE(x) 
+#endif
 
 #endif

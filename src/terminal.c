@@ -843,6 +843,8 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
             cb_write(&t.output,'+');
             t.pos_col++;
             t.pos_col += cb_write_number(&t.output, dist, 10);
+            cb_write(&t.output,' ');
+            t.pos_col++;
             if (t.pos_col > 97) {
                 t.pos_col = 1;
             }

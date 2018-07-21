@@ -36,6 +36,7 @@ typedef struct active_route{
 #define ACTIVE_ROUTE_INIT {ROUTE_INIT, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 #define ACTIVE_ROUTE_DONE_ACTIONS(ar) ((ar)->stopped)
+//#define ACTIVE_ROUTE_DONE_ACTIONS(ar) ((ar)->stopped && !((ar)->route.rcs[(ar)->idx_resrv].a != ACTION_NONE))
 #define ACTIVE_ROUTE_COMPLETE(ar) ((ACTIVE_ROUTE_DONE_ACTIONS(ar) && (ar)->stopped))
 #define ACTIVE_ROUTE_SHOULD_STOP(ar, train, dist_to_next_snsr) ((dist_to_next_snsr + (train)->stopping_distance[(train)->speed] >= (ar)->remaining_distance && !(ar)->stopped))
 #define ACTIVE_ROUTE_NEXT_STEP_RV_IN_RANGE(ar, train, d)  (((ar)->route.rcs[(ar)->cur_pos_idx].a == ACTION_RV) && ((d) + (train)->stopping_distance[(train)->speed] <= (ar)->next_step_distance) && (!(ar)->reversing))
@@ -105,6 +106,18 @@ int __attribute__((pure)) calc_short_delay(Train *train, int dist_millis) {
     int time = (-b + sqrt)/ (2*a);
     ASSERT(time > 0, "invalid time returned in calc_short_delay: %d,  a = %d, b = %d, c = %d, dist_millis = %d, det = %d, sqrt = %d", time, a, b, c, dist_millis, det, sqrt);
     return time;
+}
+
+int __attribute__((const, ATTR_OPTIMIZE("no-reorder-blocks"))) calc_accel_from_vi_vf_d(int vi, int vf, int d, int precision) {
+    // vf^2 = vi^2 + 2ad
+    // a = (vi^2 - vf^2)/(2d)
+    int vf2 = vf * vf / VELOCITY_PRECISION;
+    int vi2 = vi * vi / VELOCITY_PRECISION;
+    int deltav_prec = (vf2 - vi2) * (precision / VELOCITY_PRECISION);
+
+    //PANIC("%d %d %d %d", vf2, vi2, deltav_prec, deltav_prec / (2* d));
+
+    return deltav_prec / (2 * d);
 }
 
 int notify_rv_timeout(int trainstatetid, int activetrain) {
@@ -407,7 +420,7 @@ static inline void handle_navigate(TrainState * restrict ts, TerminalCourier * r
     } else {
         CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, NAV_SPEED, train->num); // TODO number
         ar.reversing = 0;
-        Position_HandleAccel(&train->pos, &ar.route, Time(), 0, 0);
+        Position_HandleAccel(&train->pos, &ar.route, Time(), 0, calc_accel_from_vi_vf_d(0, train->velocity[NAV_SPEED], train->stopping_distance[NAV_SPEED], ACCELERATION_PRECISION));
     }
     ASSERT(0 <= ts->active_train_map[tr] && ts->active_train_map[tr] < MAX_CONCURRENT_TRAINS, "Invalid active train: %d", ts->active_train_map[tr]);
     ts->active_routes[ts->active_train_map[tr]] = ar;
@@ -491,11 +504,12 @@ static int ar_stop(ActiveRoute * restrict ar, Train * restrict train, TerminalCo
     // Figure out how long we need to wait:
     //static int k = 0;
     int stopdelay = calc_reverse_time_from_velocity(train->velocity[train->speed], ar->remaining_distance, train->stopping_distance[train->speed]);
+    if (stopdelay < 0) stopdelay = 0;
     DelayStop ds = {.delay = stopdelay, .rv = 0, .stoppos = ar->end_node, .distance_past = ar->distance_past};
     CreateWith2Args(PRIORITY_NOTIFIER, &task_delay_stop, ds.data, train->num);
     ar->stopped = 1;
     tc_send(tc, TERMINAL_FLAGS_UNSET, STATUS_FLAG_FINDING, 0);
-    ASSERT(FALSE, "%d %d %d %d %d %d %d", ar->remaining_distance, train->stopping_distance[train->speed], train->velocity[train->speed], ds.delay, ds.rv, ds.stoppos, ds.distance_past);
+    //ASSERT(FALSE, "%d %d %d %d %d %d %d", ar->remaining_distance, train->stopping_distance[train->speed], train->velocity[train->speed], ds.delay, ds.rv, ds.stoppos, ds.distance_past);
     return 999999;
 }
 
@@ -594,11 +608,9 @@ static inline void activeroute_on_sensor_event(ActiveRoute * restrict ar, Train 
 
     //ASSERT(resrv_dist > ar->next_step_distance, "Resrv dist too small: resrv_dist = %d, sensor = %s, idx_resrv = %d, next_step_distance = %d", resrv_dist, track[SENSOR_TO_NODE(sensor)].name, ar->idx_resrv, ar->next_step_distance);
 
-    /*
-    if (ACTIVE_ROUTE_SHOULD_STOP(ar, train, resrv_dist)) {
+    /*if (ACTIVE_ROUTE_SHOULD_STOP(ar, train, dist_to_next_snsr)) {
         resrv_dist = ar_stop(ar, train, tc);
-    }
-    */
+    }//*/
 
     if (!ACTIVE_ROUTE_DONE_ACTIONS(ar)) {
         activeroute_exec_steps(ar, ts, tc, resrv_dist, tr, cmdtid);
@@ -622,7 +634,6 @@ static inline void handle_sensor_event(TrainState * restrict ts, TerminalCourier
     activeroute_on_sensor_event(ar, train, ts, tc, sensor, distance, tr, cmdtid);
 
     Position_HandleSensorHit(&train->pos, &track[SENSOR_TO_NODE(sensor)], event_time, ar->cur_pos_idx);
-
 
     train->last_sensor = sensor;
     train->last_sensor_time = event_time;
@@ -857,7 +868,10 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             int time = Time();
             ASSERT(tr->speed == NAV_SPEED, "incorrect speed");
             //PANIC("%d %s %d", stoppos, track[stoppos].name, distance);
-            Position_HandleBeginStop(&tr->pos, &ts.active_routes[activetrain].route, time, &track[stoppos], distance);
+            Position_HandleBeginStop(&tr->pos, &ts.active_routes[activetrain].route, time, 
+                    &track[stoppos], distance, 
+                    calc_accel_from_vi_vf_d(tr->velocity[tr->speed], 0, tr->stopping_distance[tr->speed], ACCELERATION_PRECISION));
+
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 212, train);
             CreateWith2Args(PRIORITY_LOW, &task_notify_rv_timeout, calc_reverse_time(&ts, activetrain), activetrain);
             ts.active_trains[activetrain].speed = 0;
@@ -873,7 +887,9 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             ActiveRoute *ar = &ts.active_routes[activetrain];
             Command c = {COMMAND_TR, 0, .arg2=train};
             SendCommand(cmdtid, c);
-            Position_HandleBeginStop(&tr->pos, &ar->route, Time(), &track[stoppos], distance);
+            Position_HandleBeginStop(&tr->pos, &ar->route, Time(), 
+                    &track[stoppos], distance,
+                    calc_accel_from_vi_vf_d(tr->velocity[tr->speed], 0, tr->stopping_distance[tr->speed], ACCELERATION_PRECISION));
 
             CreateWith2Args(PRIORITY_LOW, &task_notify_stopped, calc_reverse_time(&ts, activetrain), train);
             break;
