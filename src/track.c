@@ -376,7 +376,7 @@ bool reserve_track(const Route *route, int idx, const track_node *start, const t
 }
 
 //INclusive of start, but EXclusive of end
-void free_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations) {
+void free_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations, const char *sig) {
     ASSERT_VALID_TRACK(start);
     //in theory should handle end == null just fine by freeing to the switch after the end of the route, but put this here anyways
     ASSERT_VALID_TRACK(end);
@@ -386,7 +386,7 @@ void free_track(const Route *route, int idx, const track_node *start, const trac
     const track_edge *e;
     while (n != end && n != NULL) {
         add_to_mask(n, &mask);
-        e = next_edge_on_route(route, &idx, n, "free_track");
+        e = next_edge_on_route(route, &idx, n, sig);
         ASSERT(e != NULL, "tried to free track past end of given route. start = %s, end = %s, n = %s, idx = %d", start->name, end->name, n->name, idx);
         n = e->dest;
     }
