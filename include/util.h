@@ -18,7 +18,7 @@
 #endif
 
 #ifndef INT_MAX
-#define INT_MAX (UINT_MAX / 2)
+#define INT_MAX (int)(UINT_MAX / 2)
 #endif
 
 #define bool int

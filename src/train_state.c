@@ -438,7 +438,7 @@ static inline void __attribute__((nonnull)) train_on_sensor_event(TerminalCourie
 
 //NOTE: called both when a sensor is hit, and when we reach the end of a route
 //SORT OF SKETCHY because the only reason we can do this is that ACTIVE_ROUTE_NEXT_STEP_RV() returns false at the end of a route
-static inline void __attribute__((nonnull)) free_track_and_print(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Reservation * restrict reservations, Train * restrict train, const track_node *free_end, const char *sig) {
+static inline void __attribute__((nonnull)) free_track_behind_train(ActiveRoute * restrict ar, Reservation * restrict reservations, Train * restrict train, const track_node *free_end, const char *sig) {
     const track_node *free_start = &track[SENSOR_TO_NODE(train->last_sensor)];
     //ASSERT(free_start != free_end, "hit same sensor twice?! free_start = %s, free_end = %s, train = %d", free_start->name, free_end->name, train->num);
 
@@ -456,10 +456,6 @@ static inline void __attribute__((nonnull)) free_track_and_print(TerminalCourier
     //TODO: free when we're past the sensor, not when we hit it
     //OR, reserve end node, and the node after
     free_track(&ar->route, ar->cur_pos_idx, free_start, free_end, reservations, sig);
-
-    //TODO
-    tc_send(tc, TERMINAL_PRINT_RESRV1, reservations->bits_low & 0xFFFFFFFFULL, (reservations->bits_low >> 32) & 0xFFFFFFFFULL);
-    tc_send(tc, TERMINAL_PRINT_RESRV2, reservations->bits_high & 0xFFFFFFFFULL, (reservations->bits_high >> 32) & 0xFFFFFFFFULL);
 }
 
 static inline void __attribute__((nonnull)) update_cur_pos_idx(ActiveRoute * restrict ar, int sensor) {
@@ -550,9 +546,6 @@ static inline void __attribute__((nonnull)) activeroute_exec_steps(TerminalCouri
     }
 
     tc_send(tc, TERMINAL_ROUTE_DBG2, 261, resrv_end->num);
-    //TODO
-    tc_send(tc, TERMINAL_PRINT_RESRV1, reservations->bits_low & 0xFFFFFFFFULL, (reservations->bits_low >> 32) & 0xFFFFFFFFULL);
-    tc_send(tc, TERMINAL_PRINT_RESRV2, reservations->bits_high & 0xFFFFFFFFULL, (reservations->bits_high >> 32) & 0xFFFFFFFFULL);
 }
 
 static inline void __attribute__((nonnull)) activeroute_on_sensor_event(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Reservation * restrict reservations, Train * restrict train, int sensor, int distance, int cmdtid){
@@ -593,7 +586,7 @@ static inline void __attribute__((nonnull)) handle_sensor_event(TerminalCourier 
     //we've been given a nav command at some point
     //TODO handle problem when we give a route command an there is a switch between the last sensor and the next
     if (RESERVE_TRACK && likely(ar->end_node >= 0) && ar->rev_state != REV_AFTER_MERGE) {
-        free_track_and_print(tc, ar, reservations, train, sensor_node, "sensor_event free_track");
+        free_track_behind_train(ar, reservations, train, sensor_node, "sensor_event free_track");
     }
 
     if (!ACTIVE_ROUTE_COMPLETE(ar) && (ar->rev_state == REV_NOT_REVERSING)) {
@@ -607,6 +600,10 @@ static inline void __attribute__((nonnull)) handle_sensor_event(TerminalCourier 
     train->last_sensor = sensor;
     train->last_sensor_time = event_time;
     ASSERT(0 <= train->last_sensor && train->last_sensor <= TRACK_MAX, "invalid last sensor for train %d: %d", train->num, train->last_sensor);
+
+    tc_send(tc, TERMINAL_PRINT_RESRV1, tr, reservations->bits_low & 0xFFFFFFFFULL);
+    tc_send(tc, TERMINAL_PRINT_RESRV2, tr, (reservations->bits_low >> 32) & 0xFFFFFFFFULL);
+    tc_send(tc, TERMINAL_PRINT_RESRV3, reservations->bits_high & 0xFFFFFFFFULL, (reservations->bits_high >> 32) & 0xFFFFFFFFULL);
 }
 
 static inline void __attribute__((nonnull)) add_new_train(TrainState *ts, NewTrain data) {
@@ -770,8 +767,9 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             }
 
             //TODO
-            tc_send(&tc, TERMINAL_PRINT_RESRV1, ts.reservations.bits_low & 0xFFFFFFFFULL, (ts.reservations.bits_low >> 32) & 0xFFFFFFFFULL);
-            tc_send(&tc, TERMINAL_PRINT_RESRV2, ts.reservations.bits_high & 0xFFFFFFFFULL, (ts.reservations.bits_high >> 32) & 0xFFFFFFFFULL);
+            tc_send(&tc, TERMINAL_PRINT_RESRV1, 0, ts.reservations.bits_low & 0xFFFFFFFFUL);
+            tc_send(&tc, TERMINAL_PRINT_RESRV2, 1, (ts.reservations.bits_low >> 32) & 0xFFFFFFFFUL);
+            tc_send(&tc, TERMINAL_PRINT_RESRV3, ts.reservations.bits_high & 0xFFFFFFFFULL, (ts.reservations.bits_high >> 32) & 0xFFFFFFFFULL);
             break;
         }
         case (NOTIFY_RV_TIMEOUT):
@@ -853,9 +851,15 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
         {
             Reply(tid, &rm, sizeof(rm));
             int tr = tm.data;
+            int a_tr = ts.active_train_map[tr];
             Train *train = TRAIN(&ts, tr);
             ActiveRoute *ar = ACTIVE_ROUTE(&ts, tr);
-            free_track_and_print(&tc, ar, &(ts.reservations), train, train->pos.stop_end_pos, "stopped free_track");
+
+            free_track_behind_train(ar, &(ts.reservations), train, train->pos.stop_end_pos, "stopped free_track");
+            tc_send(&tc, TERMINAL_PRINT_RESRV1, a_tr, ts.reservations.bits_low & 0xFFFFFFFFULL);
+            tc_send(&tc, TERMINAL_PRINT_RESRV2, a_tr, (ts.reservations.bits_low >> 32) & 0xFFFFFFFFULL);
+            tc_send(&tc, TERMINAL_PRINT_RESRV3, ts.reservations.bits_high & 0xFFFFFFFFULL, (ts.reservations.bits_high >> 32) & 0xFFFFFFFFULL);
+
             Position_HandleStop(&train->pos, ar->cur_pos_idx, Time());
             break;
         }

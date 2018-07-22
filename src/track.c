@@ -102,7 +102,9 @@ int find_path_between_nodes(const Blockage * restrict blockages, int min_dist, i
         int distance = entry.value;
         Route route = bn->r;
         int idx = bn->idx;
-        ASSERT(idx < MAX_ROUTE_COMMAND, "Too many route commands in a route from %d to %d (%d, %d)", origin->num, dest->num, k, rev_penalty);
+        if (idx >= MAX_ROUTE_COMMAND) {
+            return INT_MAX;
+        }
         //if (idx >= MAX_ROUTE_COMMAND) continue;
         
         const track_node *cn = bn->current_node;

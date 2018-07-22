@@ -538,11 +538,11 @@ static inline void print_status(circlebuffer_t * restrict cb, unsigned int statu
     ASSERT(cb_write_string(cb, str) == 0, "TERMINAL OUTPUT CB FULL");
 }
 
-static inline void print_reservations1(circlebuffer_t * restrict cb, unsigned long long reservations, int train) {
+static inline void print_reservations1(circlebuffer_t * restrict cb, unsigned int reservations, int train) {
     //*
     cb_write_string(cb, "\033[s\033[H\n\t");
 
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < 2; ++i) {
         unsigned int flags = (reservations >> (i * 16)) & 0xFFFF;
         char str[] = STYLED_RESRV_STRING_1 "\r\n\t";
         restylize_string(str, flags, 6, 3, (0x1U << 16), '1' + train);
@@ -558,7 +558,27 @@ static inline void print_reservations1(circlebuffer_t * restrict cb, unsigned lo
     cb_write_string(cb, "\033[u");
     //*/
 }
-static inline void print_reservations2(circlebuffer_t * restrict cb, unsigned long long reservations, int train) {
+static inline void print_reservations2(circlebuffer_t * restrict cb, unsigned int reservations, int train) {
+    //*
+    cb_write_string(cb, "\033[s\033[4;77H");
+
+    for (int i = 0; i < 2; ++i) {
+        unsigned int flags = (reservations >> (i * 16)) & 0xFFFF;
+        char str[] = STYLED_RESRV_STRING_1 "\r\n\t";
+        restylize_string(str, flags, 6, 3, (0x1U << 16), '1' + train);
+        ASSERT(cb_write_string(cb, str) == 0, "TERMINAL OUTPUT CB FULL");
+    }
+    cb_write_string(cb, "\033[u");
+    /*/
+    cb_write_string(cb, "\033[s\033[H\n\t");
+
+    for (int i = 0; i < 7; ++i) {
+        cb_write_string(cb, resrv_strs[i]);
+    }
+    cb_write_string(cb, "\033[u");
+    //*/
+}
+static inline void print_reservations3(circlebuffer_t * restrict cb, unsigned long long reservations, int train) {
     cb_write_string(cb, "\033[s\033[6;77H");
 
     unsigned int flags_snsr = reservations & 0xFFFF;
@@ -843,34 +863,25 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
         }
         case(TERMINAL_PRINT_RESRV1):
         {
-            int active_train = 0;
-            unsigned long long flags = (unsigned int)tm.arg1 | (((unsigned long long)tm.arg2) << 32ULL);
+            int active_train = tm.arg1;
+            unsigned int flags = (unsigned int)tm.arg2;
             print_reservations1(&t.output, flags, active_train);
             break;
         }
         case(TERMINAL_PRINT_RESRV2):
         {
-            int active_train = 1;
-            unsigned long long flags = (unsigned int)tm.arg1 | (((unsigned long long)tm.arg2) << 32ULL);
+            int active_train = tm.arg1;
+            unsigned int flags = (unsigned int)tm.arg2;
             print_reservations2(&t.output, flags, active_train);
             break;
         }
-        /*
-        case(TERMINAL_SET_RESRV3):
+        case(TERMINAL_PRINT_RESRV3):
         {
-            int active_train = tm.arg1;
-            unsigned int flags = (unsigned int)tm.arg2;
-            print_reservations3(&t.output, active_train, flags);
+            int active_train = 4;
+            unsigned long long flags = (unsigned int)tm.arg1 | (((unsigned long long)tm.arg2) << 32ULL);
+            print_reservations3(&t.output, flags, active_train);
             break;
         }
-        case(TERMINAL_SET_RESRV4):
-        {
-            int active_train = tm.arg1;
-            unsigned int flags = (unsigned int)tm.arg2;
-            print_reservations4(&t.output, active_train, flags);
-            break;
-        }
-        //*/
         case (TERMINAL_POS_DBG):
         {
             int node = tm.arg1;
