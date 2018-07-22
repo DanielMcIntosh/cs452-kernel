@@ -10,15 +10,41 @@
 /* Notes:
  * This file uses the kinematics equations associated to motion with constant acceleration.
  * It could instead use the kinematics equations associated to motion with constant jerk
+ *
+ * TODO tomorrow: convert to floats, use an approximation of command delay
  */
 
+static int __attribute__((pure)) position_calc_distance_with_max_velo(Position *p, int dt) {
+    int distance = p->millis_off_last_node;
+    if (p->state == PSTATE_STOPPED) return distance;
+    if (p->v == p->v_max) {
+        distance += p->v * dt / VELOCITY_PRECISION;
+    } else {
+        // so we aren't stopped, and we aren't at the maximum velocity. So, we must be accelerating or decelerating
+        ASSERT(p->state != PSTATE_CONST_VELO && p->state != PSTATE_STOPPED, "Cannot be a constant velocity without v = v_max: state %d v %d vm %d a %d dt %d", p->state, p->v, p->v_max, p->a, dt);
+        // first, we need to figure out how much of dt we need to get to max velo
+        // vf = vi + at -> t =(vf - vi)/a
+        // Note that when decelerating, vf = 0, but v_max not zero (it's the starting velocity) so we get -vi/a
+        int accel_t = MIN(
+                (((p->state == PSTATE_ACCEL ? p->v_max : 0) - p->v) * ACCELERATION_PRECISION) / (p->a * VELOCITY_PRECISION), 
+                dt) ;
+        int accel_d = p->v * accel_t / VELOCITY_PRECISION + (p->a * accel_t / ACCELERATION_PRECISION) * accel_t / 2;
+
+        // then, do the rest at const velo
+        int const_t = dt - accel_t;
+        int const_d = p->v_max * const_t / VELOCITY_PRECISION;
+        distance += accel_d + const_d;
+    }
+
+    return distance;
+}
 void Position_HandleSensorHit(Position* p, track_node *snsr, int time, int new_route_idx){
     p->last_known_node = snsr;
     p->millis_off_last_node = 0;
     if (p->state == PSTATE_ACCEL) {
-        p->v = p->v + (time - p->last_update_time) * p->a * VELOCITY_PRECISION / ACCELERATION_PRECISION;
+        p->v = MIN(p->v + (time - p->last_update_time) * p->a * VELOCITY_PRECISION / ACCELERATION_PRECISION, p->v_max);
     } else if (p->state == PSTATE_DECEL) {
-        p->v = p->v - (time - p->last_update_time) * p->a * VELOCITY_PRECISION / ACCELERATION_PRECISION;
+        p->v = MIN(p->v - (time - p->last_update_time) * p->a * VELOCITY_PRECISION / ACCELERATION_PRECISION, p->v_max);
     }
     p->last_update_time = time;
     p->last_route_idx = new_route_idx;
@@ -38,6 +64,7 @@ void Position_HandleStop(Position *p, int idx_new, int time) {
     p->last_update_time = time;
     p->last_route_idx = idx_new;
     p->v = 0;
+    p->v_max = 0;
     p->a = 0;
 }
 
@@ -47,41 +74,39 @@ void Position_HandleBeginStop(Position *p, const Route *r, int time, const track
     p->millis_off_stop_end = millis_off_stop_end;
 }
 
-void position_handle_accdec(Position *p, const Route *r, int time, int current_velocity, int a, PositionState ps) {
-    p->state = ps;
+void position_handle_accdec(Position *p, const Route *r, int time, int current_velocity, int a, int v_max, PositionState ps) {
     // when a decel starts, we first need to figure out what the most recent predicted node is
     int dt = time - p->last_update_time;
-    int distance = p->millis_off_last_node + p->v * dt / VELOCITY_PRECISION +  p->a * dt * dt / (2 * ACCELERATION_PRECISION);
-    
+    int distance = position_calc_distance_with_max_velo(p, dt);
     // This should update idx.
+    p->state = ps;
     p->last_known_node = forward_dist_on_route_no_extra(r, &p->last_route_idx, p->last_known_node, &distance, "handle accel/decel");
     p->millis_off_last_node = distance;
     p->last_update_time = time;
     p->v = current_velocity;
+    p->v_max = v_max;
     p->a = a;
 }
 
-void Position_HandleAccel(Position *p, const Route *r, int time, int current_velocity, int a) {
+void Position_HandleAccel(Position *p, const Route *r, int time, int current_velocity, int a, int v_max) {
     ASSERT(a > 0, "accel must be positive to accel, %d, %d", a, a / ACCELERATION_PRECISION);
-    return position_handle_accdec(p, r, time, current_velocity, a, PSTATE_ACCEL);
+    return position_handle_accdec(p, r, time, current_velocity, a, v_max, PSTATE_ACCEL);
 }
 
 void Position_HandleDecel(Position *p, const Route *r, int time, int current_velocity, int a) {
     ASSERT(a < 0, "accel must be negative to decel: pv %d, cv %d, a %d", p->v, current_velocity, a);
-    return position_handle_accdec(p, r, time, current_velocity, a, PSTATE_DECEL);
+    return position_handle_accdec(p, r, time, current_velocity, a, current_velocity, PSTATE_DECEL);
 }
 
 void Position_HandleConstVelo(Position *p, Route *r, int time, int current_velocity) {
-    return position_handle_accdec(p, r, time, current_velocity, 0, PSTATE_CONST_VELO);
+    return position_handle_accdec(p, r, time, current_velocity, 0, current_velocity, PSTATE_CONST_VELO);
 }
 
 TrackPosition Position_CalculateNow(Position *p, const Route *r, int time) {
     int dt = time - p->last_update_time;
     ASSERT(dt >= 0, "negative dt");
-    int distance = p->millis_off_last_node + 
-        ((p->state != PSTATE_STOPPED) ? 
-            p->v * dt / VELOCITY_PRECISION + p->a * dt * dt / (2 * ACCELERATION_PRECISION)
-            : 0);
+    int distance = position_calc_distance_with_max_velo(p, dt);
+
     int idx = p->last_route_idx, object = TRACK_NODE_TO_INDEX(p->last_known_node);
     // TODO this will totally break if your position predicts ahead too far
     if (r != NULL && !(p->state == PSTATE_STOPPED)) {
@@ -89,6 +114,12 @@ TrackPosition Position_CalculateNow(Position *p, const Route *r, int time) {
         //ASSERT(tn != NULL, "Null TrackNode");
         if (tn != NULL)
             object = TRACK_NODE_TO_INDEX(tn);
+        else {
+            // we past the end of the route
+            FdistReq frq = {TRACK_NODE_TO_INDEX(p->last_known_node), distance};
+            TrackPosition fdist = GetFdist(WhoIs(NAME_TRACK_STATE), frq);
+            p->last_known_node = &track[fdist.object];
+        }
     }
     TrackPosition tp = {.object = object, .distance_past = distance};
     return tp;
@@ -101,7 +132,7 @@ void Position_Reverse(Position *p){
 
 int __attribute__((pure)) Position_CalculateVelocityNow(Position *p, int time) {
     ASSERT(time > p->last_update_time, "Can't calculate velocity retrospectively");
-    int velo = p->v + (time - p->last_update_time) * p->a * VELOCITY_PRECISION / ACCELERATION_PRECISION;
+    int velo = p->v + ((time - p->last_update_time) * p->a * VELOCITY_PRECISION) / ACCELERATION_PRECISION;
     ASSERT(velo >= 0, "Cannot have negative velocity: velo %d v %d a %d lut %d t %d", velo, p->v, p->a, p->last_update_time, time);
-    return velo;
+    return MIN(velo, p->v_max);
 }

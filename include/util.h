@@ -41,7 +41,7 @@ int fastintsqrt(int);
 #endif
 
 #ifndef ABS
-#define ABS(X) (X > 0 ? X : -X)
+#define ABS(X) ((X) > 0 ? (X) : -(X))
 #endif
 
 #ifndef MOVING_AVERAGE

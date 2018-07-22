@@ -17,7 +17,7 @@ IDLE: %__  E_D:     STK_AVG:     VELO_PR:      SNSR_NX:                  A: 1234
 */
 
 //ABOVE COMMENT IS FOR GETTING LINE, COLUMN VALUES
-#include <kernel.h>
+#include <kernel.h> 
 #include <circlebuffer.h>
 #include <terminal.h>
 #include <name.h>
@@ -773,7 +773,7 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
             cb_write_number(&t.output, sw, 10);
             cb_write_string(&t.output, (action == ACTION_STRAIGHT ? "S" : (action == ACTION_CURVED ? "C" : "R")));
             cb_write_string(&t.output, " ");
-            cb_write_string(&t.output, "\0338");
+            cb_write_string(&t.output, "      \0338");
             break;
         }
         case (TERMINAL_ROUTE_DBG2):
@@ -787,11 +787,11 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
             t.dbg2_col += cb_write_number(&t.output, n2, 10);
             cb_write_string(&t.output, " ");
             t.dbg2_col += 2;
-            if (t.dbg2_col > 97) {
+            if (t.dbg2_col > 153) {
                 //cb_write_string(&t.output, "\n");
                 t.dbg2_col = 1;
             }
-            cb_write_string(&t.output, "\0338");
+            cb_write_string(&t.output, "      \0338");
             break;
         }
         case(TERMINAL_FLAGS_SET):
@@ -848,7 +848,7 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
             if (t.pos_col > 97) {
                 t.pos_col = 1;
             }
-            cb_write_string(&t.output, "\0338");
+            cb_write_string(&t.output, "      \0338");
             break;
         }
         case(TERMINAL_NOTIFY_COURIER):
