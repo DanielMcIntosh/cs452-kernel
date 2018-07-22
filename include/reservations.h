@@ -25,7 +25,7 @@ typedef struct blockage {
 //EXclusive of start, but INclusive of end. When start == end, reserves end (and therefore start)
 bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations, const char * restrict sig) __attribute__((warn_unused_result, nonnull (3, 4, 5, 6)));
 //INclusive of start, but EXclusive of end. When start == end, doesn't free anything
-void free_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations, const char *sig) __attribute__((nonnull (3, 4, 5, 6)));
+void free_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations, Blockage * restrict result, const char *sig) __attribute__((nonnull (3, 4, 5, 6)));
 
 void reservation_to_blockage(Blockage * restrict blockages, const Reservation * restrict reservations);
 

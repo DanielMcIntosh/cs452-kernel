@@ -1,6 +1,8 @@
 #ifndef TERMINAL_H
 #define TERMINAL_H
 
+#include "reservations.h"
+
 #define L(x) x, sizeof(x)
 
 #define CB_INPUT_BUF_SIZE 20
@@ -54,9 +56,6 @@ typedef enum terminalrequest {
     TERMINAL_DISTANCE_DEBUG,
     TERMINAL_FLAGS_SET,
     TERMINAL_FLAGS_UNSET,
-    TERMINAL_PRINT_RESRV1,
-    TERMINAL_PRINT_RESRV2,
-    TERMINAL_PRINT_RESRV3,
     TERMINAL_SET_RESRV1,
     TERMINAL_SET_RESRV2,
     TERMINAL_SET_RESRV3,
@@ -73,7 +72,12 @@ typedef enum terminalrequest {
     NUM_TERMINAL_REQUESTS
 } TerminalRequest;
 
+typedef struct tcourier TerminalCourier;
+
 int SendTerminalRequest(int terminaltid, TerminalRequest rq, int arg1, int arg2);
+int terminal_set_reservations(TerminalCourier *tc, Blockage * restrict blockages, int train);
+int terminal_unset_reservations(TerminalCourier *tc, Blockage * restrict blockages, int train);
+
 
 void __attribute__((noreturn)) task_terminal();
 #endif
