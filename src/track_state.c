@@ -120,6 +120,7 @@ static int reverse_distance_from_node(const Switch * restrict ts, const track_no
 */
 static int forward_distance_from_node(const SwitchState * restrict ts, const track_node *destination, int distance, int * restrict wakeup_sensor, int * restrict dist_after_sensor) {
     ASSERT(distance >= 0, "Cannot forward find negative distance");
+    ASSERT_VALID_TRACK(destination);
     const track_node * restrict next_sensor = destination;
     const track_edge *e;
     *wakeup_sensor = TRACK_NODE_TO_INDEX(next_sensor);
@@ -131,6 +132,7 @@ static int forward_distance_from_node(const SwitchState * restrict ts, const tra
         ASSERT(e != NULL, "NULL edge predicted ahead");
         tdist += e->dist;
         next_sensor = e->dest;
+        ASSERT_VALID_TRACK(next_sensor);
     }
     cdist = distance - last_tdist; // remaining distance (in mm)
     *dist_after_sensor = cdist;
@@ -290,6 +292,7 @@ void __attribute__((noreturn)) task_track_state() {
             FdistReq fdr = tm.fdist_request;
             int node = 0, distance = 0;
             //PANIC("WHY __-__ %s (%d), %d", track[fdr.cnode].name, fdr.cnode, fdr.distance);
+            StoreValue(VALUE_LAST_FN, 2);
             int err = forward_distance_from_node(ts.switches, &track[fdr.cnode], fdr.distance, &node, &distance);
             if (err < 0) {
                 rm.ret = -1;

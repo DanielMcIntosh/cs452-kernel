@@ -141,6 +141,8 @@ int main(){
     TaskQueue task_ready_queue;
     task_ready_queue.task_pool = task_pool;
     ValueStore value_store = {{0}};
+    value_store.values[VALUE_LAST_FN] = 51;
+    value_store.values[VALUE_VSLF_ADDR] = (int) (value_store.values + VALUE_LAST_FN);
 
     task_init(&task_ready_queue, stack_space, STACK_SPACE_SIZE);
 
@@ -162,6 +164,8 @@ int main(){
         if (task->last_syscall != SYSCALL_INTERRUPT){
             task->sp[0] = task->r0; 
         }
+        value_store.values[VALUE_LAST_FN] = task->tid;
+        value_store.values[VALUE_LAST_LR] = task->sp[13];
         f = activate((int) task);
         task->last_syscall = f;
 
@@ -174,5 +178,6 @@ int main(){
     LOG("Kernel Exiting - No More Tasks");
     vic2->IntEnableClear = 0xFFFFFFFF;
 
+    bwprintf(COM2,"\r\n\n\n\n\n  \033[1;4;33;41m x -b 0x%x\033[0m  ", (int) value_store.values+VALUE_LAST_FN);
     return 0;
 }

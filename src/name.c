@@ -22,7 +22,7 @@ int TID_NS = 0;
 
 int __attribute__((pure)) legal_name(const char * n){
     int len = 0;
-    while (*n++ != NULL)
+    while (*n++ != NULL && len < 8)
         len++;
     return len <= 8;
 }
@@ -72,6 +72,8 @@ int RegisterAs(const char * name) {
     msg.id = MESSAGE_REGAS;
     memcpy(msg.name, name, MAXNAMESIZE); 
     Send(TID_NS, &msg, sizeof(msg), &msg, sizeof(msg));
+    if (msg.tid < 0) __builtin_trap();
+    //ASSERT(msg.tid >= 2, "fuck %d", msg.tid);
     return msg.tid;
 }
 
@@ -80,6 +82,8 @@ int WhoIs(const char * name){
     msg.id = MESSAGE_WHOIS;
     memcpy(msg.name, name, MAXNAMESIZE);
     Send(TID_NS, &msg, sizeof(msg), &msg, sizeof(msg));
+    if (msg.tid < 2) __builtin_trap();
+    ASSERT(msg.tid >= 2, "fuck %d", msg.tid);
     return msg.tid;
 }
 

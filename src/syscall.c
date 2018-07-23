@@ -65,6 +65,7 @@ int Create(Priority priority, void (*code)()){
 }
 
 int Send(int tid, const void *msg, int msglen, void *reply, int rplen){
+    ASSERT(tid >= 0, "fuck this");
     return syscall_5(SYSCALL_SEND, tid, (int) msg, msglen, (int) reply, rplen);
 }
 
@@ -73,6 +74,7 @@ int Receive(int * restrict tid, void * restrict msg, int msglen){
 }
 
 int Reply(int tid, const void *reply, int rplen){
+    ASSERT(tid >= 0, "fuck this");
     return syscall_3(SYSCALL_REPLY, tid, (int) reply, rplen);
 }
 

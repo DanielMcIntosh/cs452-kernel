@@ -14,7 +14,7 @@
  * TODO tomorrow: convert to floats, use an approximation of command delay
  */
 
-static int __attribute__((pure)) position_calc_distance_with_max_velo(Position *p, int dt) {
+static int position_calc_distance_with_max_velo(Position *p, int dt) {
     int distance = p->millis_off_last_node;
     if (p->state == PSTATE_STOPPED) return distance;
     if (p->v == p->v_max) {
@@ -22,6 +22,10 @@ static int __attribute__((pure)) position_calc_distance_with_max_velo(Position *
     } else {
         // so we aren't stopped, and we aren't at the maximum velocity. So, we must be accelerating or decelerating
         ASSERT(p->state != PSTATE_CONST_VELO && p->state != PSTATE_STOPPED, "Cannot be a constant velocity without v = v_max: state %d v %d vm %d a %d dt %d", p->state, p->v, p->v_max, p->a, dt);
+        ASSERT(
+                (p->state == PSTATE_ACCEL && p->a > 0) ||
+                (p->state == PSTATE_DECEL && p->a < 0),
+                "State does not match p->a sign: %d, %d", p->state, p->a);
         // first, we need to figure out how much of dt we need to get to max velo
         // vf = vi + at -> t =(vf - vi)/a
         // Note that when decelerating, vf = 0, but v_max not zero (it's the starting velocity) so we get -vi/a
@@ -29,10 +33,11 @@ static int __attribute__((pure)) position_calc_distance_with_max_velo(Position *
                 (((p->state == PSTATE_ACCEL ? p->v_max : 0) - p->v) * ACCELERATION_PRECISION) / (p->a * VELOCITY_PRECISION), 
                 dt) ;
         int accel_d = p->v * accel_t / VELOCITY_PRECISION + (p->a * accel_t / ACCELERATION_PRECISION) * accel_t / 2;
+        int vm = p->v + accel_t * p->a * VELOCITY_PRECISION / ACCELERATION_PRECISION;
 
         // then, do the rest at const velo
         int const_t = dt - accel_t;
-        int const_d = p->v_max * const_t / VELOCITY_PRECISION;
+        int const_d = vm * const_t / VELOCITY_PRECISION;
         distance += accel_d + const_d;
     }
 
@@ -78,9 +83,23 @@ void position_handle_accdec(Position *p, const Route *r, int time, int current_v
     // when a decel starts, we first need to figure out what the most recent predicted node is
     int dt = time - p->last_update_time;
     int distance = position_calc_distance_with_max_velo(p, dt);
+    int d = distance;
     // This should update idx.
+
+    int idx = p->last_route_idx;
+    const track_node *tn = forward_dist_on_route_no_extra(r, &idx, p->last_known_node, &distance, "handle accel/decel");
+    ASSERT(tn != NULL, 
+            "big oopsies: %d, %s, %d, %d -> %d, %d -> %d, %d - %d = %d, |%d, %d, %d|, :%d -> %d@ ", 
+            (int) p->last_known_node, p->last_known_node->name, distance,
+            p->last_route_idx, idx,
+            p->state, ps,
+            time, p->last_update_time, dt,
+            p->v, p->v_max, p->a,
+            p->millis_off_last_node, d
+            );
     p->state = ps;
-    p->last_known_node = forward_dist_on_route_no_extra(r, &p->last_route_idx, p->last_known_node, &distance, "handle accel/decel");
+    p->last_known_node  = tn;
+    p->last_route_idx = idx;
     p->millis_off_last_node = distance;
     p->last_update_time = time;
     p->v = current_velocity;
@@ -103,10 +122,12 @@ void Position_HandleConstVelo(Position *p, Route *r, int time, int current_veloc
 }
 
 TrackPosition Position_CalculateNow(Position *p, const Route *r, int time) {
+    StoreValue(VALUE_LAST_FN, 1);
     int dt = time - p->last_update_time;
     ASSERT(dt >= 0, "negative dt");
     int distance = position_calc_distance_with_max_velo(p, dt);
 
+    ASSERT(p != NULL && p->last_known_node != NULL, "null p or last node: %d/%d", (int) p, (int) (p ? p->last_known_node : NULL));
     int idx = p->last_route_idx, object = TRACK_NODE_TO_INDEX(p->last_known_node);
     // TODO this will totally break if your position predicts ahead too far
     if (r != NULL && !(p->state == PSTATE_STOPPED)) {
@@ -116,12 +137,16 @@ TrackPosition Position_CalculateNow(Position *p, const Route *r, int time) {
             object = TRACK_NODE_TO_INDEX(tn);
         else {
             // we past the end of the route
+            /*
             FdistReq frq = {TRACK_NODE_TO_INDEX(p->last_known_node), distance};
             TrackPosition fdist = GetFdist(WhoIs(NAME_TRACK_STATE), frq);
             p->last_known_node = &track[fdist.object];
+            //*/
+            object = TRACK_NODE_TO_INDEX(p->last_known_node);
         }
     }
     TrackPosition tp = {.object = object, .distance_past = distance};
+    StoreValue(VALUE_LAST_FN, 0);
     return tp;
 }
 

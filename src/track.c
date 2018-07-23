@@ -252,7 +252,8 @@ const track_node *forward_dist_on_route_no_extra(const Route *route, int * restr
     while (cur_dist < *distance && prev != NULL) {
         e = next_edge_on_route(route, idx, prev, sig);
         if (e == NULL) {
-            *distance = cur_dist;
+            *distance = cur_dist; // off route?
+
             return NULL;
         } else if (cur_dist + e->dist > *distance) {
             *idx = idx_old;
@@ -334,6 +335,7 @@ static inline void remove_from_mask(const track_node *n, Reservation * restrict 
 
 bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations) {
     ASSERT_VALID_TRACK(start);
+    ASSERT_VALID_TRACK(end);
 
     Reservation mask = RESERVATION_INIT;
     add_to_mask(end, &mask);

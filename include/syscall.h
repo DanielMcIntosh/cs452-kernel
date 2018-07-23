@@ -43,6 +43,9 @@ typedef enum {
     VALUE_STACK_AVG,
     VALUE_STACK_MAX,
     VALUE_TRACK_NAME,
+    VALUE_LAST_FN,
+    VALUE_LAST_LR,
+    VALUE_VSLF_ADDR,
     NUM_VALUES
 } StorableValue;
 

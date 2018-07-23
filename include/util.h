@@ -33,7 +33,7 @@ int fastintsqrt(int);
 #endif
 
 #ifndef MIN
-#define MIN(X, Y) (((X) > (Y)) ? (X) : (Y))
+#define MIN(X, Y) (((X) > (Y)) ? (Y) : (X))
 #endif
 
 #ifndef CLAMP

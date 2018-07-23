@@ -64,7 +64,11 @@ static inline void handle_send(TD *task, TaskQueue *task_ready_queue){
         return;
     }
 
-    KASSERT(!is_deadlock(task, receiver), "DEADLOCK BETWEEN %d (%d) and %d (%d)", task->tid, *((int *) TD_arg(task, 1)), receiver->tid, *((int *) TD_arg(receiver, 1)));
+    //KASSERT(!is_deadlock(task, receiver), "DEADLOCK BETWEEN %d (%d) and %d (%d)", task->tid, TD_arg(task, 1), receiver->tid, TD_arg(receiver, 1));
+    if (task == NULL || is_deadlock(task, receiver)) {
+        //__builtin_trap();
+        //bwprintf(COM2, "F");
+    }
 
     //reciever is already waiting for a message
     if (receiver->state == STATE_BLK_SEND)
@@ -72,6 +76,8 @@ static inline void handle_send(TD *task, TaskQueue *task_ready_queue){
         *((int *)(TD_arg(receiver, 0))) = task_getTid(task); //set the tid of the receive caller
         if (unlikely(TD_arg(task, 2) != TD_arg(receiver, 2))){
             receiver->r0 = ERR_MSG_TRUNCATED;
+
+            //__builtin_trap();
         } else {
             receiver->r0 = TD_arg(task, 2);
         }

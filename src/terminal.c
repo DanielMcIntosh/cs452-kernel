@@ -150,6 +150,12 @@ static void output_base_terminal(Terminal *t) {
 
     cursor_to_position(cb, 1, 29);
     cb_write_number(cb, STACK_SPACE_SIZE/TASK_POOL_SIZE - 4, 16);
+
+    cursor_to_position(cb, 1, 85);
+    cb_write_string(cb, "\033[1;4;36;41m x -b 0x");
+    cb_write_number(cb, GetValue(VALUE_VSLF_ADDR), 16);
+    cb_write_string(cb, "\033[0m  ");
+
     cursor_to_position(cb, t->input_line, t->input_col);
 }
 

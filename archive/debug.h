@@ -8,13 +8,17 @@
 #define DEBUG 0
 #define DEBUG_COM2 0
 
+// addr of last_function value: 3311040
+// hex version: 0x3285C0
+
 #define PANIC(...) \
     EnterCriticalSection();\
     bwprintf(COM2, __VA_ARGS__);\
     Quit();
 
 #define KPANIC(...) \
-    bwprintf(COM2, __VA_ARGS__);\
+    if (!(uart2->ctrl & UARTEN_MASK)){ init_uart(INIT_U2); for (volatile int i = 0; i < 555; i++);}\
+    bwprintf(COM2, __VA_ARGS__); \
     __builtin_trap();
 
 #define IS(x) #x
@@ -23,7 +27,6 @@
 if (unlikely(!(x))) {\
     PANIC("ASSERT FAILED: " S(x) "\r\nFUNCTION: %s\r\nFILE: "S(__FILE__) "\r\nLINE: " S(__LINE__) "\r\n" S(y) "\r\n", __func__,  ##vargs)\
 }
-
 #define KASSERT(x, y,vargs...) \
 if (unlikely(!(x))) {\
     KPANIC("ASSERT FAILED: " S(x) "\r\nFUNCTION: %s\r\nFILE: "S(__FILE__) "\r\nLINE: " S(__LINE__) "\r\n" S(y) "\r\n", __func__,  ##vargs)\
