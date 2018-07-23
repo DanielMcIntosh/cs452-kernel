@@ -76,7 +76,7 @@ typedef struct tcourier TerminalCourier;
 
 int SendTerminalRequest(int terminaltid, TerminalRequest rq, int arg1, int arg2);
 int terminal_set_reservations(TerminalCourier *tc, Blockage * restrict blockages, int train);
-int terminal_unset_reservations(TerminalCourier *tc, Blockage * restrict blockages, int train);
+int terminal_unset_reservations(TerminalCourier *tc, Blockage * restrict blockages);
 
 
 void __attribute__((noreturn)) task_terminal();

@@ -77,7 +77,7 @@ int terminal_set_reservations(TerminalCourier *tc, Blockage * restrict blockages
     return err;
 }
 
-int terminal_unset_reservations(TerminalCourier *tc, Blockage * restrict blockages, int train) {
+int terminal_unset_reservations(TerminalCourier *tc, Blockage * restrict blockages) {
     int err;
     err = tc_send(tc, TERMINAL_UNSET_RESRV1, blockages->bits_low & 0xFFFFFFFFUL, (blockages->bits_low >> 32) & 0xFFFFFFFFUL);
     /*

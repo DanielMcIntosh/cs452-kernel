@@ -1,0 +1,6 @@
+#ifndef __CONFIG_CONSTANTS_H__
+#define __CONFIG_CONSTANTS_H__
+
+#define MAX_CONCURRENT_TRAINS 5
+
+#endif //__CONFIG_CONSTANTS_H__
