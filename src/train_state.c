@@ -352,10 +352,14 @@ static void ts_exec_step(TrainState * restrict ts, TerminalCourier * restrict tc
         RouteCommand nc = ar->route.rcs[ar->idx_resrv];
         const track_node *nnode = rc_to_track_node(nc, sig);
         ASSERT(nc.swmr >= 0, "invalid swmr: %d\r\n", nc.swmr);
-        ar->next_step_distance += distance_to_on_route(&ar->route, ar->idx_resrv - 1, cnode, nnode, sig);
+        bool on_route;
+        ar->next_step_distance += distance_to_on_route(&ar->route, ar->idx_resrv - 1, cnode, nnode, &on_route, sig);
+        ASSERT(on_route, "next step must be on route when execing");
     } else if (!ar->stopped && !ar->reversing) {
         const track_node *nnode = &track[ar->end_node];
-        ar->next_step_distance += distance_to_on_route(&ar->route, ar->idx_resrv - 1, cnode, nnode, sig);
+        bool on_route;
+        ar->next_step_distance += distance_to_on_route(&ar->route, ar->idx_resrv - 1, cnode, nnode, &on_route, sig);
+        ASSERT(on_route, "next step must be on route when execing");
     } else {
         ar->next_step_distance = INT_MAX - 10000;
         tc_send(tc, TERMINAL_ROUTE_DBG2, 204, 0);
@@ -366,27 +370,28 @@ static inline int get_resrv_dist(const ActiveRoute * restrict ar, int idx, const
     ASSERT_VALID_TRACK(start);
     int cur_dist = 0, total_dist = 0;
     const track_node *resrv_end = start;
+    bool on_route = TRUE;
 
     //nth-sensor + stopping_dist + next_switch
-    resrv_end = nth_sensor_on_route(2,  &ar->route, &idx, resrv_end, &cur_dist, "get_resrv_dist: 1");
+    resrv_end = nth_sensor_on_route(2,  &ar->route, &idx, resrv_end, &cur_dist, &on_route, "get_resrv_dist: 1");
     total_dist += cur_dist;
-    if (resrv_end == NULL) {
+    if (resrv_end == NULL || !on_route) {
         return total_dist;
     }
     ASSERT_VALID_TRACK(resrv_end);
 
     cur_dist = stopping_distance;
-    resrv_end = forward_dist_on_route(  &ar->route, &idx, resrv_end, &cur_dist, "get_resrv_dist: 2");
+    resrv_end = forward_dist_on_route(  &ar->route, &idx, resrv_end, &cur_dist, &on_route, "get_resrv_dist: 2");
     total_dist += cur_dist;
-    if (resrv_end == NULL) {
+    if (resrv_end == NULL || !on_route) {
         return total_dist;
     }
     ASSERT_VALID_TRACK(resrv_end);
 
     cur_dist = 0;
-    resrv_end = next_switch_on_route(   &ar->route, &idx, resrv_end, &cur_dist, "get_resrv_dist: 3");
+    resrv_end = next_switch_on_route(   &ar->route, &idx, resrv_end, &cur_dist, &on_route, "get_resrv_dist: 3");
     total_dist += cur_dist;
-    if (resrv_end == NULL) {
+    if (resrv_end == NULL || !on_route) {
         return total_dist;
     }
     ASSERT_VALID_TRACK(resrv_end);
@@ -509,10 +514,16 @@ static inline void activeroute_recalculate_distances(ActiveRoute * restrict ar, 
         ar->next_step_distance = 0;
     } else {
         ASSERT(ar->idx_resrv >= ar->cur_pos_idx, "should have reserved ahead of cur_pos_idx, idx_resrv = %d, cur_pos_idx = %d, sensor = %d", ar->idx_resrv, ar->cur_pos_idx, sensor);
+        bool on_route = TRUE;
         if (ar->route.rcs[ar->idx_resrv].a != ACTION_NONE)
-            ar->next_step_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[ar->idx_resrv], "ar next step recalculate rc2tn"), "ar next step recalculate");
+            ar->next_step_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[ar->idx_resrv], "ar next step recalculate rc2tn"), &on_route, "ar next step recalculate");
         else 
-            ar->next_step_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], rc_to_track_node(ar->route.rcs[ar->end_node], "ar next step recalculate rc2tn"), "ar next step recalculate");
+            ar->next_step_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], &track[ar->end_node], &on_route, "ar next step recalculate");
+
+        ASSERT(on_route, "recalculate distance cannot be off route: %d (%s -> %s@ %d)", on_route, track[SENSOR_TO_NODE(sensor)].name, 
+                (ar->route.rcs[ar->idx_resrv].a == ACTION_NONE ? 
+                    track[ar->end_node].name : 
+                    track[SWITCH_TO_NODE_NSC(ar->route.rcs[ar->idx_resrv].swmr)].name), ar->idx_resrv);
 
         //have to delay initialization of next step distance until we hit the next sensor, since that's where the route actually starts
         if (ar->idx_resrv == 0 && RESERVE_TRACK) {
@@ -522,7 +533,8 @@ static inline void activeroute_recalculate_distances(ActiveRoute * restrict ar, 
             }
         }
     }
-    ar->remaining_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], &track[ar->end_node], "ar distance recalculate") + ar->distance_past;
+    bool on_route = TRUE;
+    ar->remaining_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], &track[ar->end_node], &on_route, "ar distance recalculate") + ar->distance_past;
     tc_send(tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
 }
 
@@ -530,9 +542,10 @@ static int activeroute_distance_to_next_stop(ActiveRoute *ar, track_node *cnode,
     const track_node *n = cnode;
     int distance = 0;
     const track_edge *e;
+    bool on_route = TRUE;
     while (ar->route.rcs[*idx].a != ACTION_NONE && ar->route.rcs[*idx].a != ACTION_RV){
-        e = next_edge_on_route(&(ar->route), idx, n, "Distance to next stop");
-        ASSERT(e != NULL, "Should not be able to get null edge without ACTION_NONE or ACTION_RV");
+        e = next_edge_on_route(&(ar->route), idx, n, &on_route, "Distance to next stop");
+        ASSERT(e != NULL && on_route, "Should not be able to get null edge without ACTION_NONE or ACTION_RV");
         distance += e->dist;
         n = e->dest;
     }
@@ -655,16 +668,36 @@ static void activeroute_exec_steps(ActiveRoute * restrict ar, TrainState * restr
     tc_send(tc, TERMINAL_PRINT_RESRV2, ts->reservations.bits_high & 0xFFFFFFFF, (ts->reservations.bits_high >> 32) & 0xFFFFFFFF);
 }
 
+static bool activeroute_off_route(ActiveRoute * restrict ar, Train * restrict train, TerminalCourier * restrict tc, int sensor, int distance, int tr, int cmdtid){
+    if (ar->reversing) return FALSE; // We're off route, but we don't mind
+
+    ASSERT(FALSE, "Off route, but not currently reversing");
+    return FALSE;
+}
+
 static inline void activeroute_on_sensor_event(ActiveRoute * restrict ar, Train * restrict train, TrainState * restrict ts, TerminalCourier * restrict tc, int sensor, int distance, int tr, int cmdtid){
     int dist_to_next_snsr = 0;
-    if (ACTIVE_ROUTE_COMPLETE(ar) || ar->reversing)
+    if (ACTIVE_ROUTE_COMPLETE(ar))
         return;
 
     // update cur_pos_idx
-    while (ar->last_handled_sensor != -1 && ar->last_handled_sensor != sensor){
-        ar->last_handled_sensor =  next_sensor_on_route(&ar->route, &ar->cur_pos_idx, &track[SENSOR_TO_NODE(ar->last_handled_sensor)], &dist_to_next_snsr, "update cur_pos_idx")->num;
+    bool on_route = TRUE;
+    int lhs = ar->last_handled_sensor;
+    while (lhs != -1 && lhs != sensor && on_route){
+        const track_node *ns =  next_sensor_on_route(&ar->route, &ar->cur_pos_idx, &track[SENSOR_TO_NODE(lhs)], &dist_to_next_snsr, &on_route, "update cur_pos_idx");
+        if (ns != NULL)
+            lhs = ns->num;
     }
+    if (!on_route){
+        bool continue_actions = activeroute_off_route(ar, train, tc, sensor, distance, tr, cmdtid);
+        if (!continue_actions)
+            return;
+    } 
+
     ar->last_handled_sensor = sensor;
+
+    if (ar->reversing)
+        return;
 
     activeroute_recalculate_distances(ar, ts, tc, sensor, distance);
 
@@ -935,7 +968,7 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             SendCommand(cmdtid, c);
             // figure out end position:
             int time = Time();
-            ASSERT(tr->speed == NAV_SPEED, "incorrect speed");
+            //ASSERT(tr->speed == NAV_SPEED, "incorrect speed");
             //PANIC("%d %s %d", stoppos, track[stoppos].name, distance);
             Position_HandleBeginStop(&tr->pos, &ts.active_routes[activetrain].route, time, 
                     &track[stoppos], distance, 

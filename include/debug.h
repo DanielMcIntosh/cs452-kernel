@@ -21,7 +21,7 @@
 #define S(x) IS(x) 
 #define ASSERT(x, y,vargs...) \
 if (unlikely(!(x))) {\
-    PANIC("ASSERT FAILED: " S(x) "\r\nFUNCTION: %s\r\nFILE: "S(__FILE__) "\r\nLINE: " S(__LINE__) "\r\n" S(y) "\r\n", __func__,  ##vargs)\
+    PANIC("\033[0m\033[1;37;41mASSERT FAILED:\033[21;31;40m\r\n" S(x) "\r\nFUNCTION: %s\r\nFILE: "S(__FILE__) "\r\nLINE: " S(__LINE__) "\r\n" S(y) "\r\n\033[0m", __func__,  ##vargs)\
 }
 
 #define KASSERT(x, y,vargs...) \

@@ -20,7 +20,7 @@ typedef struct namemessage {
 
 int TID_NS = 0;
 
-int __attribute__((pure)) legal_name(const char * n){
+int __attribute__((const)) legal_name(const char * n){
     int len = 0;
     while (*n++ != NULL && len < 8)
         len++;

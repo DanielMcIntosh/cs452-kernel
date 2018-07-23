@@ -133,7 +133,7 @@ static void output_base_terminal(Terminal *t) {
         "\033[g"
         ;
     circlebuffer_t * restrict cb = &t->output;
-    ASSERT(cb_write_string(cb, "\033[2J\033[3g\033[H") == 0, "Error outputting base terminal");
+    ASSERT(cb_write_string(cb, "\033[0m\033[2J\033[3g\033[H") == 0, "Error outputting base terminal");
     ASSERT(cb_write_string(cb, topbar) == 0, "Error outputting base terminal");
     ASSERT(cb_write_string(cb, track_char == 'A' ? trackA : trackB) == 0, "Error outputting base terminal");
     ASSERT(cb_write_string(cb, reservables) == 0, "Error outputting base terminal");

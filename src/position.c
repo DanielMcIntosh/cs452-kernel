@@ -87,9 +87,10 @@ void position_handle_accdec(Position *p, const Route *r, int time, int current_v
     // This should update idx.
 
     int idx = p->last_route_idx;
-    const track_node *tn = forward_dist_on_route_no_extra(r, &idx, p->last_known_node, &distance, "handle accel/decel");
-    ASSERT(tn != NULL, 
-            "big oopsies: %d, %s, %d, %d -> %d, %d -> %d, %d - %d = %d, |%d, %d, %d|, :%d -> %d@ ", 
+    bool on_route = TRUE;
+    const track_node *tn = forward_dist_on_route_no_extra(r, &idx, p->last_known_node, &distance, &on_route, "handle accel/decel");
+    ASSERT(tn != NULL || !on_route, 
+            "accelerating off route: %d, %s, %d, %d -> %d, %d -> %d, %d - %d = %d, |%d, %d, %d|, :%d -> %d@ ", 
             (int) p->last_known_node, p->last_known_node->name, distance,
             p->last_route_idx, idx,
             p->state, ps,
@@ -131,9 +132,10 @@ TrackPosition Position_CalculateNow(Position *p, const Route *r, int time) {
     int idx = p->last_route_idx, object = TRACK_NODE_TO_INDEX(p->last_known_node);
     // TODO this will totally break if your position predicts ahead too far
     if (r != NULL && !(p->state == PSTATE_STOPPED)) {
-        const track_node *tn = forward_dist_on_route_no_extra(r, &idx, p->last_known_node, &distance, "position calculateion");
+        bool on_route = TRUE;
+        const track_node *tn = forward_dist_on_route_no_extra(r, &idx, p->last_known_node, &distance, &on_route, "position calculateion");
         //ASSERT(tn != NULL, "Null TrackNode");
-        if (tn != NULL)
+        if (!on_route)
             object = TRACK_NODE_TO_INDEX(tn);
         else {
             // we past the end of the route
