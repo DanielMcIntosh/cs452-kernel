@@ -190,7 +190,7 @@ static inline void handle_interrupt(TD __attribute__((unused)) *task, TaskQueue 
             break;
         }
     }
-    ASSERT(event < NUM_EVENTS, "Interrupt doesn't correspond to an event");
+    KASSERT(event < NUM_EVENTS, "Interrupt doesn't correspond to an event");
     LOGF("EVENT: %d | STATUS: %x|%x\r\n", event, vic1->IRQStatus, vic2->IRQStatus);
 
     // turn off that interrupt

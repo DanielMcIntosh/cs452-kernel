@@ -3,7 +3,13 @@
 #include <syscall.h>
 #include <debug.h>
 
-inline static __attribute__((always_inline)) int syscall_5(const int n, const int arg1, const int arg2, const int arg3, const int arg4, const int arg5){
+#define sy
+#define syscall_0(n) syscall_5(n, 0, 0, 0, 0, 0);
+#define syscall_2(n, arg1, arg2) syscall_5(n, arg1, arg2, 0, 0, 0);
+#define syscall_3(n, arg1, arg2, arg3)  syscall_5(n, arg1, arg2, arg3, 0, 0);
+#define syscall_4(n, arg1, arg2, arg3, arg4) syscall_5(n, arg1, arg2, arg3, arg4, 0);
+
+static __attribute__((always_inline)) inline int syscall_5(const int n, const int arg1, const int arg2, const int arg3, const int arg4, const int arg5){
     int ret;
     LOGF("Expected Arguments: %d, %d, %d, %d, %d\r\n", arg1, arg2, arg3, arg4, arg5);
 __asm__(
@@ -30,18 +36,20 @@ __asm__ volatile (
     return ret;
 }
 
-inline static __attribute__((always_inline)) int syscall_0(const int n){
+/*
+static __attribute__((always_inline)) inline int syscall_0(const int n){
     return syscall_5(n, 0, 0, 0, 0, 0);
 }
-inline static __attribute__((always_inline)) int syscall_2(const int n, const int arg1, const int arg2){
+static __attribute__((always_inline)) inline int syscall_2(const int n, const int arg1, const int arg2){
     return syscall_5(n, arg1, arg2, 0, 0, 0);
 }
-inline static __attribute__((always_inline)) int syscall_3(const int n, const int arg1, const int arg2, const int arg3){
+static __attribute__((always_inline)) inline int syscall_3(const int n, const int arg1, const int arg2, const int arg3){
     return syscall_5(n, arg1, arg2, arg3, 0, 0);
 }
-inline static __attribute__((always_inline)) int syscall_4(const int n, const int arg1, const int arg2, const int arg3, const int arg4){
+static __attribute__((always_inline)) inline int syscall_4(const int n, const int arg1, const int arg2, const int arg3, const int arg4){
     return syscall_5(n, arg1, arg2, arg3, arg4, 0);
 }
+*/
 
 void Pass(){
     syscall_0(SYSCALL_PASS);

@@ -147,7 +147,7 @@ int main(){
     task_init(&task_ready_queue, stack_space, STACK_SPACE_SIZE);
 
     int err = task_create(&task_ready_queue, 1, PRIORITY_INIT, (int) &fut, 0, 0);
-    ASSERT(err == 0, "FATAL ERROR: Could not create First User Task");
+    KASSERT(err == 0, "FATAL ERROR: Could not create First User Task");
 
     LOG("Task Created!\r\n");
     LOGF("&fut: %x\r\n", (int) &fut);

@@ -1,6 +1,8 @@
 #include <ts7200.h>
 #include <circlebuffer.h>
 #include <err.h>
+#include <debug.h>
+#include <syscall.h>
 
 void cb_init(struct circlebuffer * restrict cb, char *buf, int size) {
     cb->buf = buf;
@@ -33,6 +35,7 @@ inline int cb_avail_for_write(struct circlebuffer *cb) {
 
 int cb_read(struct circlebuffer * restrict cb, char * restrict c){
     if (cb_empty(cb)) {
+        ASSERT(FALSE, "empty cb during read");
         return 1;
     }
 
@@ -65,7 +68,8 @@ int cb_read_number(struct circlebuffer * restrict cb, int * restrict i){
 
     num = 0;
     char c;
-    while(cb_read(cb, &c) == 0) {
+    while(cb_peek(cb, &c) == 0) {
+        ASSERT(cb_read(cb, &c) == 0, "read failed from peeked cb");
         digit = cb_ch2d(c);
         if (digit >= 10 || digit < 0){
             break;
@@ -105,6 +109,7 @@ int cb_read_int(struct circlebuffer *cb, int *i){ // reads 4-char int
 
 int cb_write(struct circlebuffer *cb, char c){
     if (cb_full(cb)) {
+        ASSERT(FALSE, "writing to full cb");
         return 1;
     }
 

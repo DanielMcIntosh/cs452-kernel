@@ -125,7 +125,6 @@ void Position_HandleConstVelo(Position *p, Route *r, int time, int current_veloc
 }
 
 TrackPosition Position_CalculateNow(Position *p, const Route *r, int time) {
-    StoreValue(VALUE_LAST_FN, 1);
     int dt = time - p->last_update_time;
     ASSERT(dt >= 0, "negative dt");
     int distance = position_calc_distance_with_max_velo(p, dt);
@@ -153,7 +152,6 @@ TrackPosition Position_CalculateNow(Position *p, const Route *r, int time) {
         }
     }
     TrackPosition tp = {.object = object, .distance_past = distance};
-    StoreValue(VALUE_LAST_FN, 0);
     return tp;
 }
 
