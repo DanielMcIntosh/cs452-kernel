@@ -16,4 +16,6 @@
 
 #define ALLOW_SHORTS TRUE
 
+#define DEBUG_CLOCK FALSE
+
 #endif

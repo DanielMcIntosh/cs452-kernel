@@ -656,7 +656,12 @@ static void ar_short_move(TrainState * restrict ts, ActiveRoute * restrict ar, T
 }
 
 static void activeroute_exec_steps(ActiveRoute * restrict ar, TrainState * restrict ts, TerminalCourier * restrict tc, int resrv_dist, int tr, int cmdtid) {
-    const track_node *resrv_end = rc_to_track_node(ar->route.rcs[ar->idx_resrv], "resrv_start");
+    const track_node *resrv_end;
+    if (ar->route.rcs[ar->idx_resrv].a == ACTION_NONE) {
+        resrv_end = &track[ar->end_node];
+    } else {
+        resrv_end = rc_to_track_node(ar->route.rcs[ar->idx_resrv], "resrv_start");
+    }
     //we assign resrv_end to resrv_start first thing in the loop
     tc_send(tc, TERMINAL_ROUTE_DBG2, 260, resrv_end->num);
     // Perform any actions we need to do:

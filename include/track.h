@@ -4,6 +4,8 @@
 #include "track_data.h"
 #include "train_state.h"
 
+#define BFS_MH_SIZE 120
+
 extern track_node track[TRACK_MAX];
 #define ASSERT_VALID_TRACK(n) ASSERT(track <= (n) && (n) <= track+TRACK_MAX, "INVALID "S(n)": %d, [%d -> %d]", (int)(n), (int)track, (int)track+TRACK_MAX)
 #define ASSERT_VALID_TRACK_SIG(n, sig) ASSERT(track <= (n) && (n) <= track+TRACK_MAX, "INVALID "S(n)": %d, [%d -> %d] @ %s", (int)(n), (int)track, (int)track+TRACK_MAX, (sig))

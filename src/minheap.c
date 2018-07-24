@@ -25,6 +25,7 @@ static void mh_bubble_up(minheap_t *mh, unsigned int idx) {
 static void mh_bubble_down(minheap_t *mh, unsigned int idx) {
     entry_t e = mh->entries[idx];
     unsigned int lc = (idx * 2) + 1;
+    ASSERT(lc < mh->size, "there might be an actual problem here: %d %d %d", idx, lc, mh->count);
     unsigned int rc = lc+1;
 
     unsigned int swapped = 0;

@@ -39,8 +39,6 @@
 #define INCREMENT_SHORT 2
 #define NUM_SHORTS ((MAX_SHORT / INCREMENT_SHORT) + 1)
 
-#define BFS_MH_SIZE 80
-
 #define TRACK_STATE_TERMINAL_BUFFER_SIZE 300
 
 typedef struct sensordata {

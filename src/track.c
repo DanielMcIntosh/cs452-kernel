@@ -30,7 +30,7 @@ typedef struct bfsnode {
 } BFSNode;
 
 static BFSNode* q_pop(BFSNode** freeQ, BFSNode** freeQTail){
-    ASSERT(freeQ != NULL, "Cannot pop from empty free queue");
+    ASSERT(*freeQ != NULL, "Cannot pop from empty free queue");
     BFSNode *ret = *freeQ;
     *freeQ = (*freeQ)->next;
     if (*freeQ == NULL)
@@ -96,6 +96,7 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
     int k = 0;
 
     while (mh_remove_min(&mh, &entry) == 0){
+        Pass();
         ASSERT(k++ <= 10000, "probably an infinite loop");
         BFSNode *bn = (BFSNode*) entry.item;
         int distance = entry.value;
