@@ -3,4 +3,8 @@
 
 #define MAX_CONCURRENT_TRAINS 5
 
+#define NUM_SWITCHES 22
+
+#define SENSORS_PER_GROUP 16
+
 #endif //__CONFIG_CONSTANTS_H__

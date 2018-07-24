@@ -3,8 +3,6 @@
 #ifndef SWITCH_H
 #define SWITCH_H
 
-#define NUM_SWITCHES 22
-
 #define STATE_TO_CHAR(s) ((s) == SWITCH_UNKNOWN ? '?' : ((s) == SWITCH_STRAIGHT ? 'S' : 'C'))
 #define INV_STATE_TO_CHAR(s) ((s) == SWITCH_UNKNOWN ? '?' : ((s) == SWITCH_STRAIGHT ? 'C' : 'S'))
 #define CHAR_TO_SW_STATE(c) ((c) == '?' ? SWITCH_UNKNOWN : ((c) == 'S' ? SWITCH_STRAIGHT : SWITCH_CURVED))

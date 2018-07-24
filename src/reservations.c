@@ -7,13 +7,13 @@
 
 #define CHECK_OWNERSHIP(total, mine) \
     ASSERT(((total)->bits_low & (mine)->bits_low) == (mine)->bits_low, "total reservations doesn't contain my reservations! mine_low = 0x%x %x, total_low = 0x%x %x", \
-                                                                        (unsigned int)((mine) ->bits_low >> 32), (unsigned int)((mine) ->bits_low & 0xFFFFFFFF), \
-                                                                        (unsigned int)((total)->bits_low >> 32), (unsigned int)((total)->bits_low & 0xFFFFFFFF)); \
+                                                                        (mine) ->word2, (mine) ->word1, \
+                                                                        (total)->word2, (total)->word1); \
     ASSERT(((total)->bits_high & (mine)->bits_high) == (mine)->bits_high, "total reservations doesn't contain my reservations! mine_high = 0x%x %x, total_high = 0x%x %x", \
-                                                                        (unsigned int)((mine) ->bits_high >> 32), (unsigned int)((mine) ->bits_high & 0xFFFFFFFF), \
-                                                                        (unsigned int)((total)->bits_high >> 32), (unsigned int)((total)->bits_high & 0xFFFFFFFF));
+                                                                        (mine) ->word2, (mine) ->word1, \
+                                                                        (total)->word2, (total)->word1);
 
-static inline void add_to_mask(const track_node *n, Blockage * restrict mask) {
+static inline void add_to_mask(const track_node *n, Blockage *mask) {
     int ind = TRACK_NODE_TO_INDEX(n);
     if (ind < 64) {
         mask->bits_low |= 0x1ULL << ind;
@@ -26,13 +26,13 @@ static inline void add_to_mask(const track_node *n, Blockage * restrict mask) {
             ind = (SWCLAMP(n->num) - 1) + 80 + NUM_SWITCHES;
         }
         ind -= 64;
-        ASSERT(ind >= 0, "can't have a negative shift! ind = %d, n = %s", ind, n->name);
+        ASSERT(0 <= ind && ind < 64, "can't have a negative shift! ind = %d, n = %s", ind, n->name);
         mask->bits_high |= 0x1ULL << ind;
     }
 }
 
 /*
-static inline void remove_from_mask(const track_node *n, Blockage * restrict mask) {
+static inline void remove_from_mask(const track_node *n, Blockage *mask) {
     int ind = TRACK_NODE_TO_INDEX(n);
     if (ind < 64) {
         mask->bits_low &= ~(0x1ULL << ind);
@@ -50,12 +50,12 @@ static inline void remove_from_mask(const track_node *n, Blockage * restrict mas
 }
 //*/
 
-inline void reservation_to_my_reservation(MyReservation * restrict my_reserv, Reservation * restrict reservations, int active_train) {
+inline void reservation_to_my_reservation(MyReservation *my_reserv, Reservation *reservations, int active_train) {
     my_reserv->mine = &(reservations->blkges[active_train]);
     my_reserv->total = &(reservations->total);
 }
 
-inline void my_reservation_to_blockage(Blockage * restrict blockages, const MyReservation * restrict my_reserv) {
+inline void my_reservation_to_blockage(Blockage *blockages, const MyReservation *my_reserv) {
     Blockage *mine = my_reserv->mine;
     Blockage *total = my_reserv->total;
     CHECK_OWNERSHIP(total, mine);
@@ -65,7 +65,7 @@ inline void my_reservation_to_blockage(Blockage * restrict blockages, const MyRe
     blockages->bits_high ^= mine->bits_high;
 }
 
-inline void reservation_to_blockage(Blockage * restrict blockages, const Reservation * restrict reservations, int active_train) {
+inline void reservation_to_blockage(Blockage *blockages, const Reservation *reservations, int active_train) {
     MyReservation tmp;
     //cast to remove const qualifier.
     //SAFE ONLY BECAUSE my_reservation_to_blockage doesn't write to tmp->mine or tmp->total
@@ -73,14 +73,14 @@ inline void reservation_to_blockage(Blockage * restrict blockages, const Reserva
     my_reservation_to_blockage(blockages, &tmp);
 }
 
-static inline bool can_resrv(const MyReservation * restrict my_reserv, Blockage * restrict mask) {
+static inline bool can_resrv(const MyReservation *my_reserv, Blockage *mask) {
     Blockage blockages;
     my_reservation_to_blockage(&blockages, my_reserv);
 
     return !((blockages.bits_low & mask->bits_low) || (blockages.bits_high & mask->bits_high));
 }
 
-static inline void set_resrv(const MyReservation * restrict my_reserv, Blockage * restrict mask) {
+static inline void set_resrv(const MyReservation *my_reserv, Blockage *mask) {
     my_reserv->mine->bits_low   |= mask->bits_low;
     my_reserv->mine->bits_high  |= mask->bits_high;
 
@@ -88,7 +88,7 @@ static inline void set_resrv(const MyReservation * restrict my_reserv, Blockage 
     my_reserv->total->bits_high |= mask->bits_high;
 }
 
-static inline void unset_resrv(const MyReservation * restrict my_reserv, Blockage * restrict mask) {
+static inline void unset_resrv(const MyReservation *my_reserv, Blockage *mask) {
     my_reserv->mine->bits_low   &= ~(mask->bits_low);
     my_reserv->mine->bits_high  &= ~(mask->bits_high);
 
@@ -97,7 +97,7 @@ static inline void unset_resrv(const MyReservation * restrict my_reserv, Blockag
 }
 
 //EXclusive of start, but INclusive of end
-bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, const MyReservation * restrict my_reserv, const char * restrict sig) {
+bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, const MyReservation *my_reserv, const char * restrict sig) {
     ASSERT_VALID_TRACK_SIG(start, sig);
     //in theory should handle end == null just fine by reserving to the switch after the end of the route, but put this here anyways
     ASSERT_VALID_TRACK_SIG(end, sig);
@@ -129,7 +129,7 @@ bool reserve_track(const Route *route, int idx, const track_node *start, const t
 }
 
 //INclusive of start, but EXclusive of end
-void free_track(const Route *route, int idx, const track_node *start, const track_node *end, const MyReservation * restrict my_reserv, Blockage * restrict result, const char *sig) {
+void free_track(const Route *route, int idx, const track_node *start, const track_node *end, const MyReservation *my_reserv, Blockage *result, const char * restrict sig) {
     ASSERT_VALID_TRACK(start);
     //in theory should handle end == null just fine by freeing to the switch after the end of the route, but put this here anyways
     ASSERT_VALID_TRACK(end);

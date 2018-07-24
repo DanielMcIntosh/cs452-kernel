@@ -32,7 +32,7 @@ void *memset(void *s, int c, unsigned int n);
 #endif
 
 #ifndef MIN
-#define MIN(X, Y) (((X) > (Y)) ? (X) : (Y))
+#define MIN(X, Y) (((X) > (Y)) ? (Y) : (X))
 #endif
 
 #ifndef CLAMP
@@ -40,7 +40,7 @@ void *memset(void *s, int c, unsigned int n);
 #endif
 
 #ifndef ABS
-#define ABS(X) (X > 0 ? X : -X)
+#define ABS(X) ((X) > 0 ? (X) : -(X))
 #endif
 
 #ifndef MOVING_AVERAGE

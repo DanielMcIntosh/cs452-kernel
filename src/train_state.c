@@ -769,8 +769,13 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             reservation_to_my_reservation(&my_reserv, &(ts.reservations), active_train);
 
             bool success = reserve_track(NULL, 0, &track[object], &track[object], &my_reserv, "drop track");
+            /*
+            PANIC("%x %x %x %x\ntrain = %d, e = %x, br = %x, mr = %x", 
+                my_reserv.mine->word4, my_reserv.mine->word3, my_reserv.mine->word2, my_reserv.mine->word1,
+                MAX_CONCURRENT_TRAINS, my_reserv.mine->e, my_reserv.mine->br, my_reserv.mine->mr);
+            //*/
             if (likely(success)) {
-                terminal_set_reservations(&tc, &(ts.reservations.blkges[MAX_CONCURRENT_TRAINS]), MAX_CONCURRENT_TRAINS);
+                terminal_set_reservations(&tc, my_reserv.mine, MAX_CONCURRENT_TRAINS);
             } else {
                 Blockage freed;
                 const track_node *next = track[object].edge[DIR_AHEAD].dest;
