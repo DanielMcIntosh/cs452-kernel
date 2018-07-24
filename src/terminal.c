@@ -80,7 +80,6 @@ int terminal_set_reservations(TerminalCourier *tc, Blockage *blockages, int trai
     if (err != 0) {
         return err;
     }
-    //PANIC("train = %d, e = %x, br = %x, mr = %x", train, blockages->e, blockages->br, blockages->mr);
     err = tc_send(tc, TERMINAL_SET_RESRV3, (unsigned int)train | (blockages->e << 16), blockages->br);
     if (err != 0) {
         return err;
@@ -96,12 +95,6 @@ int terminal_unset_reservations(TerminalCourier *tc, Blockage *blockages) {
         return err;
     }
     err = tc_send(tc, TERMINAL_UNSET_RESRV2, blockages->word3, blockages->word4);
-    /*
-    if (err != 0) {
-        return err;
-    }
-    err = tc_send(tc, TERMINAL_UNSET_RESRV3, blockages->bits_high & 0xFFFFFFFFULL, (blockages->bits_high >> 32) & 0xFFFFFFFFULL);
-    //*/
     return err;
 }
 
@@ -937,7 +930,6 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
         {
             int active_train = tm.short_arg1;
             unsigned int flags_e = tm.short_arg2;
-            //PANIC("%x %x", tm.arg1, tm.arg2);
 
             restylize_string(resrv_e, flags_e, 6, 3, (0x1U << 16), '1' + active_train);
 
@@ -962,15 +954,12 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
         }
         case(TERMINAL_UNSET_RESRV1):
         {
-            unsigned int flags_a = ((unsigned int)tm.arg1 >> 0 ) & 0xFFFF;
-            unsigned int flags_b = ((unsigned int)tm.arg1 >> 16) & 0xFFFF;
-            unsigned int flags_c = ((unsigned int)tm.arg2 >> 0 ) & 0xFFFF;
-            unsigned int flags_d = ((unsigned int)tm.arg2 >> 16) & 0xFFFF;
+            Blockage tmp = {.word1 = tm.arg1, .word2 = tm.arg2, .word3 = 0, .word4 = 0};
 
-            restylize_string(resrv_a, flags_a, 6, 3, (0x1U << 16), '7');
-            restylize_string(resrv_b, flags_b, 6, 3, (0x1U << 16), '7');
-            restylize_string(resrv_c, flags_c, 6, 3, (0x1U << 16), '7');
-            restylize_string(resrv_d, flags_d, 6, 3, (0x1U << 16), '7');
+            restylize_string(resrv_a, tmp.a, 6, 3, (0x1U << 16), '7');
+            restylize_string(resrv_b, tmp.b, 6, 3, (0x1U << 16), '7');
+            restylize_string(resrv_c, tmp.c, 6, 3, (0x1U << 16), '7');
+            restylize_string(resrv_d, tmp.d, 6, 3, (0x1U << 16), '7');
 
             //terminal_unset_reservations will call TERMINAL_UNSET_RESRV2, so don't bother printing yet
             //print_reservations(&t.output, resrv_strs);

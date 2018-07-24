@@ -38,14 +38,14 @@ typedef struct reservation {
     //the extra +1 is for user reserved track from the 'drop' command
     Blockage blkges[MAX_CONCURRENT_TRAINS+1];
     Blockage total;
-} __attribute__((packed)) Reservation;
-#define RESERVATION_INIT {{}, BLOCKAGE_INIT}
+} __attribute__((packed, designated_init)) Reservation;
+#define RESERVATION_INIT {.blkges = {}, .total = BLOCKAGE_INIT}
 
 typedef struct myreservation {
     Blockage *mine;
     Blockage *total;
-} __attribute__((packed)) MyReservation;
-#define RESERVATION_INIT {{}, BLOCKAGE_INIT}
+} __attribute__((packed, designated_init)) MyReservation;
+#define MY_RESERVATION_INIT {NULL, NULL}
 
 #define TRACK_BLOCKED(blockages, cn) (blockages != NULL && ((0x1ULL << (TRACK_NODE_TO_INDEX(cn) % 64)) & ((TRACK_NODE_TO_INDEX(cn) < 64) ? blockages->bits_low : blockages->bits_high)))
 
