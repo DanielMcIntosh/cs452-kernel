@@ -48,10 +48,12 @@ typedef struct uartmessage{
 
 static inline void __attribute__((noreturn)) generic_uart_rcv_notifier(int servertid, int uart) {
     int event = (uart == 1? EVENT_UART_1_RCV : EVENT_UART_2_RCV);
+    struct uart *u = (uart == 1 ? uart1 : uart2);
     UARTMessage msg = {MESSAGE_UART, NOTIFY_RCV, 0, {0}};
     ReplyMessage rm = {0, 0};
 
     FOREVER {
+        ASSERT(u->err.individual.breakerror == 0 && u->err.individual.framingerror == 0 && u->err.individual.overrunerror == 0 && u->err.individual.parityerror == 0, "uart error: %d", u->err.collective);
         int data = AwaitEvent(event);
         ASSERT(data >= 0, "Error waiting on event");
         msg.argument = data;
@@ -76,6 +78,7 @@ static inline void __attribute__((noreturn)) generic_uart_send_notifier(int serv
     ReplyMessage rm = {0, 0};
 
     FOREVER {
+        ASSERT(u->err.individual.breakerror == 0 && u->err.individual.framingerror == 0 && u->err.individual.overrunerror == 0 && u->err.individual.parityerror == 0, "uart error: %d", u->err.collective);
         msg.argument = AwaitEvent(event); 
         int err = Send(servertid, &msg, sizeof(msg), &rm, sizeof(rm));
         ASSERT(err >= 0, "Error sending to server");

@@ -63,6 +63,7 @@ void Position_HandleStop(Position *p, int idx_new, int time) {
     int distance = p->millis_off_stop_end;
     FdistReq frq = {TRACK_NODE_TO_INDEX(p->stop_end_pos), distance};
     TrackPosition fdist = GetFdist(WhoIs(NAME_TRACK_STATE), frq);
+    ASSERT(0 <= fdist.object && fdist.object <= TRACK_MAX, "invalid object");
     p->last_known_node = &track[fdist.object];
     //PANIC("::: %s (%d) + %d -> %s + %d", p->stop_end_pos->name, TRACK_NODE_TO_INDEX(p->stop_end_pos), distance, p->last_known_node->name, fdist.distance_past);
     p->millis_off_last_node = fdist.distance_past;
@@ -89,7 +90,8 @@ void position_handle_accdec(Position *p, const Route *r, int time, int current_v
     int idx = p->last_route_idx;
     bool on_route = TRUE;
     const track_node *tn = forward_dist_on_route_no_extra(r, &idx, p->last_known_node, &distance, &on_route, "handle accel/decel");
-    ASSERT(tn != NULL || !on_route, 
+    ASSERT_VALID_TRACK(tn);
+    ASSERT(tn != NULL && on_route, 
             "accelerating off route: %d, %s, %d, %d -> %d, %d -> %d, %d - %d = %d, |%d, %d, %d|, :%d -> %d@ ", 
             (int) p->last_known_node, p->last_known_node->name, distance,
             p->last_route_idx, idx,
@@ -135,8 +137,10 @@ TrackPosition Position_CalculateNow(Position *p, const Route *r, int time) {
         bool on_route = TRUE;
         const track_node *tn = forward_dist_on_route_no_extra(r, &idx, p->last_known_node, &distance, &on_route, "position calculateion");
         //ASSERT(tn != NULL, "Null TrackNode");
-        if (!on_route)
+        if (!on_route){
+            ASSERT_VALID_TRACK(tn);
             object = TRACK_NODE_TO_INDEX(tn);
+        }
         else {
             // we past the end of the route
             /*
@@ -144,6 +148,7 @@ TrackPosition Position_CalculateNow(Position *p, const Route *r, int time) {
             TrackPosition fdist = GetFdist(WhoIs(NAME_TRACK_STATE), frq);
             p->last_known_node = &track[fdist.object];
             //*/
+            ASSERT_VALID_TRACK(p->last_known_node);
             object = TRACK_NODE_TO_INDEX(p->last_known_node);
         }
     }

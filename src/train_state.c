@@ -136,9 +136,12 @@ int __attribute__((pure)) calc_short_delay(Train *train, int dist_millis) {
 int __attribute__((const)) calc_accel_from_vi_vf_d(int vi, int vf, int d) {
     // vf^2 = vi^2 + 2ad
     // a = (vi^2 - vf^2)/(2d)
-    int vf2 = vf * vf / VELOCITY_PRECISION;
-    int vi2 = vi * vi / VELOCITY_PRECISION;
-    int deltav_prec = (vf2 - vi2) * (ACCELERATION_PRECISION / VELOCITY_PRECISION);
+    float vff = ((float) vf) / VELOCITY_PRECISION;
+    float vif = ((float) vi) / VELOCITY_PRECISION;
+    float vf2 = vff * vff;
+    float vi2 = vif * vif;
+    //ASSERT(vf2 > vf && vi2 > vi, "Overflow: %d %d -> %d %d", vf, vi, vf2, vi2);
+    int deltav_prec = (vf2 - vi2) * ACCELERATION_PRECISION;
     return deltav_prec / (2 * d);
 }
 
@@ -457,7 +460,9 @@ static inline void handle_navigate(TrainState * restrict ts, TerminalCourier * r
         CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, NAV_SPEED, train->num); // TODO number
         train->speed = NAV_SPEED;
         ar.reversing = 0;
-        Position_HandleAccel(&train->pos, &ar.route, Time(), 0, -1 * calc_accel_from_vi_vf_d(train->velocity[NAV_SPEED], 0, DS_TO_DA(train->stopping_distance[NAV_SPEED])), train->velocity[NAV_SPEED]);
+        int a = calc_accel_from_vi_vf_d(train->velocity[NAV_SPEED], 0, DS_TO_DA(train->stopping_distance[NAV_SPEED]));
+        ASSERT(a <= 0, "A ought be negative: %d %d %d", a, train->velocity[NAV_SPEED], DS_TO_DA(train->stopping_distance[NAV_SPEED]));
+        Position_HandleAccel(&train->pos, &ar.route, Time(), 0, -1 * a, train->velocity[NAV_SPEED]);
     }
     ASSERT(0 <= ts->active_train_map[tr] && ts->active_train_map[tr] < MAX_CONCURRENT_TRAINS, "Invalid active train: %d", ts->active_train_map[tr]);
     ts->active_routes[ts->active_train_map[tr]] = ar;
@@ -466,7 +471,7 @@ static inline void handle_navigate(TrainState * restrict ts, TerminalCourier * r
         tc_send(tc, TERMINAL_ROUTE_DBG, ar.route.rcs[i].swmr, ar.route.rcs[i].a);
     }
     //tc_send(&tc, TERMINAL_ROUTE_DBG2, 211, route.reverse);
-    //tc_send(&tc, TERMINAL_ROUTE_DBG2, 214, ar.reversing);
+    tc_send(tc, TERMINAL_ROUTE_DBG2, 21, ar.remaining_distance);
     tc_send(tc, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING, 0);
 }
 
@@ -535,6 +540,7 @@ static inline void activeroute_recalculate_distances(ActiveRoute * restrict ar, 
     }
     bool on_route = TRUE;
     ar->remaining_distance = distance_to_on_route(&ar->route, ar->cur_pos_idx, &track[SENSOR_TO_NODE(sensor)], &track[ar->end_node], &on_route, "ar distance recalculate") + ar->distance_past;
+    ASSERT(on_route, "should be on_route to find end");
     tc_send(tc, TERMINAL_ROUTE_DBG2, 207, ar->remaining_distance);
 }
 
@@ -592,7 +598,7 @@ static inline bool ar_perform_action(ActiveRoute *restrict ar, TrainState * rest
         const track_node *resrv_end;
         bool resrv_successful = TRUE;
 
-        if (ar->idx_resrv < MAX_ROUTE_COMMAND && ar->route.rcs[ar->idx_resrv+1].a != ACTION_NONE) {
+        if (ar->idx_resrv+1 < MAX_ROUTE_COMMAND && ar->route.rcs[ar->idx_resrv+1].a != ACTION_NONE) {
             resrv_end = rc_to_track_node(ar->route.rcs[ar->idx_resrv+1], "resrv_end");
         }
         else {
@@ -749,7 +755,7 @@ static inline void add_new_train(TrainState * restrict ts, NewTrain data) {
     ts->active_trains[ts->total_trains].pos.swdir = 0;
     ts->active_trains[ts->total_trains].pos.last_route_idx = 0;
     ts->active_trains[ts->total_trains].pos.v = 0;
-    //ts->active_trains[ts->total_trains].pos.a = 0;
+    ts->active_trains[ts->total_trains].pos.a = 0;
     ts->active_trains[ts->total_trains].pos.stop_end_pos = NULL;
     ts->active_trains[ts->total_trains].pos.millis_off_stop_end = 0;
 
@@ -930,6 +936,7 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
              
             int time = Time();
             TrackPosition tp = Position_CalculateNow(&train->pos, &ts.active_routes[activetrain].route, time);
+            ASSERT(tp.object >= 0 && tp.object <= TRACK_MAX, "bad object %d", tp.object);
             track_node *rvn = &track[tp.object];
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 134, TRACK_NODE_TO_INDEX(rvn));
             int idx = ar->cur_pos_idx + 1;

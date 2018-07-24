@@ -91,10 +91,12 @@ void __attribute__((noreturn)) task_clockserver(){
             break;
         case DELAY:
             LOGF("Delay: %d\r\n", cm.argument);
+            ASSERT(cm.argument > 0, "Delay %d <= 0", cm.argument);
             err = mh_add(&cs.mh, tid, cm.argument + cs.ticks);
             ASSERT(err == 0, "MINHEAP ADD ERROR");
             break;
         case DELAYUNTIL:
+            ASSERT((unsigned int) cm.argument > cs.ticks, "Delay %d <= %d cs.ticks ", cm.argument, cs.ticks);
             LOGF("DELAY UNTIL: %d\r\n", cm.argument);
             err = mh_add(&cs.mh, tid, cm.argument);
             ASSERT(err == 0, "MINHEAP ADD ERROR");
@@ -148,7 +150,8 @@ int Time(){
     return clockSend(TIME, 0);
 }
 
-int Delay(int ticks){
+inline int Delay(int ticks){
+    ASSERT(ticks > 0, "cannot delay for negative time: %d", ticks);
     return clockSend(DELAY, ticks);
 }
 

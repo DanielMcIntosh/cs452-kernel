@@ -19,7 +19,7 @@ AS	= arm-none-eabi-as
 LD      = arm-none-eabi-ld
 WARNINGS = -Wall -Wextra -Wformat=2 -Wcast-align -Wcast-qual -Wdisabled-optimization -Winit-self -Wlogical-op -Wmissing-include-dirs -Wredundant-decls -Wshadow -Wundef -Wno-variadic-macros -Wstrict-aliasing=3 -Wwrite-strings -Wfloat-conversion -Wbad-function-cast -Wsuggest-attribute=pure -Wsuggest-attribute=const -Wsuggest-attribute=noreturn -Wsuggest-attribute=malloc -Wsuggest-attribute=format -Wnull-dereference
 #others (not comprehensive): -Wstrict-prototypes -Wold-style-definition -Wconversion
-CFLAGS  = $(DEPFLAGS) -c -std=c11 -fPIC $(WARNINGS) -I. -I $(INCLUDEDIR) -mcpu=arm920t -msoft-float -O3 -fverbose-asm
+CFLAGS  = $(DEPFLAGS) -c -std=c11 -fPIC $(WARNINGS) -I. -I $(INCLUDEDIR) -mcpu=arm920t -msoft-float -O1 -fverbose-asm
 # -g: include hooks for gdb
 # -c: only compile
 # -mcpu=arm920t: generate code for the 920t architecture
@@ -75,6 +75,10 @@ build: all clean
 install: all
 	@echo "cp $(BINDIR)/kernel.elf /u/cs452/tftp/ARM/$(shell whoami)/"
 	@cp $(BINDIR)/kernel.elf /u/cs452/tftp/ARM/$(shell whoami)/
+
+cmp: all
+	@echo "cp $(BINDIR)/kernel.elf /u/cs452/tftp/ARM/$(shell whoami)/kernelc.elf"
+	@cp $(BINDIR)/kernel.elf /u/cs452/tftp/ARM/$(shell whoami)/kernelc.elf
 
 rebuild: clean all
 reinstall: clean install
