@@ -549,7 +549,7 @@ static int activeroute_distance_to_next_stop(ActiveRoute *ar, track_node *cnode,
     int distance = 0;
     const track_edge *e;
     bool on_route = TRUE;
-    while (ar->route.rcs[*idx].a != ACTION_NONE && ar->route.rcs[*idx].a != ACTION_RV){
+    WHILEK (20, ar->route.rcs[*idx].a != ACTION_NONE && ar->route.rcs[*idx].a != ACTION_RV)
         e = next_edge_on_route(&(ar->route), idx, n, &on_route, "Distance to next stop");
         ASSERT(e != NULL && on_route, "Should not be able to get null edge without ACTION_NONE or ACTION_RV");
         distance += e->dist;
@@ -625,10 +625,9 @@ static void ar_short_move(TrainState * restrict ts, ActiveRoute * restrict ar, T
     // start the server to delay stopping the train
     // if the short move is a reverse, trigger the reverse start after the delay as well.
     
-    int k = 0;
     if (ar->route.rcs[ar->idx_resrv].a != ACTION_NONE) { // no more reservations exist
         const track_node *resrv_end =  rc_to_track_node(ar->route.rcs[ar->idx_resrv], "resrv_start short move");
-        while (ar->idx_resrv < shortmoveidx){
+        WHILEK (20, ar->idx_resrv < shortmoveidx)
             bool resrv_successful = ar_perform_action(ar, ts, tc, &resrv_end, train->num, cmdtid);
             // resrv_end is updated by this call
             if (!resrv_successful) 
@@ -661,17 +660,15 @@ static void activeroute_exec_steps(ActiveRoute * restrict ar, TrainState * restr
     //we assign resrv_end to resrv_start first thing in the loop
     tc_send(tc, TERMINAL_ROUTE_DBG2, 260, resrv_end->num);
     // Perform any actions we need to do:
-    int k = 0;
-    while (ACTIVE_ROUTE_SHOULD_PERFORM_ACTION(ar, resrv_dist))  { // must perform next actio due to proximity directly or bc the reverse will take a while
+    WHILEK (20, ACTIVE_ROUTE_SHOULD_PERFORM_ACTION(ar, resrv_dist))  // must perform next actio due to proximity directly or bc the reverse will take a while
         ASSERT(resrv_end != NULL, "invalid reserv_end");
         bool resrv_successful = ar_perform_action(ar, ts, tc, &resrv_end, tr, cmdtid);
         // rsrv_end is updated by this call
         if (!resrv_successful) 
             break;
-        ASSERT(k++ < 20, "infinite loop of execs");
     }
-    tc_send(tc, TERMINAL_PRINT_RESRV1, ts->reservations.bits_low & 0xFFFFFFFF, (ts->reservations.bits_low >> 32) & 0xFFFFFFFF);
-    tc_send(tc, TERMINAL_PRINT_RESRV2, ts->reservations.bits_high & 0xFFFFFFFF, (ts->reservations.bits_high >> 32) & 0xFFFFFFFF);
+    tc_send(tc, TPR1, ts->reservations.bits_low & 0xFFFFFFFF, (ts->reservations.bits_low >> 32) & 0xFFFFFFFF);
+    tc_send(tc, TPR2, ts->reservations.bits_high & 0xFFFFFFFF, (ts->reservations.bits_high >> 32) & 0xFFFFFFFF);
 }
 
 static bool activeroute_off_route(ActiveRoute * restrict ar, Train * restrict train, TerminalCourier * restrict tc, int sensor, int distance, int tr, int cmdtid){
@@ -689,7 +686,7 @@ static inline void activeroute_on_sensor_event(ActiveRoute * restrict ar, Train 
     // update cur_pos_idx
     bool on_route = TRUE;
     int lhs = ar->last_handled_sensor;
-    while (lhs != -1 && lhs != sensor && on_route){
+    WHILEK (20, lhs != -1 && lhs != sensor && on_route)
         const track_node *ns =  next_sensor_on_route(&ar->route, &ar->cur_pos_idx, &track[SENSOR_TO_NODE(lhs)], &dist_to_next_snsr, &on_route, "update cur_pos_idx");
         if (ns != NULL)
             lhs = ns->num;
@@ -905,8 +902,8 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             } else {
                 ts.reservations.bits_high ^= 0x1ULL << (tm.data - 64);
             }
-            tc_send(&tc, TERMINAL_PRINT_RESRV1, ts.reservations.bits_low & 0xFFFFFFFFULL, (ts.reservations.bits_low >> 32) & 0xFFFFFFFFULL);
-            tc_send(&tc, TERMINAL_PRINT_RESRV2, ts.reservations.bits_high & 0xFFFFFFFFULL, (ts.reservations.bits_high >> 32) & 0xFFFFFFFFULL);
+            tc_send(&tc, TPR1, ts.reservations.bits_low & 0xFFFFFFFFULL, (ts.reservations.bits_low >> 32) & 0xFFFFFFFFULL);
+            tc_send(&tc, TPR2, ts.reservations.bits_high & 0xFFFFFFFFULL, (ts.reservations.bits_high >> 32) & 0xFFFFFFFFULL);
             break;
         }
         case (NOTIFY_RV_TIMEOUT):

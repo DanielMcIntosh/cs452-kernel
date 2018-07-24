@@ -43,6 +43,7 @@ typedef struct terminal {
     int input_line;
     int input_col;
     int sensor_line;
+    int dbg_col;
     int dbg2_col;
     int pos_col;
     int notifier;
@@ -615,7 +616,7 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
     char cb_terminal_buf[CB_TERMINAL_BUF_SIZE];
     circlebuffer_t cb_terminal;
     cb_init(&cb_terminal, cb_terminal_buf, sizeof(cb_terminal_buf));
-    Terminal t = {cb_terminal, TERMINAL_INPUT_BASE_LINE, TERMINAL_INPUT_BASE_COL, SENSOR_LINE_BASE, 0, 1, 0};
+    Terminal t = {cb_terminal, TERMINAL_INPUT_BASE_LINE, TERMINAL_INPUT_BASE_COL, SENSOR_LINE_BASE, 0, 1, 1, 0};
     int tid, err; char c;
     TerminalMessage tm = {0, 0, 0, 0};
     ReplyMessage rm = {MESSAGE_REPLY, 0};
@@ -772,11 +773,13 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
             int sw = tm.arg1;
             int action = tm.arg2;
             cb_write_string(&t.output, "\0337");
-            cursor_to_position(&t.output, TERMINAL_INPUT_MAX_LINE+2, 1);
-            cb_write_number(&t.output, sw, 10);
+            cursor_to_position(&t.output, TERMINAL_INPUT_MAX_LINE+2, t.dbg_col);
+            t.dbg_col += cb_write_number(&t.output, sw, 10);
             cb_write_string(&t.output, (action == ACTION_STRAIGHT ? "S" : (action == ACTION_CURVED ? "C" : "R")));
             cb_write_string(&t.output, " ");
             cb_write_string(&t.output, "      \0338");
+            t.dbg_col += 2;
+            if (t.dbg_col > 97) t.dbg_col = 1;
             break;
         }
         case (TERMINAL_ROUTE_DBG2):
@@ -857,6 +860,10 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
         case(TERMINAL_NOTIFY_COURIER):
         {
             t.notifier = tid;
+            break;
+        }
+        case (TERMINAL_JUST_REPLY):
+        {
             break;
         }
         default:
