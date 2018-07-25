@@ -625,11 +625,9 @@ static int activeroute_distance_to_next_stop(ActiveRoute *ar, track_node *cnode,
         n = e->dest;
     }
     if (ar->route.rcs[*idx].a == ACTION_RV) {
-        distance += 350; // TODO 
+        distance += distance_to_on_route(&ar->route, *idx, n, &track[SWITCH_TO_NODE_NSC(ar->route.rcs[*idx].swmr)], &on_route, "distance to next stop (rv)")  + 350; // TODO 
     } else {
         distance += distance_to_on_route(&ar->route, *idx, n, &track[ar->end_node], &on_route, "distance to next stop");
-        //ar->next_step_distance += distance_to_on_route(&ar->route, ar->idx_resrv - 1, cnode, nnode, &on_route, sig);
-
     }
     return distance;
 }
@@ -741,7 +739,7 @@ static void activeroute_exec_steps(TerminalCourier * restrict tc, ActiveRoute * 
     // Perform any actions we need to do:
     while (ACTIVE_ROUTE_SHOULD_PERFORM_ACTION(ar, resrv_dist)){  // must perform next actio due to proximity directly or bc the reverse will take a while
         ASSERT(resrv_end != NULL, "invalid reserv_end");
-        if ((ar->idx_resrv >= MAX_ROUTE_COMMAND || ar->route.rcs[ar->idx_resrv].a == ACTION_NONE || ar->route.rcs[ar->idx_resrv].a == ACTION_RV) && !can_stop)
+        if (((ar->idx_resrv >= MAX_ROUTE_COMMAND || ar->route.rcs[ar->idx_resrv].a == ACTION_NONE || ar->route.rcs[ar->idx_resrv].a == ACTION_RV)) && !can_stop)
             break;
         bool resrv_successful = ar_perform_action(tc, ar, my_reserv, train, &resrv_end, cmdtid);
         // rsrv_end is updated by this call
