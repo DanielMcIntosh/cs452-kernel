@@ -32,7 +32,8 @@ extern track_node track[TRACK_MAX];
 // SWITCH_NONE is the maximum 5 bit unsigned int
 
 void init_track();
-int find_path_between_nodes(const Blockage * restrict blockages, int min_dist, int rev_penalty, const track_node *origin, const track_node *dest, Route * restrict r) __attribute__((nonnull (4, 5, 6)));
+ __attribute__((nonnull (5, 6, 7)))
+int find_path_between_nodes(const Blockage * restrict blockages, int min_dist, int max_dist, int rev_penalty, const track_node *origin, const track_node *dest, Route * restrict r);
 
 const track_node *rc_to_track_node(RouteCommand rc, const char * restrict sig) __attribute__((warn_unused_result));
 const track_edge *next_edge_on_route(const Route *route, int * restrict ind, const track_node *n, const char * restrict sig) __attribute__((nonnull));

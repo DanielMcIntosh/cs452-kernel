@@ -229,15 +229,15 @@ static inline void __attribute__((nonnull)) trainserver_begin_reverse(ActiveRout
 }
 
 static inline int __attribute__((nonnull, warn_unused_result)) get_active_train_from_sensor(TrainState *ts, const track_node *sensor_node, int *distance, int rev_penalty) {
-    int min_dist = INT_MAX;
+    int min_dist = MAX_SENSOR_ATTRIB_LEN + 1;
     int train = 0;
     for (int i = 0; i < ts->total_trains; ++i) {
         const track_node *n = &track[ts->active_trains[i].last_sensor];
 
         Route r = ROUTE_INIT;
-        int cur_dist = find_path_between_nodes(NULL, 1, rev_penalty, n, sensor_node, &r);
+        int cur_dist = find_path_between_nodes(NULL, 1, min_dist, rev_penalty, n, sensor_node, &r);
         //TODO notify track_state of any switches we would have to have taken, incase a switch wasn't in the expected state
-        if (cur_dist < min_dist) {
+        if (cur_dist > 0 && cur_dist < min_dist) {
             min_dist = cur_dist;
             train = i;
         }

@@ -6,6 +6,7 @@
 #include <minheap.h>
 #include <features.h>
 #include <reservations.h>
+#include <constants.h>
 
 track_node track[TRACK_MAX];
 
@@ -31,7 +32,7 @@ typedef struct bfsnode {
 } BFSNode;
 
 static BFSNode* q_pop(BFSNode** freeQ, BFSNode** freeQTail){
-    ASSERT(freeQ != NULL, "Cannot pop from empty free queue");
+    ASSERT(freeQ != NULL && *freeQ != NULL, "Cannot pop from empty free queue");
     BFSNode *ret = *freeQ;
     *freeQ = (*freeQ)->next;
     if (*freeQ == NULL)
@@ -65,7 +66,7 @@ static inline void bfs_add_node(minheap_t *mh, BFSNode **freeQ, BFSNode **freeQT
     mh_add(mh, (unsigned long int) straight, distance + dist);
 }
 
-int find_path_between_nodes(const Blockage * restrict blockages, int min_dist, int rev_penalty, const track_node *origin, const track_node *dest, Route * restrict r) {
+int find_path_between_nodes(const Blockage * restrict blockages, int min_dist, int max_dist, int rev_penalty, const track_node *origin, const track_node *dest, Route * restrict r) {
     entry_t mh_array[BFS_MH_SIZE];
     minheap_t mh = {mh_array, 0, BFS_MH_SIZE};
     entry_t entry;
@@ -102,7 +103,7 @@ int find_path_between_nodes(const Blockage * restrict blockages, int min_dist, i
         int distance = entry.value;
         Route route = bn->r;
         int idx = bn->idx;
-        if (idx >= MAX_ROUTE_COMMAND) {
+        if (idx >= MAX_ROUTE_COMMAND || distance > max_dist) {
             return INT_MAX;
         }
         //if (idx >= MAX_ROUTE_COMMAND) continue;
