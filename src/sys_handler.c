@@ -40,19 +40,23 @@ static inline void handle_exit(TD *task) {
 //                                  MESSAGE PASSING
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-static int is_deadlock(TD *sender, TD *receiver) {
-    // TODO
+static void check_for_deadlock(TD *sender, TD *receiver) {
     int k = 0;
 
     if (receiver->state == STATE_BLK_RECEIVE || receiver->state == STATE_BLK_REPLY) {
         TD * sndr = sender->rcv_queue;
+        //check if the receiver did a send to me (if I've already called Recieve for it, it won't be on my queue)
+        KASSERT(TD_arg(receiver, 0) != sender->tid, "DEADLOCK: %d is sending to %d, but %d is currently sending to %d (in state: %d)", sender->tid, receiver->tid, receiver->tid, sender->tid, receiver->state);
+
+        //check if receiver is one of the tasks that has queued a send to us
         while (sndr != NULL) {
-            if (sndr->tid == receiver->tid) return 1; //, "DEADLOCK: %d is sending to %d, but %d is currently sending to %d (in state: %d)", task->tid, receiver->tid, receiver->tid, task->tid, receiver->state);
+            KASSERT(sndr->state == STATE_BLK_RECEIVE || sndr->state == STATE_BLK_REPLY, "task in our rcv_queue that is not in a send call");
+            KASSERT(sndr != receiver && sndr->tid != receiver->tid, "DEADLOCK: %d is sending to %d, but %d is currently sending to %d (in state: %d)", sender->tid, receiver->tid, receiver->tid, sender->tid, receiver->state);
+
             sndr = sndr->rdynext;
             KASSERT(k++ < 200, "definitely an infinite loop");
         }
-   }
-    return 0;
+    }
 }
 
 static inline void handle_send(TD *task, TaskQueue *task_ready_queue){
@@ -64,11 +68,7 @@ static inline void handle_send(TD *task, TaskQueue *task_ready_queue){
         return;
     }
 
-    //KASSERT(!is_deadlock(task, receiver), "DEADLOCK BETWEEN %d (%d) and %d (%d)", task->tid, TD_arg(task, 1), receiver->tid, TD_arg(receiver, 1));
-    if (task == NULL || is_deadlock(task, receiver)) {
-        //__builtin_trap();
-        //bwprintf(COM2, "F");
-    }
+    check_for_deadlock(task, receiver);
 
     //reciever is already waiting for a message
     if (receiver->state == STATE_BLK_SEND)
@@ -183,7 +183,7 @@ static inline void handle_await(TD *task, TaskQueue *task_ready_queue){
 static inline void handle_interrupt(TD __attribute__((unused)) *task, TaskQueue *task_ready_queue){
     LOG("HANDLE INTERRUPT\r\n");
     // figure out what interrupt it is
-    unsigned long long IRQStatus = ((unsigned long long) vic1->IRQStatus) | ((unsigned long long)(vic2->IRQStatus) << VIC_SIZE);
+    unsigned long long IRQStatus = ((unsigned long long) ((unsigned int)vic1->IRQStatus)) | ((unsigned long long)((unsigned int)vic2->IRQStatus) << VIC_SIZE);
     Event event;
     for (event = 0; event < NUM_EVENTS; ++event) {
         if ((0x1ULL << IRQ_MAP[event]) & IRQStatus) {
@@ -256,6 +256,7 @@ static inline void handle_get_value(TD * restrict task, ValueStore * restrict v)
 //                                     MAIN
 //////////////////////////////////////////////////////////////////////////////////////////////
 Syscall handle(Syscall a, TD *task, TaskQueue *task_ready_queue, ValueStore * restrict values) {
+    KASSERT(task != NULL, "called handle with a null task! a = %d", a);
     LOGF("HANDLE: %d, %d\t", a, task);
     LOGF("ARGS: %d, %d, %d, %d, %d\t", TD_arg(task, 0), TD_arg(task, 1), TD_arg(task, 2), TD_arg(task, 3), TD_arg(task, 4));
     switch(a) {

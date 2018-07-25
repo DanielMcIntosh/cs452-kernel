@@ -6,7 +6,7 @@ void * memcpy(void * dest, const void* src, unsigned int sz){
     const unsigned char *sp = src;
 
     //use duffs device to unroll loop
-    register int n = sz >> 2;
+    register unsigned int n = sz >> 2;
     switch (sz & 0x3) {
         do {
                 {*dp++ = *sp++;  FALLTHROUGH;}

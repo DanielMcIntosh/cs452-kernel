@@ -33,7 +33,11 @@ int kernel_init(){
         "str r0, [r1]\n\t"
         : : :"r0", "r1");
     // Unmask interrupts
-    vic2->IntEnable |= 0x1 << (IRQ_MAP[EVENT_CLK_3] - 32) | ( 0x1 << (IRQ_MAP[EVENT_UART_1_SEND] - 32)) | (0x1 << (IRQ_MAP[EVENT_UART_1_RCV] - 32)) | (0x1 << (IRQ_MAP[EVENT_UART_2_SEND] - 32)) | (0x1 << (IRQ_MAP[EVENT_UART_2_RCV] - 32));
+    vic2->IntEnable |= (0x1U << (IRQ_MAP[EVENT_CLK_3]        - 32)) |
+                       (0x1U << (IRQ_MAP[EVENT_UART_1_SEND]  - 32)) |
+                       (0x1U << (IRQ_MAP[EVENT_UART_1_RCV]   - 32)) |
+                       (0x1U << (IRQ_MAP[EVENT_UART_2_SEND]  - 32)) |
+                       (0x1U << (IRQ_MAP[EVENT_UART_2_RCV]   - 32));
 
     // enable
     uart2->ctrl &= ~UARTEN_MASK;
@@ -49,11 +53,11 @@ TD* schedule(TaskQueue *task_ready_queue){
 #define IDLE_ITERATIONS 2000000
 void __attribute__((noreturn)) task_idle() {
     int i, j = 0;
-    int movingavg = 99;
-    int alpha = 60;
+    unsigned int movingavg = 99;
+    unsigned int alpha = 60;
     FOREVER {
         i = IDLE_ITERATIONS;
-        int time_start = clk4->value_low;        
+        unsigned int time_start = clk4->value_low;        
         __asm__ volatile (
             "idle_loop:\n\t"
             "subs %[i], %[i], #1\n\t"
@@ -63,11 +67,11 @@ void __attribute__((noreturn)) task_idle() {
             "mov %[i], %[j]\n\t"
             "bne idle_loop\n\t"
             : [i] "+r" (i), [j] "+r" (j));
-        int time_end = clk4->value_low;
-        int time_total = time_end - time_start;
-        int percent_idle = 157280 * 100 / time_total;
+        unsigned int time_end = clk4->value_low;
+        unsigned int time_total = time_end - time_start;
+        unsigned int percent_idle = 157280 * 100 / time_total;
         movingavg = MOVING_AVERAGE(percent_idle, movingavg, alpha);
-        StoreValue(VALUE_IDLE, movingavg);
+        StoreValue(VALUE_IDLE, movingavg & 0xFFFF);
     }
 }
 #undef IDLE_ITERATIONS
@@ -152,7 +156,8 @@ int main(){
     LOG("Task Created!\r\n");
     LOGF("&fut: %x\r\n", (int) &fut);
 
-    TD *task = schedule(&task_ready_queue);
+    TD *task = schedule(&task_ready_queue), *prev_task = NULL;
+    int reentry_count = 0;
     LOGF("OFFSETS: lr %d, sp %d, r0 %d, spsr %d, task %d\r\n", (int) &(task->lr)-(int)task, (int)&(task->sp)-(int)task, (int)&(task->r0)-(int)task, (int)&(task->spsr)-(int)task, task);
     int f = 0;
     while (task && f != SYSCALL_QUIT){
@@ -173,8 +178,20 @@ int main(){
 
         handle(f, task, &task_ready_queue, &value_store);
         LOG("\r\n");
+
+        //check for infinite loop                                                                       //20 is the TID of task_terminal
+        if (task == prev_task && PRIORITY_IDLE > task->priority && task->priority > PRIORITY_WAREHOUSE && task_getTid(task) != 20) {
+            ++reentry_count;
+            KASSERT(reentry_count < 100, "infinite loop. tid = %d, priority = %d, lr = %x", task_getTid(task), task->priority, TD_lr(task));
+        }
+        else if (task->priority > PRIORITY_WAREHOUSE) {
+            reentry_count = 0;
+            prev_task = task;
+        }
+        
         task = schedule(&task_ready_queue);
     }
+
     LOG("Kernel Exiting - No More Tasks");
     vic2->IntEnableClear = 0xFFFFFFFF;
 

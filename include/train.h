@@ -1,11 +1,11 @@
 #include <position.h>
+#include <constants.h>
 
 #ifndef TRAIN_H
 #define TRAIN_H
 
 #define NUM_SPEEDS 15
 
-#define MAX_CONCURRENT_TRAINS 5
 #define NUM_TRAINS 80
 
 //train body is ~62cm long, round up to 65 just in case

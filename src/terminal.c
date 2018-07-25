@@ -30,8 +30,8 @@ IDLE: %__  E_D:     STK_AVG:     VELO_PR:      SNSR_NX:                  A: 1234
 #include <message.h>
 #include <clock.h>
 #include <sensor.h>
-#include <track_state.h> 
-#include <train_state.h>
+#include <track.h>
+#include <terminalcourier.h>
 
 typedef struct terminalparser {
     circlebuffer_t input;
@@ -52,15 +52,50 @@ typedef struct terminal {
 typedef struct terminalmessage {
     MessageType type;
     TerminalRequest rq;
-    int arg1;
+    union {
+        int arg1;
+        struct {
+            unsigned int short_arg1 : 16;
+            unsigned int short_arg2 : 16;
+        };
+    };
     int arg2;
 } TerminalMessage;
+#define TERMINAL_MESSAGE_INIT {0, 0, .arg1 = 0, .arg2 = 0}
 
 inline int SendTerminalRequest(int terminaltid, TerminalRequest rq, int arg1, int arg2) {
-    TerminalMessage tm = {MESSAGE_TERMINAL, rq, arg1, arg2};
+    TerminalMessage tm = {MESSAGE_TERMINAL, rq, .arg1 = arg1, .arg2 = arg2};
     ReplyMessage rm = {0, 0};
     int r = Send(terminaltid, &tm, sizeof(tm), &rm, sizeof(rm));
     return ( r >= 0 ? rm.ret : r);
+}
+
+int terminal_set_reservations(TerminalCourier *tc, Blockage *blockages, int train) {
+    int err;
+    err = tc_send(tc, TERMINAL_SET_RESRV1, train, blockages->word1);
+    if (err != 0) {
+        return err;
+    }
+    err = tc_send(tc, TERMINAL_SET_RESRV2, train, blockages->word2);
+    if (err != 0) {
+        return err;
+    }
+    err = tc_send(tc, TERMINAL_SET_RESRV3, (unsigned int)train | (blockages->e << 16), blockages->br);
+    if (err != 0) {
+        return err;
+    }
+    err = tc_send(tc, TERMINAL_SET_RESRV4, train, blockages->mr);
+    return err;
+}
+
+int terminal_unset_reservations(TerminalCourier *tc, Blockage *blockages) {
+    int err;
+    err = tc_send(tc, TERMINAL_UNSET_RESRV1, blockages->word1, blockages->word2);
+    if (err != 0) {
+        return err;
+    }
+    err = tc_send(tc, TERMINAL_UNSET_RESRV2, blockages->word3, blockages->word4);
+    return err;
 }
 
 static inline void cursor_to_position(struct circlebuffer *cb, int line, int col) {
@@ -132,7 +167,7 @@ static void output_base_terminal(Terminal *t) {
         //now clear the tab stop
         "\033[g"
         ;
-    circlebuffer_t * restrict cb = &t->output;
+    circlebuffer_t *cb = &t->output;
     ASSERT(cb_write_string(cb, "\033[0m\033[2J\033[3g\033[H") == 0, "Error outputting base terminal");
     ASSERT(cb_write_string(cb, topbar) == 0, "Error outputting base terminal");
     ASSERT(cb_write_string(cb, track_char == 'A' ? trackA : trackB) == 0, "Error outputting base terminal");
@@ -517,7 +552,7 @@ void __attribute__((noreturn)) task_terminal_command_parser(int terminaltid){
 
 void __attribute__((noreturn)) task_uart2_courier(int servertid) {
     int gettid = WhoIs(NAME_UART2_SEND);
-    TerminalMessage tm = {MESSAGE_TERMINAL, TERMINAL_NOTIFY_COURIER, 0, 0};
+    TerminalMessage tm = {MESSAGE_TERMINAL, TERMINAL_NOTIFY_COURIER, .arg1 = 0, .arg2 = 0};
     ReplyMessage rm;
     FOREVER {
         Send(servertid, &tm, sizeof(tm), &rm, sizeof(rm));
@@ -526,52 +561,90 @@ void __attribute__((noreturn)) task_uart2_courier(int servertid) {
 
 }
 
-static inline void print_styled_string(circlebuffer_t * restrict cb, char * const restrict styled_string, const int flags, const int increment, const int end) {
+static inline void restylize_string(char * restrict styled_string, unsigned int flags, unsigned int increment, unsigned int start, unsigned int limit, char attrib) {
     //append the 'restore cursor' to save a call to cb_write_string
-    for (int i = 1, cur = 2; i < end; i <<= 1, cur += increment) {
+    for (unsigned int i = 1, cur = start; i < limit; i <<= 1, cur += increment) {
         if (flags & i) {
-            //attribute 1 = Bright
-            styled_string[cur] = '1';
+            styled_string[cur] = attrib;
         }
     }
-    ASSERT(cb_write_string(cb, styled_string) == 0, "TERMINAL OUTPUT CB FULL");
 }
 
-static inline void print_status(circlebuffer_t * restrict cb, int status) {
+static inline void print_status(circlebuffer_t * restrict cb, unsigned int status) {
     cb_write_string(cb, "\033[s");
     cursor_to_position(cb, TERMINAL_INPUT_MAX_LINE + 1, 12);
 
     char str[] = STYLED_FLAG_STRING "\033[u";
-    print_styled_string(cb, str, status, 5, STATUS_FLAG_END);
+    //attribute 1 = Bright
+    restylize_string(str, status, 5, 2, STATUS_FLAG_END, '1');
+    ASSERT(cb_write_string(cb, str) == 0, "TERMINAL OUTPUT CB FULL");
 }
 
-static inline void print_reservations1(circlebuffer_t * restrict cb, unsigned long long reservations) {
+static inline void print_reservations(circlebuffer_t * restrict cb, char *resrv_strs[]) {
+    /*
     cb_write_string(cb, "\033[s\033[H\n\t");
 
-    for (int i = 0; i < 4; ++i) {
-        int flags = (reservations >> (i * 16)) & 0xFFFF;
+    for (int i = 0; i < 2; ++i) {
+        unsigned int flags = (reservations >> (i * 16)) & 0xFFFF;
         char str[] = STYLED_RESRV_STRING_1 "\r\n\t";
-        print_styled_string(cb, str, flags, 5, (1 << 16));
+        restylize_string(str, flags, 6, 3, (0x1U << 16), '1' + train);
+        ASSERT(cb_write_string(cb, str) == 0, "TERMINAL OUTPUT CB FULL");
     }
     cb_write_string(cb, "\033[u");
-}
-static inline void print_reservations2(circlebuffer_t * restrict cb, unsigned long long reservations) {
-    cb_write_string(cb, "\033[s\033[6;77H");
+    /*/
+    cb_write_string(cb, "\033[s\033[H\n\t");
 
-    int flags_snsr = reservations & 0xFFFF;
-    char str[] = STYLED_RESRV_STRING_1 "\r\n\t";
-    print_styled_string(cb, str, flags_snsr, 5, (1 << 16));
+    for (int i = 0; i < 9; ++i) {
+        cb_write_string(cb, resrv_strs[i]);
+    }
+    cb_write_string(cb, "\033[u");
+    //*/
+}
+static inline void print_reservations2(circlebuffer_t * restrict cb, unsigned int reservations, int train) {
+    //*
+    cb_write_string(cb, "\033[s\033[4;77H");
 
     for (int i = 0; i < 2; ++i) {
-        int flags = ((reservations >> (16 + 22 * i)) & 0x3FFFF);
-        int flags_3way = ((reservations >> (16 + 18 + 22 * i)) & 0xF);
+        unsigned int flags = (reservations >> (i * 16)) & 0xFFFF;
+        char str[] = STYLED_RESRV_STRING_1 "\r\n\t";
+        restylize_string(str, flags, 6, 3, (0x1U << 16), '1' + train);
+        ASSERT(cb_write_string(cb, str) == 0, "TERMINAL OUTPUT CB FULL");
+    }
+    cb_write_string(cb, "\033[u");
+    /*/
+    cb_write_string(cb, "\033[s\033[H\n\t");
+
+    for (int i = 0; i < 7; ++i) {
+        cb_write_string(cb, resrv_strs[i]);
+    }
+    cb_write_string(cb, "\033[u");
+    //*/
+}
+static inline void print_reservations3(circlebuffer_t * restrict cb, unsigned long long reservations, int train) {
+    cb_write_string(cb, "\033[s\033[6;77H");
+
+    unsigned int flags_snsr = reservations & 0xFFFF;
+    char str[] = STYLED_RESRV_STRING_1 "\r\n\t";
+    restylize_string(str, flags_snsr, 6, 3, (0x1U << 16), '1' + train);
+    ASSERT(cb_write_string(cb, str) == 0, "TERMINAL OUTPUT CB FULL");
+
+    for (int i = 0; i < 2; ++i) {
+        unsigned int flags = ((reservations >> (16 + NUM_SWITCHES * i)) & 0x3FFFF);
+        unsigned int flags_3way = ((reservations >> (16 + 18 + NUM_SWITCHES * i)) & 0xF);
 
         char str2[] = STYLED_RESRV_STRING_2 "\r\n\t";
-        print_styled_string(cb, str2, flags, 5, (1 << 18));
+        restylize_string(str2, flags, 6, 3, (0x1U << 18), '1' + train);
+        ASSERT(cb_write_string(cb, str2) == 0, "TERMINAL OUTPUT CB FULL");
+
         char str3[] = STYLED_RESRV_STRING_3 "\r\n\t";
-        print_styled_string(cb, str3, flags_3way, 8, (1 << 4));
+        restylize_string(str3, flags_3way, 9, 3, (0x1U << 4), '1' + train);
+        ASSERT(cb_write_string(cb, str3) == 0, "TERMINAL OUTPUT CB FULL");
     }
-    cb_write_number(cb, reservations >> 32, 10);
+    cb_write_number(cb, reservations >> 32ULL, 10);
+    cb_write(cb, ' ');
+    cb_write_number(cb, reservations & 0xFFFFFFFFULL, 10);
+    cb_write_string(cb, "\n\r");
+
     cb_write_string(cb, "\033[u");
 }
 
@@ -610,7 +683,7 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
     CreateWithArgument(PRIORITY_HIGH, &task_terminal_command_parser, mytid);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_uart2_courier, mytid);
     CreateWithArgument(PRIORITY_LOW, &task_clockprinter, mytid);
-    CreateWithArgument(PRIORITY_HIGH, &task_sensor_server, trackstate_tid);
+    CreateWithArgument(PRIORITY_HIGHEST, &task_sensor_server, trackstate_tid);
     CreateWithArgument(PRIORITY_LOW, &task_stack_metric_printer, mytid);
 
     char cb_terminal_buf[CB_TERMINAL_BUF_SIZE];
@@ -618,9 +691,21 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
     cb_init(&cb_terminal, cb_terminal_buf, sizeof(cb_terminal_buf));
     Terminal t = {cb_terminal, TERMINAL_INPUT_BASE_LINE, TERMINAL_INPUT_BASE_COL, SENSOR_LINE_BASE, 0, 1, 1, 0};
     int tid, err; char c;
-    TerminalMessage tm = {0, 0, 0, 0};
+    TerminalMessage tm = TERMINAL_MESSAGE_INIT;
     ReplyMessage rm = {MESSAGE_REPLY, 0};
-    int status = 0;
+    unsigned int status = 0;
+
+    char resrv_a[] = STYLED_RESRV_STRING_1 "\r\n\t";
+    char resrv_b[] = STYLED_RESRV_STRING_1 "\r\n\t";
+    char resrv_c[] = STYLED_RESRV_STRING_1 "\r\n\t";
+    char resrv_d[] = STYLED_RESRV_STRING_1 "\r\n\t";
+    char resrv_e[] = STYLED_RESRV_STRING_1 "\r\n\t";
+    char resrv_br1[] = STYLED_RESRV_STRING_2 "\r\n\t";
+    char resrv_br2[] = STYLED_RESRV_STRING_3 "\r\n\t";
+    char resrv_mr1[] = STYLED_RESRV_STRING_2 "\r\n\t";
+    char resrv_mr2[] = STYLED_RESRV_STRING_3;
+
+    char *resrv_strs[] = { resrv_a, resrv_b, resrv_c, resrv_d, resrv_e, resrv_br1, resrv_br2, resrv_mr1, resrv_mr2 };
 
     output_base_terminal(&t);
 
@@ -695,14 +780,14 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
         }
         case (TERMINAL_TIME):
         {
-            int time_hundred_millis = tm.arg1, idle = tm.arg2; 
+            unsigned int time_hundred_millis = (unsigned int)tm.arg1, idle = (unsigned int)tm.arg2; 
             
             cb_write_string(&t.output, "\0337\033[H");
-            int m = time_hundred_millis % 10;
+            unsigned int m = time_hundred_millis % 10;
             time_hundred_millis /= 10;
-            int ss = time_hundred_millis % 60;
+            unsigned int ss = time_hundred_millis % 60;
             time_hundred_millis /= 60;
-            int mm = time_hundred_millis;
+            unsigned int mm = time_hundred_millis;
 
             cb_write_fixed_size_number(&t.output, mm, 10, 10);
             cb_write(&t.output, ':');
@@ -802,7 +887,7 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
         }
         case(TERMINAL_FLAGS_SET):
         {
-            int flags = tm.arg1;
+            unsigned int flags = (unsigned int)tm.arg1;
             if (~status & flags)
             {
                 status |= flags;
@@ -813,7 +898,7 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
         }
         case(TERMINAL_FLAGS_UNSET):
         {
-            int flags = tm.arg1;
+            unsigned int flags = (unsigned int)tm.arg1;
             if (status & flags) {
                 status &= ~flags;
 
@@ -821,16 +906,82 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
             }
             break;
         }
-        case(TERMINAL_PRINT_RESRV1):
+        case(TERMINAL_SET_RESRV1):
         {
-            unsigned long long flags = ((unsigned long long)tm.arg1) | (((unsigned long long)tm.arg2) << 32ULL);
-            print_reservations1(&t.output, flags);
+            int active_train = tm.arg1;
+            unsigned int flags_a = ((unsigned int)tm.arg2 >> 0 ) & 0xFFFF;
+            unsigned int flags_b = ((unsigned int)tm.arg2 >> 16) & 0xFFFF;
+
+            restylize_string(resrv_a, flags_a, 6, 3, (0x1U << 16), '1' + active_train);
+            restylize_string(resrv_b, flags_b, 6, 3, (0x1U << 16), '1' + active_train);
+
+            //terminal_set_reservations will call TERMINAL_SET_RESRV4, so don't bother printing yet
+            //print_reservations(&t.output, resrv_strs, active_train);
             break;
         }
-        case(TERMINAL_PRINT_RESRV2):
+        case(TERMINAL_SET_RESRV2):
         {
-            unsigned long long flags = ((unsigned long long)tm.arg1) | (((unsigned long long)tm.arg2) << 32ULL);
-            print_reservations2(&t.output, flags);
+            int active_train = tm.arg1;
+            unsigned int flags_c = ((unsigned int)tm.arg2 >> 0 ) & 0xFFFF;
+            unsigned int flags_d = ((unsigned int)tm.arg2 >> 16) & 0xFFFF;
+
+            restylize_string(resrv_c, flags_c, 6, 3, (0x1U << 16), '1' + active_train);
+            restylize_string(resrv_d, flags_d, 6, 3, (0x1U << 16), '1' + active_train);
+
+            //terminal_set_reservations will call TERMINAL_SET_RESRV4, so don't bother printing yet
+            //print_reservations(&t.output, resrv_strs);
+            break;
+        }
+        case(TERMINAL_SET_RESRV3):
+        {
+            int active_train = tm.short_arg1;
+            unsigned int flags_e = tm.short_arg2;
+
+            restylize_string(resrv_e, flags_e, 6, 3, (0x1U << 16), '1' + active_train);
+
+            unsigned int flags_br = (unsigned int)tm.arg2;
+            restylize_string(resrv_br1, flags_br, 6, 3, (0x1U << 18), '1' + active_train);
+            restylize_string(resrv_br2, flags_br >> 18, 9, 3, (0x1U << 4), '1' + active_train);
+
+            //terminal_set_reservations will call TERMINAL_SET_RESRV4, so don't bother printing yet
+            //print_reservations(&t.output, resrv_strs);
+            break;
+        }
+        case(TERMINAL_SET_RESRV4):
+        {
+            int active_train = tm.arg1;
+            unsigned int flags_mr = (unsigned int)tm.arg2;
+
+            restylize_string(resrv_mr1, flags_mr, 6, 3, (0x1U << 18), '1' + active_train);
+            restylize_string(resrv_mr2, flags_mr >> 18, 9, 3, (0x1U << 4), '1' + active_train);
+
+            print_reservations(&t.output, resrv_strs);
+            break;
+        }
+        case(TERMINAL_UNSET_RESRV1):
+        {
+            Blockage tmp = {.word1 = tm.arg1, .word2 = tm.arg2, .word3 = 0, .word4 = 0};
+
+            restylize_string(resrv_a, tmp.a, 6, 3, (0x1U << 16), '7');
+            restylize_string(resrv_b, tmp.b, 6, 3, (0x1U << 16), '7');
+            restylize_string(resrv_c, tmp.c, 6, 3, (0x1U << 16), '7');
+            restylize_string(resrv_d, tmp.d, 6, 3, (0x1U << 16), '7');
+
+            //terminal_unset_reservations will call TERMINAL_UNSET_RESRV2, so don't bother printing yet
+            //print_reservations(&t.output, resrv_strs);
+            break;
+        }
+        case(TERMINAL_UNSET_RESRV2):
+        {
+            Blockage tmp = {.word1 = 0, .word2 = 0, .word3 = tm.arg1, .word4 = tm.arg2};
+
+            restylize_string(resrv_e,   tmp.e,        6, 3, (0x1U << 16), '7');
+            restylize_string(resrv_br1, tmp.br >>  0, 6, 3, (0x1U << 18), '7');
+            restylize_string(resrv_br2, tmp.br >> 18, 9, 3, (0x1U <<  4), '7');
+            restylize_string(resrv_mr1, tmp.mr >>  0, 6, 3, (0x1U << 18), '7');
+            restylize_string(resrv_mr2, tmp.mr >> 18, 9, 3, (0x1U <<  4), '7');
+
+            print_reservations(&t.output, resrv_strs);
             break;
         }
         case (TERMINAL_POS_DBG):

@@ -1,0 +1,14 @@
+#ifndef __CONFIG_CONSTANTS_H__
+#define __CONFIG_CONSTANTS_H__
+
+#define MAX_CONCURRENT_TRAINS 5
+
+#define NUM_SWITCHES 22
+
+#define SENSORS_PER_GROUP 16
+
+#define BFS_MH_SIZE 150
+
+#define MAX_SENSOR_ATTRIB_LEN 3000
+
+#endif //__CONFIG_CONSTANTS_H__

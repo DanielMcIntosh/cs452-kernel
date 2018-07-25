@@ -43,7 +43,7 @@ static int position_calc_distance_with_max_velo(Position *p, int dt) {
 
     return distance;
 }
-void Position_HandleSensorHit(Position* p, track_node *snsr, int time, int new_route_idx){
+void Position_HandleSensorHit(Position* p, const track_node *snsr, int time, int new_route_idx){
     p->last_known_node = snsr;
     p->millis_off_last_node = 0;
     if (p->state == PSTATE_ACCEL) {
@@ -120,7 +120,7 @@ void Position_HandleDecel(Position *p, const Route *r, int time, int current_vel
     return position_handle_accdec(p, r, time, current_velocity, a, current_velocity, PSTATE_DECEL);
 }
 
-void Position_HandleConstVelo(Position *p, Route *r, int time, int current_velocity) {
+void Position_HandleConstVelo(Position *p, const Route *r, int time, int current_velocity) {
     return position_handle_accdec(p, r, time, current_velocity, 0, current_velocity, PSTATE_CONST_VELO);
 }
 

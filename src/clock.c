@@ -230,7 +230,7 @@ static void __attribute__((noreturn)) task_timeout(int clock_tid) {
             ASSERT(err >= 0, "Error sending to caller of Timeout(int)");
         } else { //from a call to Timeout(int)
             //get time immediately, then reply to unblock the caller
-            int timeout = Time() + tm.ticks;
+            unsigned int timeout = Time() + tm.ticks;
             Reply(tid, NULL, 0);
 
             unsigned int old_min = UINT_MAX;

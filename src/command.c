@@ -11,7 +11,9 @@
 #include <terminal.h>
 #include <circlebuffer.h>
 #include <train.h>
+#include <track.h>
 #include <track_state.h>
+#include <train_state.h>
 #include <train_event.h>
 #include <switch.h>
 #include <util.h>

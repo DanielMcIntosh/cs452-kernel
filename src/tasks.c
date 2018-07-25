@@ -8,7 +8,7 @@
 //////////////////////////////////////////////////////
 //  HELPERS
 //////////////////////////////////////////////////////
-static const char LogTable256[256] = 
+static const signed char LogTable256[256] = 
 {
 #define LT(n) n, n, n, n, n, n, n, n, n, n, n, n, n, n, n, n
     -1, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3,
@@ -67,7 +67,7 @@ TD *fetch_task(TaskQueue * restrict queue) {
 //  EXPOSED
 //////////////////////////////////////////////////////
 int task_init(TaskQueue * restrict queue, char * restrict stack_space, unsigned int stack_space_size) {
-    int STACK_SPACE_PER_TASK = stack_space_size/TASK_POOL_SIZE - 4;
+    unsigned int STACK_SPACE_PER_TASK = stack_space_size/TASK_POOL_SIZE - 4;
 
     for (int i = 0; i < TASK_POOL_SIZE; ++i) {
         //we write to the stack from the bottom up,

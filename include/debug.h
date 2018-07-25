@@ -26,7 +26,7 @@ if (unlikely(!(x))) {\
 
 #define KASSERT(x, y,vargs...) \
 if (unlikely(!(x))) {\
-    KPANIC("\033[0m\033[1;35;44mASSERT FAILED:\033[21;31;40m\r\n" S(x) "\r\nFUNCTION: %s\r\nFILE: "S(__FILE__) "\r\nLINE: " S(__LINE__) "\r\n" S(y) "\r\n\033[0m", __func__,  ##vargs)\
+    KPANIC("\033[0m\033[1;35;44mKASSERT FAILED:\033[21;31;40m\r\n" S(x) "\r\nFUNCTION: %s\r\nFILE: "S(__FILE__) "\r\nLINE: " S(__LINE__) "\r\n" S(y) "\r\n\033[0m", __func__,  ##vargs)\
 }
 
 #if DEBUG

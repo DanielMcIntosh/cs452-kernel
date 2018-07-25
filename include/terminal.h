@@ -1,6 +1,8 @@
 #ifndef TERMINAL_H
 #define TERMINAL_H
 
+#include "reservations.h"
+
 #define L(x) x, sizeof(x)
 
 #define CB_INPUT_BUF_SIZE 20
@@ -25,9 +27,10 @@
 #define FLAG(s) "\033[2m"S(s)
 #define STYLED_FLAG_STRING FLAG(I)FLAG(F)FLAG(C)FLAG(R)FLAG(M)FLAG(S)"\033[m"
 
-#define STYLED_RESRV_STRING_1 FLAG(1)FLAG(2)FLAG(3)FLAG(4)FLAG(5)FLAG(6)FLAG(7)FLAG(8)FLAG(9)FLAG(0)FLAG(1)FLAG(2)FLAG(3)FLAG(4)FLAG(5)FLAG(6)"\033[m"
-#define STYLED_RESRV_STRING_2 FLAG(1)FLAG(2)FLAG(3)FLAG(4)FLAG(5)FLAG(6)FLAG(7)FLAG(8)FLAG(9)FLAG(0)FLAG(1)FLAG(2)FLAG(3)FLAG(4)FLAG(5)FLAG(6)FLAG(7)FLAG(8)"\033[m"
-#define STYLED_RESRV_STRING_3 "\033[2m 153\033[2m 154\033[2m 155\033[2m 156\033[m"
+#define CFLAG(s) "\033[37m"S(s)
+#define STYLED_RESRV_STRING_1 CFLAG(1)CFLAG(2)CFLAG(3)CFLAG(4)CFLAG(5)CFLAG(6)CFLAG(7)CFLAG(8)CFLAG(9)CFLAG(0)CFLAG(1)CFLAG(2)CFLAG(3)CFLAG(4)CFLAG(5)CFLAG(6)"\033[m"
+#define STYLED_RESRV_STRING_2 CFLAG(1)CFLAG(2)CFLAG(3)CFLAG(4)CFLAG(5)CFLAG(6)CFLAG(7)CFLAG(8)CFLAG(9)CFLAG(0)CFLAG(1)CFLAG(2)CFLAG(3)CFLAG(4)CFLAG(5)CFLAG(6)CFLAG(7)CFLAG(8)"\033[m"
+#define STYLED_RESRV_STRING_3 "\033[37m 153\033[37m 154\033[37m 155\033[37m 156\033[m"
 
 typedef enum status_flag{
     STATUS_FLAG_INVALID         = (1 << 0),
@@ -53,8 +56,14 @@ typedef enum terminalrequest {
     TERMINAL_DISTANCE_DEBUG,
     TERMINAL_FLAGS_SET,
     TERMINAL_FLAGS_UNSET,
-    TERMINAL_PRINT_RESRV1,
-    TERMINAL_PRINT_RESRV2,
+    TERMINAL_SET_RESRV1,
+    TERMINAL_SET_RESRV2,
+    TERMINAL_SET_RESRV3,
+    TERMINAL_SET_RESRV4,
+    TERMINAL_UNSET_RESRV1,
+    TERMINAL_UNSET_RESRV2,
+    TERMINAL_UNSET_RESRV3,
+    TERMINAL_UNSET_RESRV4,
     TERMINAL_ROUTE_DBG,
     TERMINAL_ROUTE_DBG2,
     TERMINAL_POS_DBG,
@@ -64,7 +73,12 @@ typedef enum terminalrequest {
     NUM_TERMINAL_REQUESTS
 } TerminalRequest;
 
+typedef struct tcourier TerminalCourier;
+
 int SendTerminalRequest(int terminaltid, TerminalRequest rq, int arg1, int arg2);
+int terminal_set_reservations(TerminalCourier *tc, Blockage * restrict blockages, int train);
+int terminal_unset_reservations(TerminalCourier *tc, Blockage * restrict blockages);
+
 
 void __attribute__((noreturn)) task_terminal();
 #endif

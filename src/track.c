@@ -5,6 +5,8 @@
 #include <debug.h>
 #include <minheap.h>
 #include <features.h>
+#include <reservations.h>
+#include <constants.h>
 
 track_node track[TRACK_MAX];
 
@@ -30,7 +32,7 @@ typedef struct bfsnode {
 } BFSNode;
 
 static BFSNode* q_pop(BFSNode** freeQ, BFSNode** freeQTail){
-    ASSERT(*freeQ != NULL, "Cannot pop from empty free queue");
+    ASSERT(freeQ != NULL && *freeQ != NULL, "Cannot pop from empty free queue");
     BFSNode *ret = *freeQ;
     *freeQ = (*freeQ)->next;
     if (*freeQ == NULL)
@@ -64,7 +66,7 @@ static inline void bfs_add_node(minheap_t *mh, BFSNode **freeQ, BFSNode **freeQT
     mh_add(mh, (unsigned long int) straight, distance + dist);
 }
 
-int find_path_between_nodes(const Reservation * restrict reservations, int min_dist, int rev_penalty, const track_node *origin, const track_node *dest, Route * restrict r) {
+int find_path_between_nodes(const Blockage * restrict blockages, int min_dist, int max_dist, int rev_penalty, const track_node *origin, const track_node *dest, Route * restrict r) {
     entry_t mh_array[BFS_MH_SIZE];
     minheap_t mh = {mh_array, 0, BFS_MH_SIZE};
     entry_t entry;
@@ -83,14 +85,14 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
     fw->r = *r;
     fw->current_node = origin;
     fw->idx = 0;
-    mh_add(&mh, (int) fw, 0);
+    mh_add(&mh, (unsigned long int) fw, 0);
     if (ALLOW_REVERSE_START) {
         BFSNode * rv = q_pop(&freeQ, &freeQTail);
         rv->r = *r;
         rv->r.reverse = 1;
         rv->current_node = origin->reverse;
         rv->idx = 0;
-        mh_add(&mh, (int) rv, rev_penalty);
+        mh_add(&mh, (unsigned long int) rv, rev_penalty);
     }
     bfsnodes[BFS_MH_SIZE-1].next = NULL;
     int k = 0;
@@ -102,7 +104,9 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
         int distance = entry.value;
         Route route = bn->r;
         int idx = bn->idx;
-        ASSERT(idx < MAX_ROUTE_COMMAND, "Too many route commands in a route from %d to %d (%d, %d)", origin->num, dest->num, k, rev_penalty);
+        if (idx >= MAX_ROUTE_COMMAND || distance > max_dist) {
+            return INT_MAX;
+        }
         //if (idx >= MAX_ROUTE_COMMAND) continue;
         
         const track_node *cn = bn->current_node;
@@ -114,7 +118,7 @@ int find_path_between_nodes(const Reservation * restrict reservations, int min_d
             }
             *r = route;
             return distance;
-        } else if (TRACK_RESERVED(reservations, cn)) { // TODO allow trains to use their own reserved track
+        } else if (TRACK_BLOCKED(blockages, cn)) { // TODO allow trains to use their own reserved track
             continue;
         } 
         // continue the search
@@ -169,7 +173,7 @@ const track_node* rc_to_track_node(RouteCommand rc, const char * restrict sig) {
     }
 }
 
-inline const track_edge *next_edge_on_route(const Route *route, int * restrict idx, const track_node *n,  bool* on_route, const char * restrict sig) {
+inline const track_edge *next_edge_on_route(const Route *route, int * restrict idx, const track_node *n,  bool *on_route, const char * restrict sig) {
     ASSERT_VALID_TRACK_SIG(n, sig);
     ASSERT(0 <= *idx && *idx < MAX_ROUTE_COMMAND, "invalid idx: %d @ %s", *idx, sig);
     switch (n->type) {
@@ -213,7 +217,7 @@ inline const track_edge *next_edge_on_route(const Route *route, int * restrict i
     }
 }
 
-static inline const track_node *next_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, node_type type, bool * on_route,  const char * restrict sig) {
+static inline const track_node *next_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, node_type type, bool *on_route,  const char * restrict sig) {
     ASSERT_VALID_TRACK_SIG(prev, sig);
     const track_node *n = prev;
     *distance = 0;
@@ -228,17 +232,17 @@ static inline const track_node *next_on_route(const Route *route, int * restrict
     return n;
 }
 
-inline const track_node *next_sensor_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, bool * on_route, const char * restrict sig) {
+inline const track_node *next_sensor_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, bool *on_route, const char * restrict sig) {
     ASSERT_VALID_TRACK_SIG(prev, sig);
     return next_on_route(route, idx, prev, distance, NODE_SENSOR, on_route, sig);
 }
-inline const track_node *next_switch_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, bool * on_route, const char * restrict sig) {
+inline const track_node *next_switch_on_route(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, bool *on_route, const char * restrict sig) {
     ASSERT_VALID_TRACK_SIG(prev, sig);
     return next_on_route(route, idx, prev, distance, NODE_BRANCH, on_route, sig);
 }
 
 //TODO distance is overwritten by successive calls to next_sensor_on_route, so it isn't actually the resulting distance
-const track_node *nth_sensor_on_route(int n, const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, bool * on_route, const char * restrict sig) {
+const track_node *nth_sensor_on_route(int n, const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, bool *on_route, const char * restrict sig) {
     ASSERT_VALID_TRACK_SIG(prev, sig);
     int cur_dist = 0;
     for (int i = 0; i < n && likely(prev != NULL); ++i) {
@@ -278,7 +282,7 @@ const track_node *forward_dist_on_route(const Route *route, int * restrict idx, 
     // cur_dist is the amount of distance remaining between prev and the goal distance.
     if (prev != NULL) {
         const track_edge *e = next_edge_on_route(route, idx, prev, on_route, sig);
-        if (!on_route)
+        if (!*on_route)
             return prev;
         *distance += (e->dist - cur_dist); // the amount added minus the amount missing
         prev = e->dest;
@@ -289,8 +293,9 @@ const track_node *forward_dist_on_route(const Route *route, int * restrict idx, 
 }
 
 int distance_to_on_route(const Route *route, int idx, const track_node *from, const track_node *to, bool *on_route, const char * restrict sig) {
-    ASSERT_VALID_TRACK_SIG(to, sig);
     ASSERT_VALID_TRACK_SIG(from, sig);
+    //in theory should handle to == null just fine by returning the distance to the switch after the end of the route, but put this here anyways
+    ASSERT_VALID_TRACK_SIG(to, sig);
     const track_node *n = from;
     int distance = 0;
     const track_edge *e;
@@ -305,62 +310,8 @@ int distance_to_on_route(const Route *route, int idx, const track_node *from, co
     return (unlikely(n == NULL)) ? -1 : distance;
 }
 
-static inline void add_to_mask(const track_node *n, Reservation * restrict mask) {
-    int ind = TRACK_NODE_TO_INDEX(n);
-    if (ind < 64) {
-        mask->bits_low |= 0x1ULL << ind;
-    }
-    else {
-        if (n->type == NODE_BRANCH) {
-            ind = SWCLAMP(n->num) - 1 + 80;
-        }
-        else if (n->type == NODE_MERGE) {
-            ind = (SWCLAMP(n->num) - 1) + 80 + 22;
-        }
-        ind -= 64;
-        mask->bits_high |= 0x1ULL << ind;
-    }
-}
-
-static inline void remove_from_mask(const track_node *n, Reservation * restrict mask) {
-    int ind = TRACK_NODE_TO_INDEX(n);
-    if (ind < 64) {
-        mask->bits_low &= ~(0x1ULL << ind);
-    }
-    else {
-        if (n->type == NODE_BRANCH) {
-            ind = SWCLAMP(n->num) - 1 + 80;
-        }
-        else if (n->type == NODE_MERGE) {
-            ind = (SWCLAMP(n->num) - 1) + 80 + 22;
-        }
-        ind -= 64;
-        mask->bits_high &= ~(0x1ULL << ind);
-    }
-}
-
-bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, Reservation * restrict reservations) {
-    ASSERT_VALID_TRACK(start);
-    ASSERT_VALID_TRACK(end);
-
-    Reservation mask = RESERVATION_INIT;
-    add_to_mask(end, &mask);
-
-    const track_node *n = start;
-    bool on_route = TRUE;
-    while (n != end && n != NULL && on_route) {
-        n = next_edge_on_route(route, &idx, n, &on_route, "reserve_track")->dest;
-
-        add_to_mask(n, &mask);
-    }
-    ASSERT(n == end, "While Loop broken early");
-
-    if ((reservations->bits_low & mask.bits_low) || (reservations->bits_high & mask.bits_high)) {
-        return FALSE;
-    }
-
-    reservations->bits_low |= mask.bits_low;
-    reservations->bits_high |= mask.bits_high;
-
-    return TRUE;
+int get_dist_to_nxt_sensor(const Route *route, int idx, const track_node *cur_sensor, bool *on_route, const char * restrict sig) {
+    int res;
+    next_sensor_on_route(route, &idx, cur_sensor, &res, on_route, sig);
+    return res;
 }
