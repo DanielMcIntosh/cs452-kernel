@@ -97,7 +97,7 @@ void __attribute__((noreturn)) task_clockserver(){
             ASSERT(err == 0, "MINHEAP ADD ERROR");
             break;
         case DELAYUNTIL:
-            ASSERT(DEBUG_CLOCK && (unsigned int) cm.argument > cs.ticks, "Delay %d <= %d cs.ticks ", cm.argument, cs.ticks);
+            ASSERT(!DEBUG_CLOCK || (unsigned int) cm.argument > cs.ticks, "Delay %d <= %d cs.ticks ", cm.argument, cs.ticks);
             if ((unsigned int) cm.argument <= cs.ticks){
                 err = Reply(tid, &rm, sizeof(rm));
             }
@@ -155,7 +155,7 @@ int Time(){
 }
 
 inline int Delay(int ticks){
-    ASSERT(DEBUG_CLOCK && ticks > 0, "cannot delay for negative time: %d", ticks);
+    ASSERT(!DEBUG_CLOCK || ticks > 0, "cannot delay for negative time: %d", ticks);
     if (ticks < 0) return 0;
     return clockSend(DELAY, ticks);
 }

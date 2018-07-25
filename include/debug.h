@@ -49,10 +49,4 @@ if (unlikely(!(x))) {\
 #define CLOG(str)
 #endif
 
-
-#define WHILEK(n, x)\
-int k = 0;\
-while (x) {\
-    ASSERT(k++ < n, "Probably infinte loop");
-
 #endif
