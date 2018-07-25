@@ -40,19 +40,24 @@ static inline void handle_exit(TD *task) {
 //                                  MESSAGE PASSING
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-static int is_deadlock(TD *sender, TD *receiver) {
+static void check_for_deadlock(TD *sender, TD *receiver) {
     // TODO
     int k = 0;
 
     if (receiver->state == STATE_BLK_RECEIVE || receiver->state == STATE_BLK_REPLY) {
         TD * sndr = sender->rcv_queue;
+        //check if the receiver did a send to me (if I've already called Recieve for it, it won't be on my queue)
+        KASSERT(TD_arg(receiver, 0) != sender->tid, "DEADLOCK: %d is sending to %d, but %d is currently sending to %d (in state: %d)", sender->tid, receiver->tid, receiver->tid, sender->tid, receiver->state);
+
+        //check if receiver is one of the tasks that has queued a send to us
         while (sndr != NULL) {
-            if (sndr->tid == receiver->tid) return 1; //, "DEADLOCK: %d is sending to %d, but %d is currently sending to %d (in state: %d)", task->tid, receiver->tid, receiver->tid, task->tid, receiver->state);
+            KASSERT(sndr->state == STATE_BLK_RECEIVE || sndr->state == STATE_BLK_REPLY, "task in our rcv_queue that is not in a send call");
+            KASSERT(sndr != receiver && sndr->tid != receiver->tid, "DEADLOCK: %d is sending to %d, but %d is currently sending to %d (in state: %d)", sender->tid, receiver->tid, receiver->tid, sender->tid, receiver->state);
+
             sndr = sndr->rdynext;
             KASSERT(k++ < 200, "definitely an infinite loop");
         }
     }
-    return 0;
 }
 
 static inline void handle_send(TD *task, TaskQueue *task_ready_queue){
@@ -64,7 +69,7 @@ static inline void handle_send(TD *task, TaskQueue *task_ready_queue){
         return;
     }
 
-    KASSERT(!is_deadlock(task, receiver), "DEADLOCK BETWEEN %d (%d) and %d (%d)", task->tid, *((int *) TD_arg(task, 1)), receiver->tid, *((int *) TD_arg(receiver, 1)));
+    check_for_deadlock(task, receiver);
 
     //reciever is already waiting for a message
     if (receiver->state == STATE_BLK_SEND)
