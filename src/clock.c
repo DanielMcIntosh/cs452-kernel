@@ -11,6 +11,7 @@
 #include <debug.h>
 #include <terminal.h>
 #include <util.h>
+#include <features.h>
 
 struct debugclock *clk4 = (struct debugclock*)TIMER4_BASE; 
 struct clock *clk1 = (struct clock*)TIMER1_BASE, *clk2=(struct clock*)TIMER2_BASE, *clk3 = (struct clock*)TIMER3_BASE;
@@ -96,7 +97,10 @@ void __attribute__((noreturn)) task_clockserver(){
             ASSERT(err == 0, "MINHEAP ADD ERROR");
             break;
         case DELAYUNTIL:
-            ASSERT((unsigned int) cm.argument > cs.ticks, "Delay %d <= %d cs.ticks ", cm.argument, cs.ticks);
+            ASSERT(DEBUG_CLOCK && (unsigned int) cm.argument > cs.ticks, "Delay %d <= %d cs.ticks ", cm.argument, cs.ticks);
+            if ((unsigned int) cm.argument <= cs.ticks){
+                err = Reply(tid, &rm, sizeof(rm));
+            }
             LOGF("DELAY UNTIL: %d\r\n", cm.argument);
             err = mh_add(&cs.mh, tid, cm.argument);
             ASSERT(err == 0, "MINHEAP ADD ERROR");
@@ -151,7 +155,8 @@ int Time(){
 }
 
 inline int Delay(int ticks){
-    ASSERT(ticks > 0, "cannot delay for negative time: %d", ticks);
+    ASSERT(DEBUG_CLOCK && ticks > 0, "cannot delay for negative time: %d", ticks);
+    if (ticks < 0) return 0;
     return clockSend(DELAY, ticks);
 }
 
