@@ -140,9 +140,9 @@ bool reserve_track(const Route *route, int idx, const track_node *start, const t
 
 //INclusive of start, but EXclusive of end
 void free_track(const Route *route, int idx, const track_node *start, const track_node *end, const MyReservation *my_reserv, Blockage *result, const char * restrict sig) {
-    ASSERT_VALID_TRACK(start);
+    ASSERT_VALID_TRACK_SIG(start, sig);
     //in theory should handle end == null just fine by freeing to the switch after the end of the route, but put this here anyways
-    ASSERT_VALID_TRACK(end);
+    ASSERT_VALID_TRACK_SIG(end, sig);
 
     Blockage mask = BLOCKAGE_INIT;
     const track_node *n = start;
@@ -152,14 +152,14 @@ void free_track(const Route *route, int idx, const track_node *start, const trac
         //TODO handle off route problems
         bool on_route;
         e = next_edge_on_route(route, &idx, n, &on_route, sig);
-        ASSERT(e != NULL || !on_route, "tried to free track past end of given route. start = %s, end = %s, n = %s, idx = %d", start->name, end->name, n->name, idx);
+        ASSERT(e != NULL || !on_route, "tried to free track past end of given route. start = %s, end = %s, n = %s, idx = %d @ %s", start->name, end->name, n->name, idx, sig);
         //if we turn off asserts, just break out of the loop when this happens
         if (e == NULL) {
             break;
         }
         n = e->dest;
     }
-    ASSERT(n == end || n == NULL, "While Loop broken early");
+    ASSERT(n == end || n == NULL, "While Loop broken early @ %s", sig);
 
     //TODO find out why this doesn't work
     //CHECK_OWNERSHIP(my_reserv->total, &mask);

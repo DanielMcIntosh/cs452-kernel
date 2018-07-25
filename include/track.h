@@ -28,9 +28,6 @@ extern track_node track[TRACK_MAX];
 #define ASSERT_VALID_TRACK(n) ASSERT(track <= (n) && (n) <= track+TRACK_MAX, "INVALID "S(n)": %d, [%d -> %d]", (int)(n), (int)track, (int)track+TRACK_MAX)
 #define ASSERT_VALID_TRACK_SIG(n, sig) ASSERT(track <= (n) && (n) <= track+TRACK_MAX, "INVALID "S(n)": %d, [%d -> %d] @ %s", (int)(n), (int)track, (int)track+TRACK_MAX, (sig))
 
-#define SWITCH_NONE 31 
-// SWITCH_NONE is the maximum 5 bit unsigned int
-
 void init_track();
  __attribute__((nonnull (5, 6, 7)))
 int find_path_between_nodes(const Blockage * restrict blockages, int min_dist, int max_dist, int rev_penalty, const track_node *origin, const track_node *dest, Route * restrict r);

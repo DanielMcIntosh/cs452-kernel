@@ -9,7 +9,10 @@
 
 #define STATE_TO_DIR(s) ((s) == SWITCH_STRAIGHT ? DIR_STRAIGHT : DIR_CURVED)
 
-#define SWCLAMP(c) ((c) > 32 ? (c) - 134 : (c))
+#define SWITCH_NONE 31
+// SWITCH_NONE is the maximum 5 bit unsigned int
+
+#define SWCLAMP(c) ((c) > SWITCH_NONE ? (c) - 134 : (c))
 #define SWUNCLAMP(c) ((c) > 18 ? (c) + 134 : (c))
 #define SW3_COMPLEMENT(c) ((((c) - 1) ^ 1) + 1)
 
