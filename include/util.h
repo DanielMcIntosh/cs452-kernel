@@ -83,4 +83,6 @@ int fastintsqrt(int);
 #define ATTR_OPTIMIZE(x) 
 #endif
 
+#define USE(x) (void) (x)
+
 #endif

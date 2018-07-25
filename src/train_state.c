@@ -19,7 +19,7 @@
 #define ZERO_ACCEL_TOLERANCE 2500
 #define TRAIN_PRINTER_DELAY 30
 
-#define DS_TO_DA(x) (2 * (x)) //((30 * (x) / 7))
+#define DS_TO_DA(x) (3 * (x)) //((30 * (x) / 7))
 
 #define TRAIN(ts, tr) (&((ts)->active_trains[(ts)->active_train_map[(tr)]]))
 #define ACTIVE_ROUTE(ts, tr) (&((ts)->active_routes[(ts)->active_train_map[(tr)]]))
@@ -98,9 +98,34 @@ int notify_rv_start(int trainstatetid, StopData data);
 int notify_stop(int trainstatetid, StopData data);
 int notify_stopped(int trainstatetid, int train);
 
-int __attribute__((pure, warn_unused_result))  calc_reverse_time(Train *train){
+static inline void dump_stop_data(TerminalCourier * restrict tc, Position * restrict pos, int delay, int vi, int vf, int a, int d, int dstp, int time, int radix){
+#if !(DEBUG_STOP_DISTANCE)
+    return;
+#endif
+    tc_send(tc, TERMINAL_ROUTE_DBG2, radix * 100 + 1, delay);
+    tc_send(tc, TERMINAL_ROUTE_DBG2, radix * 100 + 2, vi);
+    tc_send(tc, TERMINAL_ROUTE_DBG2, radix * 100 + 3, vf);
+    tc_send(tc, TERMINAL_ROUTE_DBG2, radix * 100 + 4, a);
+    tc_send(tc, TERMINAL_ROUTE_DBG2, radix * 100 + 5, d);
+    tc_send(tc, TERMINAL_ROUTE_DBG2, radix * 100 + 6, dstp);
+    tc_send(tc, TERMINAL_ROUTE_DBG2, radix * 100 + 7, pos->state);
+    tc_send(tc, TERMINAL_ROUTE_DBG2, radix * 100 + 8, time);
+    tc_send(tc, TERMINAL_ROUTE_DBG2, radix * 100 + 9, pos->last_update_time);
+    tc_send(tc, TERMINAL_ROUTE_DBG2, radix * 100 + 10, pos->v);
+    tc_send(tc, TERMINAL_ROUTE_DBG2, radix * 100 + 11, pos->a);
+}
+
+static inline int sendTrainState(int trainstatetid, const TrainStateMessage *msg) {
+    ReplyMessage rm;
+    int r = Send(trainstatetid, msg, sizeof(*msg), &rm, sizeof(rm));
+    return (r >= 0 ? rm.ret : r);
+}
+
+int __attribute__((pure, warn_unused_result))  calc_stop_time(Train *train){
     ASSERT(train->speed !=  15, "DIVISION BY ZERO");
-    return 450 / (15 - train->speed) + 75; // BIG TODO
+    // dx = v_avg * t
+    // -> t = 2 * dx / (vf + vi)
+    return (2 * train->stopping_distance[train->speed] * VELOCITY_PRECISION / (train->velocity[train->speed]));
 }
 
 int __attribute__((const, warn_unused_result)) calc_reverse_time_from_velocity(int velocity, int distance_to_stop, int stopping_distance) {
@@ -108,7 +133,7 @@ int __attribute__((const, warn_unused_result)) calc_reverse_time_from_velocity(i
     return (VELOCITY_PRECISION * (distance_to_stop - stopping_distance) / velocity); 
 }
 
-int __attribute__((const, warn_unused_result)) calc_stop_time_from_vi_vf_a_d_ds(int vi, int vf, int a, int d, int ds) {
+int __attribute__((const, warn_unused_result)) calc_stop_delay_from_vi_vf_a_d_ds(int vi, int vf, int a, int d, int ds) {
     // first, calculate portion over which we'll be accelerationg
     // vf^2 = vi^2 + 2ad -> d = (vi^2 - vf^2)/(2a)
     int vf2 = vf * vf / VELOCITY_PRECISION;
@@ -193,12 +218,6 @@ static inline void trainserver_begin_reverse(ActiveRoute * restrict ar, Train * 
     DelayStop ds = {.delay = delay, .rv = 1, .stoppos = rvstop, .distance_past = distance_past};
     CreateWith2Args(PRIORITY_NOTIFIER, &task_delay_stop, ds.data, train->num);
     ar->rev_state = REV_BEFORE_MERGE;
-}
-
-static inline int sendTrainState(int trainstatetid, const TrainStateMessage *msg) {
-    ReplyMessage rm;
-    int r = Send(trainstatetid, msg, sizeof(*msg), &rm, sizeof(rm));
-    return (r >= 0 ? rm.ret : r);
 }
 
 int notify_rv_timeout(int trainstatetid, int tr) {
@@ -315,6 +334,17 @@ static void ar_short_move(TerminalCourier * restrict tc, ActiveRoute * restrict 
 static void activeroute_exec_steps(TerminalCourier * restrict tc, ActiveRoute * restrict ar, MyReservation * my_reserv, Train *train, int resrv_dist, int cmdtid, bool can_stop);
 static void task_train_printer(int);
 
+static void ts_exec_stop(ActiveRoute * restrict ar, Train * restrict train, int stoppos, int distance, int cmdtid){
+    
+    Command c = {COMMAND_TR, 0, .arg2=train->num};
+    SendCommand(cmdtid, c);
+    Position_HandleBeginStop(&train->pos, &ar->route, Time(), 
+            &track[stoppos], distance,
+            calc_accel_from_vi_vf_d(train->velocity[train->speed], 0, train->stopping_distance[train->speed]));
+
+    CreateWith2Args(PRIORITY_LOW, &task_notify_stopped, calc_stop_time(train), train->num);
+}
+
 static void __attribute__((nonnull)) ts_exec_step(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Train * restrict train, int cmdtid, int distance_to_stop, const char * sig) {
     // do current step:
     RouteCommand rc = ar->route.rcs[ar->idx_resrv];
@@ -348,8 +378,8 @@ static void __attribute__((nonnull)) ts_exec_step(TerminalCourier * restrict tc,
             int d = distance_to_stop;
             int dstp = train->stopping_distance[train->speed];
             int a = calc_accel_from_vi_vf_d(vi, 0, dstp); // a will always be negative
-            int delay = calc_stop_time_from_vi_vf_a_d_ds(vi, vf, (vi > vf ? a : -a), d, dstp);
-            tc_send(tc, TERMINAL_ROUTE_DBG2, 600, delay);
+            int delay = calc_stop_delay_from_vi_vf_a_d_ds(vi, vf, (vi > vf ? a : -a), d, dstp);
+            dump_stop_data(tc, &train->pos, delay, vi, vf, a, d, dstp, time, 8);
             trainserver_begin_reverse(ar, train, delay, MERGE_TO_NODE_NSC(rc.swmr), 350);
             cnode = &track[MERGE_TO_NODE_NSC(rc.swmr)];
             ar->rev_state = REV_BEFORE_MERGE;
@@ -644,18 +674,8 @@ static inline int __attribute__((nonnull)) ar_stop(TerminalCourier * restrict tc
     int d = ar->remaining_distance;
     int dstp = train->stopping_distance[train->speed];
     int a = -calc_accel_from_vi_vf_d(vf, 0, DS_TO_DA(dstp)); // a will always be negative
-    int stopdelay = calc_stop_time_from_vi_vf_a_d_ds(vi, vf, a, d, dstp);
-    /*tc_send(tc, TERMINAL_ROUTE_DBG2, 1, stopdelay);
-    tc_send(tc, TERMINAL_ROUTE_DBG2, 2, vi);
-    tc_send(tc, TERMINAL_ROUTE_DBG2, 3, vf);
-    tc_send(tc, TERMINAL_ROUTE_DBG2, 4, a);
-    tc_send(tc, TERMINAL_ROUTE_DBG2, 5, d);
-    tc_send(tc, TERMINAL_ROUTE_DBG2, 6, dstp);
-    tc_send(tc, TERMINAL_ROUTE_DBG2, 7, train->pos.state);
-    tc_send(tc, TERMINAL_ROUTE_DBG2, 8, time);
-    tc_send(tc, TERMINAL_ROUTE_DBG2, 9, train->pos.last_update_time);
-    tc_send(tc, TERMINAL_ROUTE_DBG2, 10, train->pos.v);
-    /*/
+    int stopdelay = calc_stop_delay_from_vi_vf_a_d_ds(vi, vf, a, d, dstp);
+    dump_stop_data(tc, &train->pos, stopdelay, vi, vf, a, d, dstp, time, 7);
     ASSERT(stopdelay >= 0, "cannot delay negative time (vi %d vf %d a %d d %d ds %d delay %d", vi, vf, a, d, dstp, stopdelay);
     ////ASSERT(train->pos.state != PSTATE_CONST_VELO, "state shouldn't be const velo (vi %d vf %d a %d d %d ds %d delay %d", vi, vf, a, d, dstp, stopdelay);
     DelayStop ds = {.delay = stopdelay, .rv = 0, .stoppos = ar->end_node, .distance_past = ar->distance_past};
@@ -1084,7 +1104,7 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
                     calc_accel_from_vi_vf_d(train->velocity[train->speed], 0, train->stopping_distance[train->speed]));
 
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 212, tr);
-            CreateWith2Args(PRIORITY_LOW, &task_notify_rv_timeout, calc_reverse_time(train), tr);
+            CreateWith2Args(PRIORITY_LOW, &task_notify_rv_timeout, calc_stop_time(train), tr);
             //train->speed = 0;
             break;
         }
@@ -1095,13 +1115,7 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             int tr = sd.train, stoppos = sd.stoppos, distance = sd.distance_past;
             Train *train = TRAIN(&ts, tr);
             ActiveRoute *ar = ACTIVE_ROUTE(&ts, tr);
-            Command c = {COMMAND_TR, 0, .arg2=tr};
-            SendCommand(cmdtid, c);
-            Position_HandleBeginStop(&train->pos, &ar->route, Time(), 
-                    &track[stoppos], distance,
-                    calc_accel_from_vi_vf_d(train->velocity[train->speed], 0, train->stopping_distance[train->speed]));
-
-            CreateWith2Args(PRIORITY_LOW, &task_notify_stopped, calc_reverse_time(train), tr);
+            ts_exec_stop(ar, train, stoppos, distance, cmdtid);
             break;
         }
         case (NOTIFY_STOPPED):

@@ -7,6 +7,7 @@
 
 #define DEBUG 0
 #define DEBUG_COM2 0
+#define DEBUG_STOP_DISTANCE 0
 
 #define PANIC(...) \
     EnterCriticalSection();\
