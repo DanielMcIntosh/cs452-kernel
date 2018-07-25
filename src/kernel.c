@@ -41,7 +41,9 @@ int kernel_init(){
 
     // enable
     uart2->ctrl &= ~UARTEN_MASK;
+    uart2->err.collective = 0;
     uart1->ctrl &= ~UARTEN_MASK;
+    uart1->err.collective = 0;
 
     return 0;
 }

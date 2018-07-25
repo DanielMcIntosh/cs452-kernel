@@ -312,6 +312,7 @@ static inline int __attribute__((nonnull, warn_unused_result)) get_active_train_
 static int ar_stop(TerminalCourier*, ActiveRoute*, Train*) __attribute__((nonnull));
 static int activeroute_distance_to_next_stop(ActiveRoute *ar, track_node *cnode, int *idx);
 static void ar_short_move(TerminalCourier * restrict tc, ActiveRoute * restrict ar, MyReservation * my_reserv, Train * restrict train, int distance, int shortmoveidx, int cmdtid);
+static void activeroute_exec_steps(TerminalCourier * restrict tc, ActiveRoute * restrict ar, MyReservation * my_reserv, Train *train, int resrv_dist, int cmdtid, bool can_stop);
 static void task_train_printer(int);
 
 static void __attribute__((nonnull)) ts_exec_step(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Train * restrict train, int cmdtid, int distance_to_stop, const char * sig) {
@@ -443,7 +444,7 @@ static inline void __attribute__((nonnull)) handle_navigate(TerminalCourier * re
         rev_penalty = 400;
         train->speed = NAV_SPEED;
     } else {
-        min_dist = train->stopping_distance[train->speed] - distance_past;
+        min_dist = 0;// train->stopping_distance[train->speed] - distance_past;
         // assume the distance it takes to stop is the same as that needed to return to full speed in the opposite direction
         rev_penalty = 2*train->stopping_distance[train->speed];
     }
@@ -472,6 +473,12 @@ static inline void __attribute__((nonnull)) handle_navigate(TerminalCourier * re
     ar_new.distance_past = distance_past;
     ar_new.stopped = 0;
     ar_new.last_handled_sensor = -1;
+
+    MyReservation my_reserv;
+    reservation_to_my_reservation(&my_reserv, &(ts->reservations), ts->active_train_map[tr]);
+    int resrv_dist = get_resrv_dist(&ar_new,0, &track[object], train->stopping_distance[train->speed]);
+    activeroute_exec_steps(tc, &ar_new, &my_reserv, train, resrv_dist,  cmdtid, FALSE); // TODO this will stop though, no?
+
     if (route.reverse != 0) { // TODO
         //tc_send(&tc, TERMINAL_ROUTE_DBG2, 215, ts.active_train_map[tr]);
         trainserver_begin_reverse(ar_old, train, 0, train->last_sensor, 0);  // TODO reverse starts
@@ -481,8 +488,6 @@ static inline void __attribute__((nonnull)) handle_navigate(TerminalCourier * re
         int dist = activeroute_distance_to_next_stop(&ar_new, &track[tp.object], &idx);
         tc_send(tc, TERMINAL_ROUTE_DBG2, 603, dist);
         if (dist < 1000 && ALLOW_SHORTS){
-            MyReservation my_reserv;
-            reservation_to_my_reservation(&my_reserv, &(ts->reservations), ts->active_train_map[tr]);
             ar_short_move(tc, &ar_new, &my_reserv, train, dist, idx, cmdtid);
             ar_new.stopped = 1;
         } else {
@@ -622,7 +627,7 @@ static int activeroute_distance_to_next_stop(ActiveRoute *ar, track_node *cnode,
     if (ar->route.rcs[*idx].a == ACTION_RV) {
         distance += 350; // TODO 
     } else {
-        distance = distance_to_on_route(&ar->route, *idx, n, &track[ar->end_node], &on_route, "distance to next stop");
+        distance += distance_to_on_route(&ar->route, *idx, n, &track[ar->end_node], &on_route, "distance to next stop");
         //ar->next_step_distance += distance_to_on_route(&ar->route, ar->idx_resrv - 1, cnode, nnode, &on_route, sig);
 
     }
@@ -724,7 +729,7 @@ static void ar_short_move(TerminalCourier * restrict tc, ActiveRoute * restrict 
     CreateWith2Args(PRIORITY_NOTIFIER, &task_delay_stop, ds.data, train->num);
 }
 
-static void activeroute_exec_steps(TerminalCourier * restrict tc, ActiveRoute * restrict ar, MyReservation * restrict my_reserv, Train * restrict train, int resrv_dist, int cmdtid) {
+static void activeroute_exec_steps(TerminalCourier * restrict tc, ActiveRoute * restrict ar, MyReservation * restrict my_reserv, Train * restrict train, int resrv_dist, int cmdtid, bool can_stop) {
     const track_node *resrv_end;
     if (ar->route.rcs[ar->idx_resrv].a == ACTION_NONE) {
         resrv_end = &track[ar->end_node];
@@ -736,6 +741,8 @@ static void activeroute_exec_steps(TerminalCourier * restrict tc, ActiveRoute * 
     // Perform any actions we need to do:
     while (ACTIVE_ROUTE_SHOULD_PERFORM_ACTION(ar, resrv_dist)){  // must perform next actio due to proximity directly or bc the reverse will take a while
         ASSERT(resrv_end != NULL, "invalid reserv_end");
+        if ((ar->idx_resrv >= MAX_ROUTE_COMMAND || ar->route.rcs[ar->idx_resrv].a == ACTION_NONE || ar->route.rcs[ar->idx_resrv].a == ACTION_RV) && !can_stop)
+            break;
         bool resrv_successful = ar_perform_action(tc, ar, my_reserv, train, &resrv_end, cmdtid);
         // rsrv_end is updated by this call
         if (!resrv_successful) 
@@ -785,7 +792,7 @@ static inline void activeroute_on_sensor_event(TerminalCourier * restrict tc, Ac
     }//*/
 
     if (!ACTIVE_ROUTE_DONE_ACTIONS(ar)) {
-        activeroute_exec_steps(tc, ar, my_reserv, train, resrv_dist, cmdtid);
+        activeroute_exec_steps(tc, ar, my_reserv, train, resrv_dist, cmdtid, TRUE);
     }
 }
 

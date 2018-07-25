@@ -136,7 +136,7 @@ TrackPosition Position_CalculateNow(Position *p, const Route *r, int time) {
         bool on_route = TRUE;
         const track_node *tn = forward_dist_on_route_no_extra(r, &idx, p->last_known_node, &distance, &on_route, "position calculateion");
         //ASSERT(tn != NULL, "Null TrackNode");
-        if (!on_route){
+        if (on_route){
             ASSERT_VALID_TRACK(tn);
             object = TRACK_NODE_TO_INDEX(tn);
         }
