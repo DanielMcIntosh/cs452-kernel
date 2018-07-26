@@ -564,6 +564,7 @@ static inline void __attribute__((nonnull)) handle_navigate(TerminalCourier * re
     //tc_send(&tc, TERMINAL_ROUTE_DBG2, 211, route.reverse);
     tc_send(tc, TERMINAL_ROUTE_DBG2, 21, ar_new.remaining_distance);
     tc_send(tc, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING, 0);
+    tc_send(tc, TERMINAL_SHOW_DESTINATION, (a_tr | tr << 16), object);
 }
 
 static inline void __attribute__((nonnull)) handle_random_route(TerminalCourier * restrict tc, TrainState *ts, Train * restrict train, int trackstate_tid, int cmdtid) {
