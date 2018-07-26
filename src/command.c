@@ -303,6 +303,11 @@ void __attribute__((noreturn)) task_commandserver(int trackstate_tid, int trains
             Putc(servertid, 1, train);
             break;
         }
+        case COMMAND_RANDOM_ROUTE:
+        {
+            NotifyRandomRoute(trainstate_tid, cm.command.arg1);
+            break;
+        }
         case COMMAND_QUIT:
         {
             Quit();

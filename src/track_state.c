@@ -101,10 +101,11 @@ static const track_node * __attribute__((nonnull)) predict_next_sensor(const Swi
     //do-while because we don't want to return prev if prev is already a sensor
     do {
         e = predict_next_edge(ts, n, path, start_idx);
-        ASSERT(e != NULL, "NULL edge predicted ahead");
+        if (e == NULL) break;
         n = e->dest;
     } while (n != NULL && n->type != NODE_SENSOR);
-    ASSERT(n == NULL || n->type == NODE_SENSOR, "While Loop broken early");
+    if (n == NULL || n->type != NODE_SENSOR) n = prev;
+
     return n;
 }
 /*

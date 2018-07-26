@@ -30,6 +30,7 @@ extern track_node track[TRACK_MAX];
 
 #define SWITCH_NONE 31 
 // SWITCH_NONE is the maximum 5 bit unsigned int
+#define SWITCH_MAX 79
 
 #define RV_START_PENALTY 10000
 

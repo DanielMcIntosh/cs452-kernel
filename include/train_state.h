@@ -55,6 +55,7 @@ typedef enum trnstrequest{
     NOTIFY_RV_START,
     NOTIFY_STOP,
     NOTIFY_STOPPED,
+    NOTIFY_RANDOM_ROUTE,
     TRAIN_STATE_NOTIFY_TERMINAL_COURIER,
 
     NUM_TRAIN_STATE_REQUESTS
@@ -66,6 +67,7 @@ int NotifyTrainSpeed(int trainstatetid, TrainData data);
 int NotifyNewTrain(int trainstatetid, NewTrain data);
 int NotifySensorEvent(int trainstatetid, SensorEvent data);
 int NotifyReservation(int trainstatetid, int data);
+int NotifyRandomRoute(int trainstatetid, int train);
 
 int GetTrainSpeed(int trainstatetid, int train) __attribute__((warn_unused_result));
 int GetActiveTrain(int trainstatetid, int train) __attribute__((warn_unused_result));

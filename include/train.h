@@ -34,8 +34,9 @@ typedef struct train{
     int last_sensor_time; 
     int last_sensor_dist;
     Position pos;
+    bool random_routing;
 } Train;
 
-#define TRAIN_INIT {0, 0,  0, {0}, {0}, {0, 0, 0}, -1, 0, -1, 0, 0, POSITION_INIT}
+#define TRAIN_INIT {0, 0,  0, {0}, {0}, {0, 0, 0}, -1, 0, -1, 0, 0, POSITION_INIT, 0}
 
 #endif

@@ -280,6 +280,11 @@ int NotifyReservation(int trainstatetid, int data) {
     return sendTrainState(trainstatetid, &msg);
 }
 
+int NotifyRandomRoute(int trainstatetid, int train) {
+    TrainStateMessage msg = {.type = MESSAGE_TRAIN_STATE, .request = NOTIFY_RANDOM_ROUTE, {.data = train}};
+    return sendTrainState(trainstatetid, &msg);
+}
+
 int GetTrainSpeed(int trainstatetid, int train){
     TrainStateMessage msg = {.type = MESSAGE_TRAIN_STATE, .request = TRAIN_SPEED, {.data = train}};
     return sendTrainState(trainstatetid, &msg);
@@ -529,7 +534,7 @@ static inline void __attribute__((nonnull)) handle_navigate(TerminalCourier * re
 
     track_node * cn = &track[tp.object];
     if (ar_new.route.reverse) {
-        ASSERT(train->speed == 0, "Should not be able to get a reverse without 0 speed (%d)", train->speed);
+        //ASSERT(train->speed == 0, "Should not be able to get a reverse without 0 speed (%d)", train->speed);
         Command c = {COMMAND_TR, 15, .arg2 = train->num};
         SendCommand(cmdtid, c);
         Position_Reverse(&train->pos);
@@ -559,6 +564,15 @@ static inline void __attribute__((nonnull)) handle_navigate(TerminalCourier * re
     //tc_send(&tc, TERMINAL_ROUTE_DBG2, 211, route.reverse);
     tc_send(tc, TERMINAL_ROUTE_DBG2, 21, ar_new.remaining_distance);
     tc_send(tc, TERMINAL_FLAGS_SET, STATUS_FLAG_FINDING, 0);
+}
+
+static inline void __attribute__((nonnull)) handle_random_route(TerminalCourier * restrict tc, TrainState *ts, Train * restrict train, int trackstate_tid, int cmdtid) {
+    //first. pick a random node:
+    int node = clk4->value_low % SWITCH_MAX;
+    NavigateRequest nr = {.position = {.object = node, .distance_past = 0}, .train = train->num};
+    TrainStateMessage tm = {.nav_req = nr};
+
+    handle_navigate(tc, ts, &tm, trackstate_tid, -1, cmdtid);
 }
 
 static inline void __attribute__((nonnull)) train_on_sensor_event(TerminalCourier * restrict tc, ActiveRoute * restrict ar, Train * restrict train, int event_time, int distance) {
@@ -1211,6 +1225,21 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             Position_HandleStop(&train->pos, ar->cur_pos_idx, Time());
             train->speed = 0;
             ar->stop_state = STOP_STOPPED;
+
+            if (train->random_routing) {
+                handle_random_route(&tc, &ts, train, trackstate_tid, cmdtid);
+            }
+            break;
+        }
+        case (NOTIFY_RANDOM_ROUTE):
+        {
+            Reply(tid, &rm, sizeof(rm));
+            int tr = tm.data;
+            Train * train = TRAIN(&ts, tr);
+            tc_send(&tc, TERMINAL_ROUTE_DBG2, 0, tr);
+            train->random_routing = TRUE;
+
+            handle_random_route(&tc, &ts, train, trackstate_tid, cmdtid);
             break;
         }
         case (TRAIN_STATE_NOTIFY_TERMINAL_COURIER):

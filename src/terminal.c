@@ -506,6 +506,24 @@ static inline int parse_command(Command * restrict cmd, circlebuffer_t * restric
         cmd->arg2 = fn;
         return 0;
     }
+    case 'b': // believe
+    {
+        err = cb_read_match(cb_input, "elieve ");
+        if (err != 0) {
+            break;
+        }
+
+        int train;
+        err = cb_read_number(cb_input, &train);
+        if (err)
+            break;
+
+        // believe <train>
+        cmd->type = COMMAND_RANDOM_ROUTE;
+        cmd->arg1 = train;
+        cmd->arg2 = 0;
+        return 0;
+    }
     default:
     {
         break;
