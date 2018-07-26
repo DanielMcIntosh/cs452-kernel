@@ -171,7 +171,7 @@ void free_track(const Route *route, int idx, const track_node *start, const trac
     }
     ASSERT(n == end || n == NULL, "While Loop broken early @ %s", sig);
 
-    //TODO find out why this doesn't work
+    //this doesn't work because we don't own the last_sensor when a new train is added
     //CHECK_OWNERSHIP(my_reserv->total, &mask);
 
     unset_resrv(my_reserv, &mask);

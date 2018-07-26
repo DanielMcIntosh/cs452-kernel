@@ -779,7 +779,7 @@ static void activeroute_exec_steps(TerminalCourier * restrict tc, ActiveRoute * 
         resrv_start = &track[SENSOR_TO_NODE(train->last_sensor)];
     } else if (unlikely(ar->route.rcs[ar->idx_resrv].a == ACTION_NONE)) {
         //if our next step is the stop at the end of the route, don't need to reserve anything
-        //this works because reserving between ar->end_node and ar->end_node won't reserve anything
+        //this works because reserving between ar->end_node and ar->end_node will only (re-?)reserve ar->end_node
         resrv_start = &track[ar->end_node];
     } else {
         resrv_start = rc_to_track_node(ar->route.rcs[ar->idx_resrv], "resrv_start");
