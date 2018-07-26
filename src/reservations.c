@@ -144,14 +144,14 @@ void free_track(const Route *route, int idx, const track_node *start, const trac
         //TODO handle off route problems
         bool on_route;
         e = next_edge_on_route(route, &idx, n, &on_route, sig);
-        ASSERT(e != NULL, "tried to free track past end of given route. start = %s, end = %s, n = %s, idx = %d", start->name, end->name, n->name, idx);
+        ASSERT(e != NULL || !on_route, "tried to free track past end of given route. start = %s, end = %s, n = %s, idx = %d", start->name, end->name, n->name, idx);
         //if we turn off asserts, just break out of the loop when this happens
         if (e == NULL) {
             break;
         }
         n = e->dest;
     }
-    ASSERT(n == end, "While Loop broken early");
+    ASSERT(n == end || n == NULL, "While Loop broken early");
 
     //TODO find out why this doesn't work
     //CHECK_OWNERSHIP(my_reserv->total, &mask);

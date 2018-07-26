@@ -56,7 +56,7 @@ void Position_HandleSensorHit(Position* p, const track_node *snsr, int time, int
 }
 
 void Position_HandleStop(Position *p, int idx_new, int time) {
-    ASSERT(p->state == PSTATE_DECEL, "Cannot stop without first decelerating.");
+    ASSERT(p->state == PSTATE_DECEL, "Cannot stop without first decelerating (%d).", p->state);
     //int dt = time - p->last_update_time;
     //int distance = p->millis_off_last_node + p->v * dt + (1 / 2) * p->a * dt * dt;
     p->state = PSTATE_STOPPED;
@@ -90,8 +90,14 @@ void position_handle_accdec(Position *p, const Route *r, int time, int current_v
     int idx = p->last_route_idx;
     bool on_route = TRUE;
     const track_node *tn = forward_dist_on_route_no_extra(r, &idx, p->last_known_node, &distance, &on_route, "handle accel/decel");
-    ASSERT_VALID_TRACK(tn);
-    ASSERT(tn != NULL && on_route, 
+    if (tn == NULL) {
+        // Decelerating off route - might be lost
+        FdistReq frq = {TRACK_NODE_TO_INDEX(p->last_known_node), distance};
+        TrackPosition fdist = GetFdist(WhoIs(NAME_TRACK_STATE), frq);
+        tn = &track[fdist.object];
+        distance = fdist.distance_past;
+    }
+    ASSERT(tn != NULL || !on_route, 
             "accelerating off route: %d, %s, %d, %d -> %d, %d -> %d, %d - %d = %d, |%d, %d, %d|, :%d -> %d@ ", 
             (int) p->last_known_node, p->last_known_node->name, distance,
             p->last_route_idx, idx,

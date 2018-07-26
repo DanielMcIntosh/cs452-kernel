@@ -179,13 +179,14 @@ inline const track_edge *next_edge_on_route(const Route *route, int * restrict i
     switch (n->type) {
     case (NODE_BRANCH):
     {
-        if(unlikely(route->rcs[*idx].a == ACTION_NONE)) {
-            return NULL; // End of route
-        }
-        if (route->rcs[*idx].swmr != SWCLAMP(n->num)) {
+        if(unlikely( *idx >= MAX_ROUTE_COMMAND || route->rcs[*idx].a == ACTION_NONE)) {
+            *on_route = TRUE;
+            return NULL;
+        } else if (unlikely( route->rcs[*idx].swmr != SWCLAMP(n->num))) {
             *on_route = FALSE;
             return NULL;
-        }//, "Incorrect switch in path at idx %d: %d(%s), should be %d(%s) @ %s", *idx, route->rcs[*idx].swmr, track[SWITCH_TO_NODE(route->rcs[*idx].swmr)].name, SWCLAMP(n->num), n->name, sig);
+        }
+        //, "Incorrect switch in path at idx %d: %d(%s), should be %d(%s) @ %s", *idx, route->rcs[*idx].swmr, track[SWITCH_TO_NODE(route->rcs[*idx].swmr)].name, SWCLAMP(n->num), n->name, sig);
 
         RouteCommand rc = route->rcs[(*idx)++];
         return &(n->edge[(rc.a == ACTION_STRAIGHT) ? DIR_STRAIGHT : DIR_CURVED]);
