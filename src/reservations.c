@@ -31,13 +31,18 @@ bool is_track_blocked(const Blockage * restrict blkges, const track_node *node) 
 
 static inline void add_to_mask(const track_node *n, Blockage *mask) {
     int ind = node_to_blkge_ind(n);
+    int ind_rv = node_to_blkge_ind(n->reverse);
     if (ind < 64) {
         mask->bits_low |= 0x1ULL << ind;
+        mask->bits_low |= 0x1ULL << ind_rv;
     }
     else {
         ind -= 64;
+        ind_rv -= 64;
         ASSERT(0 <= ind && ind < 64, "can't have a negative shift! ind = %d, n = %s", ind, n->name);
+        ASSERT(0 <= ind_rv && ind_rv < 64, "can't have a negative shift! ind_rv = %d, n = %s", ind_rv, n->name);
         mask->bits_high |= 0x1ULL << ind;
+        mask->bits_high |= 0x1ULL << ind_rv;
     }
 }
 
@@ -162,14 +167,14 @@ void free_track(const Route *route, int idx, const track_node *start, const trac
         //TODO handle off route problems
         bool on_route;
         e = next_edge_on_route(route, &idx, n, &on_route, sig);
-        ASSERT(e != NULL || !on_route, "tried to free track past end of given route. start = %s, end = %s, n = %s, idx = %d @ %s", start->name, end->name, n->name, idx, sig);
+        //ASSERT(e != NULL || !on_route, "tried to free track past end of given route. start = %s, end = %s, n = %s, idx = %d @ %s", start->name, end->name, n->name, idx, sig);
         //if we turn off asserts, just break out of the loop when this happens
         if (e == NULL) {
             break;
         }
         n = e->dest;
     }
-    ASSERT(n == end || n == NULL, "While Loop broken early @ %s", sig);
+    //ASSERT(n == end || n == NULL, "While Loop broken early @ %s", sig);
 
     //this doesn't work because we don't own the last_sensor when a new train is added
     //CHECK_OWNERSHIP(my_reserv->total, &mask);
