@@ -621,7 +621,7 @@ static inline void __attribute__((nonnull)) free_track_behind_train(ActiveRoute 
         const track_node *merge = rc_to_track_node(ar->route.rcs[ar->cur_pos_idx], sig);
         int dist_to_merge = distance_to_on_route(&ar->route, ar->cur_pos_idx, free_start, merge, &on_route, sig);
         int dist_to_snsr = get_dist_to_nxt_sensor(&ar->route, ar->cur_pos_idx, free_start, &on_route, sig);
-        if (dist_to_merge < dist_to_snsr) { // TODO second part of && is a big hack
+        if (dist_to_merge < dist_to_snsr) { 
             free_end = merge;
             ar->rev_state = REV_AFTER_MERGE;
         }
@@ -675,14 +675,14 @@ static int __attribute__((nonnull, warn_unused_result)) activeroute_distance_to_
     bool on_route = TRUE;
     while (ar->route.rcs[*idx].a != ACTION_NONE && ar->route.rcs[*idx].a != ACTION_RV) {
         e = next_edge_on_route(&(ar->route), idx, n, &on_route, "Distance to next stop");
-        ASSERT(e != NULL && on_route, "Should not be able to get null edge without ACTION_NONE or ACTION_RV");
+        ASSERT(e != NULL && on_route, "Should not be able to get null edge without ACTION_NONE or ACTION_RV (%s -> %s -> %d)", cnode->name, n->name, *idx);
         distance += e->dist;
         n = e->dest;
     }
     if (ar->route.rcs[*idx].a == ACTION_RV) {
         distance += distance_to_on_route(&ar->route, *idx, n, &track[SWITCH_TO_NODE_NSC(ar->route.rcs[*idx].swmr)], &on_route, "distance to next stop (rv)")  + 350; // TODO 
     } else {
-        distance += distance_to_on_route(&ar->route, *idx, n, &track[ar->end_node], &on_route, "distance to next stop");
+        distance += distance_to_on_route(&ar->route, *idx, n, &track[ar->end_node], &on_route, "distance to next stop (stp)");
     }
     return distance;
 }
@@ -1105,7 +1105,10 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
                 break;
             }
 
-            Position_HandleStop(&train->pos, ar->cur_pos_idx + 1, Time());
+            int cpi = ar->cur_pos_idx;
+            //if (ar->route.rcs[cpi].a == ACTION_RV && train->pos.stop_end_pos == &track[MERGE_TO_NODE_NSC(ar->route.rcs[cpi].swmr)]) cpi++; // cur_pos_idx hasn't been updated yet.
+
+            Position_HandleStop(&train->pos, cpi , Time());
             ASSERT(train->pos.state == PSTATE_STOPPED, "cannot reverse when not yet stopped, %d | %d", train->pos.state, train->num);
             Position_Reverse(&train->pos);
 
@@ -1121,18 +1124,16 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             ASSERT(tp.object >= 0 && tp.object <= TRACK_MAX, "bad object %d", tp.object);
             track_node *rvn = &track[tp.object];
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 134, TRACK_NODE_TO_INDEX(rvn));
-            int idx = ar->cur_pos_idx + 1;
-            int dist = activeroute_distance_to_next_stop(ar, rvn, &idx);
-            // I think this will break if there are two short moves in a row
+            int dist = activeroute_distance_to_next_stop(ar, rvn, &cpi);
             tc_send(&tc, TERMINAL_ROUTE_DBG2, 133, dist);
 
             if (dist < 1000 && ALLOW_SHORTS){
-                if (ar->route.rcs[idx].a != ACTION_RV) {  // TODO idx sanitization
+                if (ar->route.rcs[cpi].a != ACTION_RV) {  // TODO idx sanitization
                     ar->rev_state = REV_NOT_REVERSING;
                 }
                 MyReservation my_reserv;
                 reservation_to_my_reservation(&my_reserv, &(ts.reservations), ts.active_train_map[tr]);
-                ar_short_move(&tc, ar, &my_reserv, train, dist, idx, cmdtid);
+                ar_short_move(&tc, ar, &my_reserv, train, dist, cpi, cmdtid);
             } else {
                 ar->rev_state = REV_NOT_REVERSING;
                 CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, NAV_SPEED, train->num); // TODO number

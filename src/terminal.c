@@ -1031,11 +1031,12 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
             int atr = tm.arg1 & 0xFFFF;
             int tr = tm.arg1 >> 16;
             track_node *tn = &track[tm.arg2];
+            cb_write_string(&t.output, "\0337");
             cursor_to_position(&t.output, TERMINAL_DEBUG_MAX_LINE+3, 20 * atr + 1);
             cb_write_number(&t.output, tr, 10);
             cb_write_string(&t.output, ": ");
             cb_write_string(&t.output, tn->name);
-            cb_write_string(&t.output, "    ");
+            cb_write_string(&t.output, "    \0338");
             break;
         }
         case(TERMINAL_NOTIFY_COURIER):

@@ -322,9 +322,10 @@ int distance_to_on_route(const Route *route, int idx, const track_node *from, co
     const track_node *n = from;
     int distance = 0;
     const track_edge *e;
+    int initial_idx = idx;
     while (n != to && n != NULL && *on_route) {
         e = next_edge_on_route(route, &idx, n, on_route, sig);
-        ASSERT(e != NULL, "Null edge on route: from %s, to %s, n: %s, idx: %d @ %s", from->name, to->name, n->name, idx, sig);
+        ASSERT(e != NULL, "Null edge on route: from %s, to %s, n: %s, idx: %d (original idx: %d) @ %s", from->name, to->name, n->name, idx, initial_idx, sig);
         distance += e->dist;
         n = e->dest;
     }
