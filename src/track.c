@@ -111,11 +111,12 @@ int find_path_between_nodes(const Blockage * restrict blockages, int min_dist, i
         
         const track_node *cn = bn->current_node;
         q_add(&freeQ, &freeQTail, bn);
-        if (unlikely(cn == dest) && distance >= (!route.reverse ? min_dist : (min_dist + rev_penalty))) { // found shortest path > min_dist
+        if (unlikely(( cn == dest || cn->reverse == dest) && distance >= (!route.reverse ? min_dist : (min_dist + rev_penalty)))) { // found shortest path > min_dist
             for (int i = idx; i < MAX_ROUTE_COMMAND; i++){
                 route.rcs[i].swmr = 0;
                 route.rcs[i].a = ACTION_NONE;
             }
+            route.reverse_dest = (cn->reverse == dest);
             *r = route;
             return distance;
         } else if (TRACK_BLOCKED(blockages, cn)) { // TODO allow trains to use their own reserved track

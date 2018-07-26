@@ -20,8 +20,10 @@ typedef struct routecommand{
 
 typedef struct route {
     RouteCommand rcs[MAX_ROUTE_COMMAND];
-    unsigned int reverse: 1; int packing: 7;
-} Route;
+    unsigned int reverse: 1; 
+    unsigned int reverse_dest: 1;
+    int: 6;
+} __attribute__((packed)) Route;
 #define ROUTE_INIT {{{0, 0, 0}}, 0, 0}
 
 #endif //__ROUTE_H__

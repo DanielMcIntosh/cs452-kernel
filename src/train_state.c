@@ -524,7 +524,7 @@ static inline void __attribute__((nonnull)) handle_navigate(TerminalCourier * re
     ar_new.id = ar_id++; // each AR has a unique id.
 
     ar_new.route = route;
-    ar_new.end_node = object;
+    ar_new.end_node = route.reverse_dest ? TRACK_NODE_TO_INDEX(track[object].reverse) : object;
     ar_new.remaining_distance = distance + distance_past;
     ar_new.distance_past = distance_past;
     ar_new.stop_state = STOP_NOT_STOPPING;
