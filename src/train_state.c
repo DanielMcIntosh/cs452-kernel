@@ -593,8 +593,6 @@ static inline void __attribute__((nonnull)) train_on_sensor_event(TerminalCourie
         Position_HandleConstVelo(&train->pos, &ar->route, event_time, train->velocity[train->speed]);
         tc_send(tc, TERMINAL_ROUTE_DBG2, 500, ABS(acceleration));
     }
-    //tc_send(tc, TERMINAL_ROUTE_DBG2, 501, new_velocity);
-    //tc_send(tc, TERMINAL_ROUTE_DBG2, 502, old_velocity);
 
     tc_send(tc, TERMINAL_VELOCITY_DEBUG, train->velocity[train->speed], acceleration);
 }
@@ -713,26 +711,26 @@ static inline int __attribute__((nonnull)) ar_stop(TerminalCourier * restrict tc
 }
 
 static inline bool __attribute__((nonnull)) ar_perform_action(TerminalCourier * restrict tc, ActiveRoute *restrict ar, MyReservation * restrict my_reserv, Train * restrict train, const track_node ** resrv_start, int cmdtid) {
-        const track_node *resrv_end;
-        bool resrv_successful = TRUE;
+    const track_node *resrv_end;
+    bool resrv_successful = TRUE;
 
-        if (ar->idx_resrv+1 < MAX_ROUTE_COMMAND && ar->route.rcs[ar->idx_resrv+1].a != ACTION_NONE) {
-            resrv_end = rc_to_track_node(ar->route.rcs[ar->idx_resrv+1], "resrv_end");
+    if (ar->idx_resrv+1 < MAX_ROUTE_COMMAND && ar->route.rcs[ar->idx_resrv+1].a != ACTION_NONE) {
+        resrv_end = rc_to_track_node(ar->route.rcs[ar->idx_resrv+1], "resrv_end");
+    }
+    else {
+        resrv_end = &track[ar->end_node];
+    }
+    if (RESERVE_TRACK) {
+        resrv_successful = reserve_track(&ar->route, ar->idx_resrv, *resrv_start, resrv_end, my_reserv, "main reserve_track");
+        if (!resrv_successful) {
+            return FALSE;
         }
-        else {
-            resrv_end = &track[ar->end_node];
-        }
-        if (RESERVE_TRACK) {
-            resrv_successful = reserve_track(&ar->route, ar->idx_resrv, *resrv_start, resrv_end, my_reserv, "main reserve_track");
-            if (!resrv_successful) {
-                return FALSE;
-            }
-            *resrv_start = resrv_end;
-        }
+        *resrv_start = resrv_end;
+    }
 
-        int nxt_step_rv_in_range = ACTIVE_ROUTE_NEXT_STEP_RV(ar);
-        ts_exec_step(tc, ar, train, cmdtid, ar->next_step_distance + (nxt_step_rv_in_range ? 350 : 0), "action loop");
-        return resrv_successful;
+    int nxt_step_rv_in_range = ACTIVE_ROUTE_NEXT_STEP_RV(ar);
+    ts_exec_step(tc, ar, train, cmdtid, ar->next_step_distance + (nxt_step_rv_in_range ? 350 : 0), "action loop");
+    return resrv_successful;
 }
 
 static void ar_short_move(TerminalCourier * restrict tc, ActiveRoute * restrict ar, MyReservation * restrict my_reserv, Train * restrict train, int distance, int shortmoveidx, int cmdtid) {
