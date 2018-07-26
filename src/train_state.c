@@ -57,7 +57,7 @@ typedef struct active_route{
 #define ACTIVE_ROUTE_COMPLETE(ar) (ACTIVE_ROUTE_DONE_ACTIONS(ar) && (ar)->stop_state == STOP_STOPPED)
 
 #define ACTIVE_ROUTE_NEXT_STEP_RV_IN_RANGE(ar, train, d)  (((ar)->route.rcs[(ar)->cur_pos_idx].a == ACTION_RV) && ((d) + (train)->stopping_distance[(train)->speed] <= (ar)->next_step_distance) && ((ar)->rev_state == REV_NOT_REVERSING))
-#define ACTIVE_ROUTE_NEXT_STEP_RV(ar)  (((ar)->route.rcs[(ar)->cur_pos_idx].a == ACTION_RV) && ((ar)->rev_state == REV_NOT_REVERSING))
+#define ACTIVE_ROUTE_NEXT_STEP_RV(ar)  ((ar)->route.rcs[(ar)->cur_pos_idx].a == ACTION_RV)
 #define ACTIVE_ROUTE_SHOULD_PERFORM_ACTION(ar, resrv_dist) ((ar)->next_step_distance <= (resrv_dist) && !ACTIVE_ROUTE_DONE_ACTIONS(ar))
 
 typedef struct train_state{
@@ -601,7 +601,7 @@ static inline void __attribute__((nonnull)) free_track_behind_train(ActiveRoute 
     const track_node *free_start = &track[SENSOR_TO_NODE(train->last_sensor)];
     //ASSERT(free_start != free_end, "hit same sensor twice?! free_start = %s, free_end = %s, train = %d", free_start->name, free_end->name, train->num);
 
-    if (ACTIVE_ROUTE_NEXT_STEP_RV(ar)) {
+    if (ACTIVE_ROUTE_NEXT_STEP_RV(ar) && ar->rev_state == REV_BEFORE_MERGE) {
         //TODO handle off route problems
         bool on_route;
 
@@ -609,7 +609,7 @@ static inline void __attribute__((nonnull)) free_track_behind_train(ActiveRoute 
         const track_node *merge = rc_to_track_node(ar->route.rcs[ar->cur_pos_idx], sig);
         int dist_to_merge = distance_to_on_route(&ar->route, ar->cur_pos_idx, free_start, merge, &on_route, sig);
         int dist_to_snsr = get_dist_to_nxt_sensor(&ar->route, ar->cur_pos_idx, free_start, &on_route, sig);
-        if (dist_to_merge < dist_to_snsr && ar->rev_state == REV_BEFORE_MERGE) { // TODO second part of && is a big hack
+        if (dist_to_merge < dist_to_snsr) { // TODO second part of && is a big hack
             free_end = merge;
             ar->rev_state = REV_AFTER_MERGE;
         }
@@ -719,7 +719,7 @@ static inline bool __attribute__((nonnull)) ar_perform_action(TerminalCourier * 
         *resrv_start = resrv_end;
     }
 
-    int nxt_step_rv_in_range = ACTIVE_ROUTE_NEXT_STEP_RV(ar);
+    int nxt_step_rv_in_range = ACTIVE_ROUTE_NEXT_STEP_RV(ar) && (ar->rev_state == REV_NOT_REVERSING);
     ts_exec_step(tc, ar, train, cmdtid, ar->next_step_distance + (nxt_step_rv_in_range ? 350 : 0), "action loop");
     return resrv_successful;
 }
