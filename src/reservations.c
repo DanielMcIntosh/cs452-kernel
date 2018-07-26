@@ -120,13 +120,13 @@ void free_all_reservations(const MyReservation *my_reserv) {
 }
 
 //EXclusive of start, but INclusive of end
-bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, const MyReservation *my_reserv, const char * restrict sig) {
+const track_node *reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, const MyReservation *my_reserv, const char * restrict sig) {
     ASSERT_VALID_TRACK_SIG(start, sig);
     //in theory should handle end == null just fine by reserving to the switch after the end of the route, but put this here anyways
     ASSERT_VALID_TRACK_SIG(end, sig);
 
-    Blockage mask = BLOCKAGE_INIT;
-
+    Blockage blockages = BLOCKAGE_INIT, mask = BLOCKAGE_INIT;
+    my_reservation_to_blockage(&blockages, my_reserv);
     add_to_mask(end, &mask);
 
     const track_node *n = start;
@@ -136,21 +136,22 @@ bool reserve_track(const Route *route, int idx, const track_node *start, const t
         bool on_route;
         e = next_edge_on_route(route, &idx, n, &on_route, sig);
         if (e == NULL) {
-            return FALSE;
+            return NULL;
         }
         ASSERT(e->dest != NULL, "about to add NULL to mask! start = %s, end = %s, n = %s, @ %s", start->name, end->name, n->name, sig)
-        n = e->dest;
 
+        if (is_track_blocked(&blockages, e->dest)) {
+            break;
+        }
+
+        n = e->dest;
         add_to_mask(n, &mask);
     }
-    ASSERT(n == end, "While Loop broken early");
 
-    if (!can_resrv(my_reserv, &mask)) {
-        return FALSE;
-    }
+    ASSERT(can_resrv(my_reserv, &mask), "should be able to reserve track, as we checked in the loop");
 
     set_resrv(my_reserv, &mask);
-    return TRUE;
+    return n;
 }
 
 //INclusive of start, but EXclusive of end

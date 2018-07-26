@@ -58,7 +58,7 @@ void free_all_reservations(const MyReservation *my_reserv);
 
 //EXclusive of start, but INclusive of end. When start == end, reserves end (and therefore start)
 __attribute__((warn_unused_result, nonnull (3, 4, 6)))
-bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, const MyReservation *my_reserv, const char * restrict sig);
+const track_node *reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, const MyReservation *my_reserv, const char * restrict sig);
 //INclusive of start, but EXclusive of end. When start == end, doesn't free anything
 __attribute__((nonnull (3, 4, 6)))
 void free_track(const Route *route, int idx, const track_node *start, const track_node *end, const MyReservation *my_reserv, Blockage *result, const char * restrict sig);
