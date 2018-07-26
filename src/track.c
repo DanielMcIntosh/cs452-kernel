@@ -98,7 +98,7 @@ int find_path_between_nodes(const Blockage * restrict blockages, int min_dist, i
     int k = 0;
 
     while (mh_remove_min(&mh, &entry) == 0){
-        Pass();
+        //Pass();
         ASSERT(k++ <= 10000, "probably an infinite loop");
         BFSNode *bn = (BFSNode*) entry.item;
         int distance = entry.value;
@@ -305,7 +305,7 @@ int distance_to_on_route(const Route *route, int idx, const track_node *from, co
         distance += e->dist;
         n = e->dest;
     }
-    ASSERT(n == to, "While Loop broken early");
+    ASSERT(n == to || !*on_route, "While Loop broken early");
 
     return (unlikely(n == NULL)) ? -1 : distance;
 }

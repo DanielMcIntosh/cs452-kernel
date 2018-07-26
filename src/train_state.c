@@ -597,17 +597,15 @@ static inline void __attribute__((nonnull)) free_track_behind_train(ActiveRoute 
     free_track(&ar->route, ar->cur_pos_idx, free_start, free_end, my_reserv, result, sig);
 }
 
-static inline void __attribute__((nonnull)) update_cur_pos_idx(ActiveRoute * restrict ar, int sensor) {
+static inline bool __attribute__((nonnull)) update_cur_pos_idx(ActiveRoute * restrict ar, int sensor) {
     int dummy;
+    bool on_route = TRUE;
     const track_node *cur_node = &track[SENSOR_TO_NODE(ar->last_handled_sensor)];
-    while (ar->last_handled_sensor >= 0 && ar->last_handled_sensor != sensor){
-        //TODO handle off route problems
-        bool on_route;
+    while (ar->last_handled_sensor >= 0 && ar->last_handled_sensor != sensor && on_route){
         cur_node = next_sensor_on_route(&ar->route, &ar->cur_pos_idx, cur_node, &on_route, &dummy, "update cur_pos_idx");
-        ASSERT(cur_node != NULL, "couldn't find the next sensor!");
-        ar->last_handled_sensor = cur_node->num;
     }
     ar->last_handled_sensor = sensor;
+    return on_route;
 }
 
 static inline void __attribute__((nonnull)) activeroute_recalculate_distances(TerminalCourier * restrict tc, ActiveRoute * restrict ar, MyReservation * restrict my_reserv, int sensor, int distance) {
@@ -781,13 +779,7 @@ static inline void activeroute_on_sensor_event(TerminalCourier * restrict tc, Ac
         return;
 
     // update cur_pos_idx
-    bool on_route = TRUE;
-    int lhs = ar->last_handled_sensor;
-    while (lhs != -1 && lhs != sensor && on_route) {
-        const track_node *ns =  next_sensor_on_route(&ar->route, &ar->cur_pos_idx, &track[SENSOR_TO_NODE(lhs)], &dist_to_next_snsr, &on_route, "update cur_pos_idx");
-        if (ns != NULL)
-            lhs = ns->num;
-    }
+    bool on_route = update_cur_pos_idx(ar, sensor);
     if (!on_route){
         bool continue_actions = activeroute_off_route(tc, ar, train, sensor, distance, cmdtid);
         if (!continue_actions)
@@ -840,10 +832,7 @@ static inline void __attribute__((nonnull)) handle_sensor_event(TerminalCourier 
         terminal_unset_reservations(tc, &freed);
     }
 
-    if (!ACTIVE_ROUTE_COMPLETE(ar) && (ar->rev_state == REV_NOT_REVERSING)) {
-        update_cur_pos_idx(ar, sensor);
         activeroute_on_sensor_event(tc, ar, &my_reserv, train, sensor, distance, cmdtid);
-    }
 
     Position_HandleSensorHit(&train->pos, sensor_node, event_time, ar->cur_pos_idx);
 
