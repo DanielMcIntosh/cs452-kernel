@@ -484,7 +484,8 @@ static inline void __attribute__((nonnull)) handle_navigate(TerminalCourier * re
     int object = tm->nav_req.position.object;
     int distance_past = tm->nav_req.position.distance_past;
     int tr = tm->nav_req.train;
-    ASSERT(0 <= ts->active_train_map[tr] && ts->active_train_map[tr] < MAX_CONCURRENT_TRAINS, "Invalid active train: %d", ts->active_train_map[tr]);
+    int a_tr = ts->active_train_map[tr];
+    ASSERT(0 <= a_tr && a_tr < MAX_CONCURRENT_TRAINS, "Invalid active train: %d", ts->active_train_map[tr]);
     Train *train = TRAIN(ts, tr);
     ActiveRoute *ar_old = ACTIVE_ROUTE(ts, tr);
     ReplyMessage rm = {MESSAGE_REPLY, 0};
@@ -532,6 +533,9 @@ static inline void __attribute__((nonnull)) handle_navigate(TerminalCourier * re
     reservation_to_my_reservation(&my_reserv, &(ts->reservations), ts->active_train_map[tr]);
     int resrv_dist = get_resrv_dist(&ar_new, 0, &track[object], train->stopping_distance[train->speed]);
     activeroute_exec_steps(tc, &ar_new, &my_reserv, train, resrv_dist,  cmdtid, TRUE); // TODO this will stop though, no?
+
+    terminal_set_reservations(tc, &(ts->reservations.blkges[a_tr]), a_tr);
+
 
     if (ar_new.route.reverse != 0) { // TODO
         //tc_send(&tc, TERMINAL_ROUTE_DBG2, 215, ts.active_train_map[tr]);
