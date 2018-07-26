@@ -872,21 +872,9 @@ static inline void __attribute__((nonnull)) handle_sensor_event(TerminalCourier 
     train_on_sensor_event(tc, ar, train, event_time, distance);
 
     // now, we need to determine if we're actually on the right route
-    int idx_rts = 0;
-    int idx_r = ar->cur_pos_idx;
-    bool off_route = FALSE, continue_actions = TRUE;
-    while (route_to_sensor.rcs[idx_rts].a != ACTION_NONE && !off_route) { // this operation is safe, since idx_rts can never be > 5?
-        RouteCommand rc_rts = route_to_sensor.rcs[idx_rts++];
-        if (idx_r >= MAX_ROUTE_COMMAND && rc_rts.a != ACTION_NONE){
-            off_route = TRUE;
-            break;
-        }
-        RouteCommand rc_r = ar->route.rcs[idx_r++];
-        if (rc_rts.a != rc_r.a || rc_rts.swmr != rc_r.swmr) {
-            off_route = TRUE;
-        }
-    }
-    if (off_route) {
+    bool continue_actions = TRUE;
+    bool on_route = compare_route(&ar->route, ar->cur_pos_idx, &route_to_sensor);
+    if (!on_route) {
         Position_HandleSensorHit(&train->pos, sensor_node, event_time, ar->cur_pos_idx); // TODO hack
         continue_actions = activeroute_off_route(tc, ts, ar, &my_reserv, train, sensor, distance, cmdtid, trackstate_tid);
     }

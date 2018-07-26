@@ -23,6 +23,22 @@ void init_track() {
     }
 }
 
+bool compare_route(const Route *primary, int idx_primary, const Route *secondary) {
+    int idx_secondary = 0;
+    while (secondary->rcs[idx_secondary].a != ACTION_NONE) { // this operation is safe, since idx_secondary can never be > 5?
+        RouteCommand rc_2nd = secondary->rcs[idx_secondary++];
+        if (idx_primary >= MAX_ROUTE_COMMAND && rc_2nd.a != ACTION_NONE){
+            return FALSE;
+        }
+
+        RouteCommand rc_1st = primary->rcs[idx_primary++];
+        if (rc_2nd.a != rc_1st.a || rc_2nd.swmr != rc_1st.swmr) {
+            return FALSE;
+        }
+    }
+
+    return TRUE;
+}
 
 typedef struct bfsnode {
     Route r;
