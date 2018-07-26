@@ -492,16 +492,7 @@ static inline void __attribute__((nonnull)) handle_navigate(TerminalCourier * re
 
     ASSERT(train->last_sensor <= TRACK_MAX && train->last_sensor >= 0, "invalid last sensor for train %d: %d", tr, train->last_sensor);
 
-    int min_dist, rev_penalty;
-    if (train->speed == 0){
-        min_dist = 0;
-        rev_penalty = 400;
-        train->speed = NAV_SPEED;
-    } else {
-        min_dist = 0;// train->stopping_distance[train->speed] - distance_past;
-        // assume the distance it takes to stop is the same as that needed to return to full speed in the opposite direction
-        rev_penalty = 2*train->stopping_distance[train->speed];
-    }
+    int min_dist = 0, rev_penalty = 2 * train->stopping_distance[NAV_SPEED];
 
     int time = Time();
     TrackPosition tp = Position_CalculateNow(&train->pos, NULL, time);
@@ -533,30 +524,32 @@ static inline void __attribute__((nonnull)) handle_navigate(TerminalCourier * re
     reservation_to_my_reservation(&my_reserv, &(ts->reservations), ts->active_train_map[tr]);
     int resrv_dist = get_resrv_dist(&ar_new, 0, &track[object], train->stopping_distance[train->speed]);
     activeroute_exec_steps(tc, &ar_new, &my_reserv, train, resrv_dist,  cmdtid, TRUE); // TODO this will stop though, no?
-
     terminal_set_reservations(tc, &(ts->reservations.blkges[a_tr]), a_tr);
 
 
-    if (ar_new.route.reverse != 0) { // TODO
-        //tc_send(&tc, TERMINAL_ROUTE_DBG2, 215, ts.active_train_map[tr]);
-        trainserver_begin_reverse(ar_old, train, 0, train->last_sensor, 0);  // TODO reverse starts
-        ar_new.rev_state = REV_BEFORE_MERGE;
+    track_node * cn = &track[tp.object];
+    if (ar_new.route.reverse) {
+        ASSERT(train->speed == 0, "Should not be able to get a reverse without 0 speed (%d)", train->speed);
+        Command c = {COMMAND_TR, 15, .arg2 = train->num};
+        SendCommand(cmdtid, c);
+        Position_Reverse(&train->pos);
+        cn = cn->reverse;
+    } 
+
+    int idx = 0;
+    int dist = activeroute_distance_to_next_stop(&ar_new, cn, &idx);
+    tc_send(tc, TERMINAL_ROUTE_DBG2, 603, dist);
+    if (dist < 1000 && ALLOW_SHORTS){
+        ar_short_move(tc, &ar_new, &my_reserv, train, dist, idx, cmdtid);
+        ar_new.stop_state = STOP_DELAY_ACTIVE;
     } else {
-        int idx = 0;
-        int dist = activeroute_distance_to_next_stop(&ar_new, &track[tp.object], &idx);
-        tc_send(tc, TERMINAL_ROUTE_DBG2, 603, dist);
-        if (dist < 1000 && ALLOW_SHORTS){
-            ar_short_move(tc, &ar_new, &my_reserv, train, dist, idx, cmdtid);
-            ar_new.stop_state = STOP_DELAY_ACTIVE;
-        } else {
-            CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, NAV_SPEED, train->num); // TODO number
-            train->speed = NAV_SPEED;
-        }
-        ar_new.rev_state = REV_NOT_REVERSING;
-        int a = calc_accel_from_vi_vf_d(train->velocity[train->speed], 0, DS_TO_DA(train->stopping_distance[train->speed]));
-        ASSERT(a <= 0, "A ought be negative: %d %d %d", a, train->velocity[NAV_SPEED], DS_TO_DA(train->stopping_distance[train->speed]));
-        Position_HandleAccel(&train->pos, &ar_new.route, Time(), 0, -1 * a, train->velocity[train->speed]);
+        CreateWith2Args(PRIORITY_LOW, &task_delay_reaccel, NAV_SPEED, train->num); // TODO number
+        train->speed = NAV_SPEED;
     }
+    ar_new.rev_state = REV_NOT_REVERSING;
+    int a = calc_accel_from_vi_vf_d(train->velocity[train->speed], 0, DS_TO_DA(train->stopping_distance[train->speed]));
+    ASSERT(a <= 0, "A ought be negative: %d %d %d", a, train->velocity[NAV_SPEED], DS_TO_DA(train->stopping_distance[train->speed]));
+    Position_HandleAccel(&train->pos, &ar_new.route, Time(), 0, -1 * a, train->velocity[train->speed]);
     *ar_old = ar_new;
 
     for (int i = 0; i < MAX_ROUTE_COMMAND && ar_new.route.rcs[i].a != ACTION_NONE; i++){

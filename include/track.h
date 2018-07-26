@@ -28,6 +28,11 @@ extern track_node track[TRACK_MAX];
 #define ASSERT_VALID_TRACK(n) ASSERT(track <= (n) && (n) <= track+TRACK_MAX, "INVALID "S(n)": %d, [%d -> %d]", (int)(n), (int)track, (int)track+TRACK_MAX)
 #define ASSERT_VALID_TRACK_SIG(n, sig) ASSERT(track <= (n) && (n) <= track+TRACK_MAX, "INVALID "S(n)": %d, [%d -> %d] @ %s", (int)(n), (int)track, (int)track+TRACK_MAX, (sig))
 
+#define SWITCH_NONE 31 
+// SWITCH_NONE is the maximum 5 bit unsigned int
+
+#define RV_START_PENALTY 10000
+
 void init_track();
 
 bool __attribute__((pure)) compare_route(const Route *primary, int idx_primary, const Route *secondary);

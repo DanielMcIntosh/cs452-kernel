@@ -113,7 +113,7 @@ int find_path_between_nodes(const Blockage * restrict blockages, int min_dist, i
         rv->r.reverse = 1;
         rv->current_node = origin->reverse;
         rv->idx = start_idx;
-        mh_add(&mh, (unsigned long int) rv, rev_penalty);
+        mh_add(&mh, (unsigned long int) rv, RV_START_PENALTY);
     }
     bfsnodes[BFS_MH_SIZE-1].next = NULL;
     int k = 0;
@@ -275,7 +275,7 @@ const track_node *nth_sensor_on_route(int n, const Route *route, int * restrict 
     return prev;
 }
 
-const track_node *forward_dist_on_route_no_extra(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, bool *on_route, const char * restrict sig) {
+const __attribute__((nonnull)) track_node *forward_dist_on_route_no_extra(const Route *route, int * restrict idx, const track_node *prev, int * restrict distance, bool *on_route, const char * restrict sig) {
     ASSERT_VALID_TRACK_SIG(prev, sig);
     int cur_dist = 0;
     int idx_old = *idx;
