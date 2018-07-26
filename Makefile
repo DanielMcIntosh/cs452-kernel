@@ -81,6 +81,10 @@ cmp: all
 	@echo "cp $(BINDIR)/kernel.elf /u/cs452/tftp/ARM/$(shell whoami)/kernelc.elf"
 	@cp $(BINDIR)/kernel.elf /u/cs452/tftp/ARM/$(shell whoami)/kernelc.elf
 
+ccmp: all
+	@echo "cp $(BINDIR)/kernel.elf /u/cs452/tftp/ARM/$(shell whoami)/kernelcc.elf"
+	@cp $(BINDIR)/kernel.elf /u/cs452/tftp/ARM/$(shell whoami)/kernelcc.elf
+
 rebuild: clean all
 reinstall: clean install
 
