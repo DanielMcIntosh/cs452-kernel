@@ -97,17 +97,22 @@ int find_path_between_nodes(const Blockage * restrict blockages, int min_dist, i
         bfsnodes[i].next = (i < BFS_MH_SIZE - 1 ? &(bfsnodes[i+1]) : NULL);
     }
 
+    int start_idx = 0;
+    while (r->rcs[start_idx].a != ACTION_NONE) {
+        ++start_idx;
+    }
+
     BFSNode * fw = q_pop(&freeQ, &freeQTail);
     fw->r = *r;
     fw->current_node = origin;
-    fw->idx = 0;
+    fw->idx = start_idx;
     mh_add(&mh, (unsigned long int) fw, 0);
     if (ALLOW_REVERSE_START) {
         BFSNode * rv = q_pop(&freeQ, &freeQTail);
         rv->r = *r;
         rv->r.reverse = 1;
         rv->current_node = origin->reverse;
-        rv->idx = 0;
+        rv->idx = start_idx;
         mh_add(&mh, (unsigned long int) rv, rev_penalty);
     }
     bfsnodes[BFS_MH_SIZE-1].next = NULL;

@@ -55,12 +55,18 @@ void init_track_state(TrackState *ts) {
     }
 }
 
-static const track_edge * predict_next_edge(const SwitchState * restrict ts, const track_node *prev) {
+static const track_edge * __attribute__((nonnull(1, 2))) predict_next_edge(const SwitchState * restrict ts, const track_node *prev, Route * restrict path, int * restrict start_idx) {
     const track_edge *e;
     switch (prev->type) {
     case (NODE_BRANCH):
     {
-        e = &prev->edge[STATE_TO_DIR(ts[SWCLAMP(prev->num)])];
+        SwitchState state = ts[SWCLAMP(prev->num)];
+        e = &prev->edge[STATE_TO_DIR(state)];
+        if (path != NULL) {
+            path->rcs[*start_idx].a = (state == SWITCH_STRAIGHT) ? ACTION_STRAIGHT : ACTION_CURVED;
+            path->rcs[*start_idx].swmr = SWCLAMP(prev->num);
+            (*start_idx)++;
+        }
         break;
     }
     case (NODE_SENSOR):
@@ -77,27 +83,27 @@ static const track_edge * predict_next_edge(const SwitchState * restrict ts, con
     }
     default:
     {
-        PANIC("in: predict_next_sensor - INVALID TRACK NODE TYPE: %d", prev->type);
+        PANIC("in: predict_next_edge - INVALID TRACK NODE TYPE: %d", prev->type);
     }
     }
 
     return e;
 }
 
-static track_node* predict_next_sensor(const SwitchState * restrict ts, const track_node *last_sensor, int * restrict distance) {
+static const track_node * __attribute__((nonnull)) predict_next_sensor(const SwitchState * restrict ts, const track_node *prev, Route * restrict path, int * restrict start_idx) {
+    ASSERT_VALID_TRACK(prev);
     // basic plan for this: linked list search: follow state given by TrackState
     // Stop when another sensor is found
 
-    track_node *n = last_sensor->edge[DIR_AHEAD].dest;
-    *distance = last_sensor->edge[DIR_AHEAD].dist;
+    const track_node *n = prev;
     
     const track_edge *e;
-    while (n != NULL && n->type != NODE_SENSOR) {
-        e = predict_next_edge(ts, n);
+    //do-while because we don't want to return prev if prev is already a sensor
+    do {
+        e = predict_next_edge(ts, n, path, start_idx);
         ASSERT(e != NULL, "NULL edge predicted ahead");
-        *distance += e->dist;
         n = e->dest;
-    }
+    } while (n != NULL && n->type != NODE_SENSOR);
     ASSERT(n == NULL || n->type == NODE_SENSOR, "While Loop broken early");
     return n;
 }
@@ -129,7 +135,7 @@ static int forward_distance_from_node(const SwitchState * restrict ts, const tra
     while (tdist < distance) {
         *wakeup_sensor = TRACK_NODE_TO_INDEX(next_sensor);
         last_tdist = tdist;
-        e = predict_next_edge(ts, next_sensor);
+        e = predict_next_edge(ts, next_sensor, NULL, NULL);
         ASSERT(e != NULL, "NULL edge predicted ahead");
         tdist += e->dist;
         next_sensor = e->dest;
@@ -177,12 +183,13 @@ int GetSwitchState(int trackstatetid, int sw) {
     return sendTrackState(trackstatetid, &msg);
 }
 
-int GetRoute(int trackstatetid, RouteRequest req, Route *res) {
+int GetRoute(int trackstatetid, RouteRequest req, Route *res, int *start_idx) {
     RouteResult rom = ROUTE_RESULT_INIT;
     TrackStateMessage msg = {.type = MESSAGE_TRACK_STATE, .request = ROUTE, {.route_request = req}};
     int r = Send(trackstatetid, &msg, sizeof(msg), &rom, sizeof(rom));
     if (r < 0) return -1;
     *res = rom.route;
+    *start_idx = rom.start_idx;
     return rom.distance;
 }
 
@@ -257,22 +264,22 @@ void __attribute__((noreturn)) task_track_state() {
             int rev_penalty = tm.route_request.rev_penalty;
             Blockage blockages = tm.route_request.blockages;
 
-            int __attribute__((unused)) distance;
-            const track_node *tmp = predict_next_sensor(ts.switches, &track[prev], &distance);
-            ASSERT(tmp != NULL, "next sensor null!");
-            int next = tmp->num;
-            tc_send(&tc, TERMINAL_ROUTE_DBG2, 208, next);
-            const track_node *d = &track[end], *n = &track[next];
-
             Route r = ROUTE_INIT;
-            distance = find_path_between_nodes(&blockages, min_dist, INT_MAX - 20, rev_penalty, n, d, &r);
-            ASSERT(distance < INT_MAX, "could not find route from %d to %d (rev_penalty = %d)", n->num, d->num, rev_penalty);
+            int start_idx = 0;
+            const track_node *next = predict_next_sensor(ts.switches, &track[prev], &r, &start_idx);
+            ASSERT_VALID_TRACK(next);
+            tc_send(&tc, TERMINAL_ROUTE_DBG2, 208, next->num);
+            const track_node *dest = &track[end];
 
-            if (distance >= 0) {
+            int distance = find_path_between_nodes(&blockages, min_dist, INT_MAX - 20, rev_penalty, next, dest, &r);
+            ASSERT(0 <= distance && distance < INT_MAX, "could not find route from %s to %s (rev_penalty = %d)", next->name, dest->name, rev_penalty);
+
+            if (likely(0 <= distance && distance < INT_MAX)) {
                 route_res.route = r;
                 route_res.distance = distance;
+                route_res.start_idx = start_idx;
             } else {
-                PANIC("failed to find path between %d and %d", next, end);
+                route_res.distance = distance;
                 for (int i = 0; i < MAX_ROUTE_COMMAND; i++) {
                     route_res.route.rcs[i].swmr = SWITCH_NONE;
                 }

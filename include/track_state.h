@@ -37,7 +37,6 @@ typedef struct switchdata{
 
 typedef struct routerequest{
     Blockage blockages;
-    const unsigned int next : 8;
     const unsigned int prev : 8;
     const unsigned int end : 8;
     const int min_dist : 16;
@@ -59,9 +58,10 @@ typedef struct routeresult{
     MessageType type;
     Route route;
     int distance;
+    int start_idx;
 } RouteResult;
 
-#define ROUTE_RESULT_INIT {MESSAGE_ROUTE, ROUTE_INIT, 0}
+#define ROUTE_RESULT_INIT {MESSAGE_ROUTE, ROUTE_INIT, 0, 0}
 
 typedef struct shortmessage{
     const int speed;
@@ -90,7 +90,7 @@ int NotifySwitchStatus(int trackstatetid, SwitchData data);
 int NotifyParam(int trackstatetid, ParamData data);
 
 int GetSwitchState(int trackstatetid, int sw) __attribute__((warn_unused_result));
-int GetRoute(int trackstatetid, RouteRequest req, Route *res) __attribute__((nonnull));
+int GetRoute(int trackstatetid, RouteRequest req, Route *res, int *start_idx) __attribute__((nonnull));
 int GetShort(int trackstatetid, int distance, ShortMessage *sm) __attribute__((nonnull));
 TrackPosition GetFdist(int trackstatetid, FdistReq fdr) __attribute__((warn_unused_result));
 
