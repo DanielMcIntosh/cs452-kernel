@@ -31,13 +31,18 @@ bool is_track_blocked(const Blockage * restrict blkges, const track_node *node) 
 
 static inline void add_to_mask(const track_node *n, Blockage *mask) {
     int ind = node_to_blkge_ind(n);
+    int ind_rv = node_to_blkge_ind(n->reverse);
     if (ind < 64) {
         mask->bits_low |= 0x1ULL << ind;
+        mask->bits_low |= 0x1ULL << ind_rv;
     }
     else {
         ind -= 64;
+        ind_rv -= 64;
         ASSERT(0 <= ind && ind < 64, "can't have a negative shift! ind = %d, n = %s", ind, n->name);
+        ASSERT(0 <= ind_rv && ind_rv < 64, "can't have a negative shift! ind_rv = %d, n = %s", ind_rv, n->name);
         mask->bits_high |= 0x1ULL << ind;
+        mask->bits_high |= 0x1ULL << ind_rv;
     }
 }
 
@@ -115,13 +120,13 @@ void free_all_reservations(const MyReservation *my_reserv) {
 }
 
 //EXclusive of start, but INclusive of end
-bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, const MyReservation *my_reserv, const char * restrict sig) {
+const track_node *reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, const MyReservation *my_reserv, const char * restrict sig) {
     ASSERT_VALID_TRACK_SIG(start, sig);
     //in theory should handle end == null just fine by reserving to the switch after the end of the route, but put this here anyways
     ASSERT_VALID_TRACK_SIG(end, sig);
 
-    Blockage mask = BLOCKAGE_INIT;
-
+    Blockage blockages = BLOCKAGE_INIT, mask = BLOCKAGE_INIT;
+    my_reservation_to_blockage(&blockages, my_reserv);
     add_to_mask(end, &mask);
 
     const track_node *n = start;
@@ -131,21 +136,22 @@ bool reserve_track(const Route *route, int idx, const track_node *start, const t
         bool on_route;
         e = next_edge_on_route(route, &idx, n, &on_route, sig);
         if (e == NULL || e->dest == NULL) {
-            return FALSE;
+            return NULL;
         }
         ASSERT(e->dest != NULL, "about to add NULL to mask! start = %s, end = %s, n = %s, @ %s", start->name, end->name, n->name, sig)
-        n = e->dest;
 
+        if (is_track_blocked(&blockages, e->dest)) {
+            break;
+        }
+
+        n = e->dest;
         add_to_mask(n, &mask);
     }
-    //ASSERT(n == end, "While Loop broken early");
 
-    if (!can_resrv(my_reserv, &mask)) {
-        return FALSE;
-    }
+    ASSERT(can_resrv(my_reserv, &mask), "should be able to reserve track, as we checked in the loop");
 
     set_resrv(my_reserv, &mask);
-    return TRUE;
+    return n;
 }
 
 //INclusive of start, but EXclusive of end
@@ -169,9 +175,8 @@ void free_track(const Route *route, int idx, const track_node *start, const trac
         }
         n = e->dest;
     }
-    //ASSERT(n == end || n == NULL || !on_route, "While Loop broken early @ %s", sig);
 
-    //TODO find out why this doesn't work
+    //this doesn't work because we don't own the last_sensor when a new train is added
     //CHECK_OWNERSHIP(my_reserv->total, &mask);
 
     unset_resrv(my_reserv, &mask);

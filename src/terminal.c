@@ -980,10 +980,10 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
         {
             Blockage tmp = {.word1 = tm.arg1, .word2 = tm.arg2, .word3 = 0, .word4 = 0};
 
-            restylize_string(resrv_a, tmp.a, 6, 3, (0x1U << 16), '7');
-            restylize_string(resrv_b, tmp.b, 6, 3, (0x1U << 16), '7');
-            restylize_string(resrv_c, tmp.c, 6, 3, (0x1U << 16), '7');
-            restylize_string(resrv_d, tmp.d, 6, 3, (0x1U << 16), '7');
+            restylize_string(resrv_a, tmp.a, 6, 3, (0x1U << 16), '0');
+            restylize_string(resrv_b, tmp.b, 6, 3, (0x1U << 16), '0');
+            restylize_string(resrv_c, tmp.c, 6, 3, (0x1U << 16), '0');
+            restylize_string(resrv_d, tmp.d, 6, 3, (0x1U << 16), '0');
 
             //terminal_unset_reservations will call TERMINAL_UNSET_RESRV2, so don't bother printing yet
             //print_reservations(&t.output, resrv_strs);
@@ -993,11 +993,11 @@ void __attribute__((noreturn)) task_terminal(int trackstate_tid) {
         {
             Blockage tmp = {.word1 = 0, .word2 = 0, .word3 = tm.arg1, .word4 = tm.arg2};
 
-            restylize_string(resrv_e,   tmp.e,        6, 3, (0x1U << 16), '7');
-            restylize_string(resrv_br1, tmp.br >>  0, 6, 3, (0x1U << 18), '7');
-            restylize_string(resrv_br2, tmp.br >> 18, 9, 3, (0x1U <<  4), '7');
-            restylize_string(resrv_mr1, tmp.mr >>  0, 6, 3, (0x1U << 18), '7');
-            restylize_string(resrv_mr2, tmp.mr >> 18, 9, 3, (0x1U <<  4), '7');
+            restylize_string(resrv_e,   tmp.e,        6, 3, (0x1U << 16), '0');
+            restylize_string(resrv_br1, tmp.br >>  0, 6, 3, (0x1U << 18), '0');
+            restylize_string(resrv_br2, tmp.br >> 18, 9, 3, (0x1U <<  4), '0');
+            restylize_string(resrv_mr1, tmp.mr >>  0, 6, 3, (0x1U << 18), '0');
+            restylize_string(resrv_mr2, tmp.mr >> 18, 9, 3, (0x1U <<  4), '0');
 
             print_reservations(&t.output, resrv_strs);
             break;

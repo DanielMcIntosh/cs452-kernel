@@ -724,8 +724,14 @@ static inline bool __attribute__((nonnull)) ar_perform_action(TerminalCourier * 
     }
     
     if (RESERVE_TRACK) {
-        resrv_successful = reserve_track(&ar->route, ar->idx_resrv, *resrv_start, resrv_end, my_reserv, "main reserve_track");
-        if (!resrv_successful) {
+        const track_node *end_of_success = reserve_track(&ar->route, ar->idx_resrv, *resrv_start, resrv_end, my_reserv, "main reserve_track");
+        if (end_of_success == NULL) {
+            //off route
+            //not quite right, but out of time to do this properly
+            return FALSE;
+        } else if (end_of_success != resrv_end) {
+            ar->stop_state = STOP_STOPPING;
+            ts_exec_stop(ar, train, TRACK_NODE_TO_INDEX(end_of_success), 0, cmdtid);
             return FALSE;
         }
         *resrv_start = resrv_end;
@@ -780,7 +786,7 @@ static void activeroute_exec_steps(TerminalCourier * restrict tc, ActiveRoute * 
         resrv_start = &track[SENSOR_TO_NODE(train->last_sensor)];
     } else if (unlikely(ar->route.rcs[ar->idx_resrv].a == ACTION_NONE)) {
         //if our next step is the stop at the end of the route, don't need to reserve anything
-        //this works because reserving between ar->end_node and ar->end_node won't reserve anything
+        //this works because reserving between ar->end_node and ar->end_node will only (re-?)reserve ar->end_node
         resrv_start = &track[ar->end_node];
     } else {
         resrv_start = rc_to_track_node(ar->route.rcs[ar->idx_resrv], "resrv_start");
@@ -1075,8 +1081,8 @@ void __attribute__((noreturn)) task_train_state(int trackstate_tid) {
             MyReservation my_reserv;
             reservation_to_my_reservation(&my_reserv, &(ts.reservations), active_train);
 
-            bool success = reserve_track(NULL, 0, &track[object], &track[object], &my_reserv, "drop track");
-            if (likely(success)) {
+            const track_node *end_of_success = reserve_track(NULL, 0, &track[object], &track[object], &my_reserv, "drop track");
+            if (likely(end_of_success == &track[object])) {
                 terminal_set_reservations(&tc, my_reserv.mine, MAX_CONCURRENT_TRAINS);
             } else {
                 Blockage freed;
