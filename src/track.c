@@ -140,7 +140,7 @@ int find_path_between_nodes(const Blockage * restrict blockages, int min_dist, i
             route.reverse_dest = (cn->reverse == dest);
             *r = route;
             return distance;
-        } else if (TRACK_BLOCKED(blockages, cn)) { // TODO allow trains to use their own reserved track
+        } else if (is_track_blocked(blockages, cn)) { // TODO allow trains to use their own reserved track
             continue;
         } 
         // continue the search

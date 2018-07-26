@@ -47,8 +47,14 @@ typedef struct myreservation {
 } __attribute__((packed, designated_init)) MyReservation;
 #define MY_RESERVATION_INIT {NULL, NULL}
 
-#define TRACK_BLOCKED(blockages, cn) (blockages != NULL && ((0x1ULL << (TRACK_NODE_TO_INDEX(cn) % 64)) & ((TRACK_NODE_TO_INDEX(cn) < 64) ? blockages->bits_low : blockages->bits_high)))
+bool __attribute__((warn_unused_result, nonnull, pure)) is_track_blocked(const Blockage *blkges, const track_node *node);
 
+
+void my_reservation_to_blockage(Blockage *blockages, const MyReservation *my_reserv);
+void reservation_to_my_reservation(MyReservation *my_reserv, Reservation *reservations, int active_train);
+void reservation_to_blockage(Blockage *blockages, const Reservation *reservations, int active_train);
+
+void free_all_reservations(const MyReservation *my_reserv);
 
 //EXclusive of start, but INclusive of end. When start == end, reserves end (and therefore start)
 __attribute__((warn_unused_result, nonnull (3, 4, 6)))
@@ -56,11 +62,5 @@ bool reserve_track(const Route *route, int idx, const track_node *start, const t
 //INclusive of start, but EXclusive of end. When start == end, doesn't free anything
 __attribute__((nonnull (3, 4, 6)))
 void free_track(const Route *route, int idx, const track_node *start, const track_node *end, const MyReservation *my_reserv, Blockage *result, const char * restrict sig);
-
-void free_all_reservations(const MyReservation *my_reserv);
-
-void my_reservation_to_blockage(Blockage *blockages, const MyReservation *my_reserv);
-void reservation_to_my_reservation(MyReservation *my_reserv, Reservation *reservations, int active_train);
-void reservation_to_blockage(Blockage *blockages, const Reservation *reservations, int active_train);
 
 #endif //__RESERVATIONS_H__

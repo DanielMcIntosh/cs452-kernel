@@ -272,7 +272,7 @@ void __attribute__((noreturn)) task_track_state() {
             const track_node *dest = &track[end];
 
             int distance = find_path_between_nodes(&blockages, min_dist, INT_MAX - 20, rev_penalty, next, dest, &r);
-            ASSERT(0 <= distance && distance < INT_MAX, "could not find route from %s to %s (rev_penalty = %d)", next->name, dest->name, rev_penalty);
+            ASSERT(0 <= distance && distance < INT_MAX, "could not find route from %s to %s (starting at %s, start_idx = %d) (rev_penalty = %d)", track[prev].name, dest->name, next->name, start_idx, rev_penalty);
 
             if (likely(0 <= distance && distance < INT_MAX)) {
                 route_res.route = r;

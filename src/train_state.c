@@ -19,7 +19,7 @@
 #define ZERO_ACCEL_TOLERANCE 2500
 #define TRAIN_PRINTER_DELAY 30
 
-#define DS_TO_DA(x) (3 * (x)) //((30 * (x) / 7))
+#define DS_TO_DA(x) (10 * (x) / 3) //((30 * (x) / 7))
 
 #define TRAIN(ts, tr) (&((ts)->active_trains[(ts)->active_train_map[(tr)]]))
 #define ACTIVE_ROUTE(ts, tr) (&((ts)->active_routes[(ts)->active_train_map[(tr)]]))

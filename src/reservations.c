@@ -13,18 +13,28 @@
                                                                         (mine) ->word2, (mine) ->word1, \
                                                                         (total)->word2, (total)->word1);
 
-static inline void add_to_mask(const track_node *n, Blockage *mask) {
+static inline int __attribute__((warn_unused_result, nonnull)) node_to_blkge_ind(const track_node *n) {
     int ind = TRACK_NODE_TO_INDEX(n);
+    if (n->type == NODE_BRANCH) {
+        ind = SWCLAMP(n->num) - 1 + 80;
+    }
+    else if (n->type == NODE_MERGE) {
+        ind = (SWCLAMP(n->num) - 1) + 80 + NUM_SWITCHES;
+    }
+    return ind;
+}
+
+bool is_track_blocked(const Blockage * restrict blkges, const track_node *node) {
+    int ind = node_to_blkge_ind(node);
+    return (0x1ULL << (ind % 64)) & ((ind < 64) ? blkges->bits_low : blkges->bits_high);
+}
+
+static inline void add_to_mask(const track_node *n, Blockage *mask) {
+    int ind = node_to_blkge_ind(n);
     if (ind < 64) {
         mask->bits_low |= 0x1ULL << ind;
     }
     else {
-        if (n->type == NODE_BRANCH) {
-            ind = SWCLAMP(n->num) - 1 + 80;
-        }
-        else if (n->type == NODE_MERGE) {
-            ind = (SWCLAMP(n->num) - 1) + 80 + NUM_SWITCHES;
-        }
         ind -= 64;
         ASSERT(0 <= ind && ind < 64, "can't have a negative shift! ind = %d, n = %s", ind, n->name);
         mask->bits_high |= 0x1ULL << ind;
