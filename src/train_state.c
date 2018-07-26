@@ -516,8 +516,10 @@ static inline void __attribute__((nonnull)) handle_navigate(TerminalCourier * re
     Route route = ROUTE_INIT;
     int distance = GetRoute(trackstate_tid, req, &route);
 
-    rm.ret = distance;
-    Reply(tid, &rm, sizeof(rm));
+    if (tid >= 0) {
+        rm.ret = distance;
+        Reply(tid, &rm, sizeof(rm));
+    }
     ActiveRoute ar_new = ACTIVE_ROUTE_INIT;
     ar_new.id = ar_id++; // each AR has a unique id.
 
@@ -792,10 +794,19 @@ static void activeroute_exec_steps(TerminalCourier * restrict tc, ActiveRoute * 
     }
 }
 
-static bool activeroute_off_route(UNUSED TerminalCourier * restrict tc, ActiveRoute * restrict ar, Train * restrict train, UNUSED int sensor, UNUSED int distance, UNUSED int cmdtid, int trackstate_tid){
+static bool activeroute_off_route(UNUSED TerminalCourier * restrict tc, TrainState *ts, ActiveRoute * restrict ar, MyReservation* restrict my_reserv, Train * restrict train, UNUSED int sensor, UNUSED int distance, UNUSED int cmdtid, int trackstate_tid){
     if (ar->rev_state == REV_AFTER_MERGE) return FALSE; // We're off route, but we don't mind
+
+    tc_send(tc, TERMINAL_ROUTE_DBG2, 999, 999);
+
+    free_all_reservations(my_reserv); // drop all current reservations (we aren't even on them anymore)
+
+    // restart navigation.
+    NavigateRequest nr  = {.position = {.object = ar->end_node, .distance_past = ar->distance_past}, .train = train->num};
+    TrainStateMessage tm = {.nav_req = nr};
+    handle_navigate(tc, ts, &tm, trackstate_tid, -1, cmdtid);
     
-    // Next Step: Drop all current reservations, re-navigate to old end node.
+    /*
     FdistReq frq = {SENSOR_TO_NODE(sensor), 0};
     TrackPosition fdist = GetFdist(trackstate_tid, frq);
     ASSERT(0 <= fdist.object && fdist.object <= TRACK_MAX, "invalid object during off-route emergency stop: %d", fdist.object);
@@ -805,6 +816,7 @@ static bool activeroute_off_route(UNUSED TerminalCourier * restrict tc, ActiveRo
         ts_exec_stop(ar, train, fdist.object, fdist.distance_past, cmdtid);
         ar->stop_state = STOP_STOPPING;
     }
+    */
 
     //ASSERT(FALSE, "Off route, but not currently reversing");
     return FALSE;
@@ -877,7 +889,8 @@ static inline void __attribute__((nonnull)) handle_sensor_event(TerminalCourier 
         }
     }
     if (off_route) {
-        continue_actions = activeroute_off_route(tc, ar, train, sensor, distance, cmdtid, trackstate_tid);
+        Position_HandleSensorHit(&train->pos, sensor_node, event_time, ar->cur_pos_idx); // TODO hack
+        continue_actions = activeroute_off_route(tc, ts, ar, &my_reserv, train, sensor, distance, cmdtid, trackstate_tid);
     }
 
     if (continue_actions) {

@@ -57,6 +57,8 @@ bool reserve_track(const Route *route, int idx, const track_node *start, const t
 __attribute__((nonnull (3, 4, 6)))
 void free_track(const Route *route, int idx, const track_node *start, const track_node *end, const MyReservation *my_reserv, Blockage *result, const char * restrict sig);
 
+void free_all_reservations(const MyReservation *my_reserv);
+
 void my_reservation_to_blockage(Blockage *blockages, const MyReservation *my_reserv);
 void reservation_to_my_reservation(MyReservation *my_reserv, Reservation *reservations, int active_train);
 void reservation_to_blockage(Blockage *blockages, const Reservation *reservations, int active_train);

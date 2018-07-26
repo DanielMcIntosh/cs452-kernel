@@ -96,6 +96,14 @@ static inline void unset_resrv(const MyReservation *my_reserv, Blockage *mask) {
     my_reserv->total->bits_high &= ~(mask->bits_high);
 }
 
+void free_all_reservations(const MyReservation *my_reserv) {
+    my_reserv->total->bits_low ^= my_reserv->mine->bits_low;
+    my_reserv->total->bits_high ^= my_reserv->mine->bits_high;
+
+    my_reserv->mine->bits_low = 0;
+    my_reserv->mine->bits_high = 0;
+}
+
 //EXclusive of start, but INclusive of end
 bool reserve_track(const Route *route, int idx, const track_node *start, const track_node *end, const MyReservation *my_reserv, const char * restrict sig) {
     ASSERT_VALID_TRACK_SIG(start, sig);
