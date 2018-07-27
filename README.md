@@ -1,7 +1,7 @@
-# Kernel 3
+# CS 452 Project
 ## Downloading the Executable
 
-The executable file for Kernel 1 is `bin/kernel.elf`.
+The executable file is `bin/kernel.elf`.
 
 ## Building
 
