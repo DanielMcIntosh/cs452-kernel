@@ -138,7 +138,7 @@ const track_node *reserve_track(const Route *route, int idx, const track_node *s
         if (e == NULL) {
             return NULL;
         }
-        ASSERT(e->dest != NULL, "about to add NULL to mask! start = %s, end = %s, n = %s, @ %s", start->name, end->name, n->name, sig)
+        //ASSERT(e->dest != NULL, "about to add NULL to mask! start = %s, end = %s, n = %s, @ %s", start->name, end->name, n->name, sig)
 
         if (is_track_blocked(&blockages, e->dest)) {
             break;
@@ -148,7 +148,7 @@ const track_node *reserve_track(const Route *route, int idx, const track_node *s
         add_to_mask(n, &mask);
     }
 
-    ASSERT(can_resrv(my_reserv, &mask), "should be able to reserve track, as we checked in the loop");
+    //ASSERT(can_resrv(my_reserv, &mask), "should be able to reserve track, as we checked in the loop");
 
     set_resrv(my_reserv, &mask);
     return n;
