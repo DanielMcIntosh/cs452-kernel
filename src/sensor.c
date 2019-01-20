@@ -95,6 +95,7 @@ void __attribute__((noreturn)) task_sensor_server(int trackstatetid){
     //int timeout_on = 0;
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_read_notifier, mytid);
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_timeout_notifier, mytid);
+    //TODO use a generic courrier to make this cleaner - see terminalcourier.c for more information on this
     CreateWithArgument(PRIORITY_NOTIFIER, &task_sensor_courier, mytid);
 
     int time_of_resp = 0;

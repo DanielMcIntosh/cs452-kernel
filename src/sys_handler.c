@@ -43,6 +43,7 @@ static inline void handle_exit(TD *task) {
 static void check_for_deadlock(TD *sender, TD *receiver) {
     int k = 0;
 
+    //this will only catch deadlocks between 2 tasks, but it's good enough for us
     if (receiver->state == STATE_BLK_RECEIVE || receiver->state == STATE_BLK_REPLY) {
         TD * sndr = sender->rcv_queue;
         //check if the receiver did a send to me (if I've already called Recieve for it, it won't be on my queue)
@@ -68,6 +69,7 @@ static inline void handle_send(TD *task, TaskQueue *task_ready_queue){
         return;
     }
 
+    //Could really put this inside the else, since we don't need to check when receiver is already waiting
     check_for_deadlock(task, receiver);
 
     //reciever is already waiting for a message
@@ -76,8 +78,6 @@ static inline void handle_send(TD *task, TaskQueue *task_ready_queue){
         *((int *)(TD_arg(receiver, 0))) = task_getTid(task); //set the tid of the receive caller
         if (unlikely(TD_arg(task, 2) != TD_arg(receiver, 2))){
             receiver->r0 = ERR_MSG_TRUNCATED;
-
-            //__builtin_trap();
         } else {
             receiver->r0 = TD_arg(task, 2);
         }
@@ -166,6 +166,7 @@ static inline void handle_reply(TD *task, TaskQueue *task_ready_queue) {
 static inline void handle_await(TD *task, TaskQueue *task_ready_queue){
     int event = TD_arg(task, 0);
 
+    //TODO let multiple tasks await on the same event
     if (task_ready_queue->event_wait[event]) {
         task->r0 = ERR_EVENT_ALREADY_HAS_TASK_WAITING;
         return;

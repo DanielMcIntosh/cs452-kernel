@@ -170,11 +170,15 @@ int task_create(TaskQueue * restrict queue, int parent_tid, Priority priority, i
     int *sp = task->sp; 
     *sp++ = arg0;
     *sp++ = arg1;
+    //just for debugging, could be removed now that this stuff works
     for (int cur_reg = 2; cur_reg <= 12; ++cur_reg){
         *sp++ = cur_reg;
     }
+    //TODO since we never actually make use of "zombie tasks", change this to Destroy()
+    //and remove the calls to Destroy() at the end of tasks that terminate, then maybe remove Exit()?
     *sp++ = (int)(&Exit);
     task->r0 = arg0;
+    //unnecessary, but never got around to removing this
     task->sp[1] = arg1;
     
     LOGF("New task = %x\t", task);

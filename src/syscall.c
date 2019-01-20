@@ -12,7 +12,11 @@
 static __attribute__((always_inline)) inline int syscall_5(const int n, const int arg1, const int arg2, const int arg3, const int arg4, const int arg5){
     int ret;
     LOGF("Expected Arguments: %d, %d, %d, %d, %d\r\n", arg1, arg2, arg3, arg4, arg5);
+    //TODO cleanup the extra register store and loads by making use of the fact that GCC will already put
+    // arg1-arg4 in r0-r3 and arg5 on the stack for us (as a result of syscalls being function calls)
+    //(have to figure out why attempts at doing this broke when using different optimization levels, and how to stop it)
 __asm__(
+    //At the very least, we could have relied on the clobber registers for the store of r0-r3?
     "stmdb sp!, {r0-r3,lr}\n\t"
     "mov r0, %[arg5]\n\t"
     ASM_STACK_PUSH("r0")
@@ -25,6 +29,7 @@ __asm__(
         : [n] "i" (n), [arg1] "ri" (arg1), [arg2] "ri" (arg2), [arg3] "ri" (arg3), [arg4] "ri" (arg4), [arg5] "ri" (arg5)
         : "r0", "r1", "r2", "r3", "lr", "sp");
 // Store r0 (return value)
+// (Also something that could be optimized, since r0 IS the return value, AND where the return value needs to be stored according to ARM specs)
 __asm__ volatile ( 
     "mov %[ret], r0\n\t"
     "add sp, sp, #4\n\t" 
@@ -73,6 +78,7 @@ int Create(Priority priority, void (*code)()){
 }
 
 int Send(int tid, const void *msg, int msglen, void *reply, int rplen){
+    //Please excuse the language, during the course there were some moments of intense frustration :P
     ASSERT(tid >= 0, "fuck this");
     return syscall_5(SYSCALL_SEND, tid, (int) msg, msglen, (int) reply, rplen);
 }
@@ -82,6 +88,7 @@ int Receive(int * restrict tid, void * restrict msg, int msglen){
 }
 
 int Reply(int tid, const void *reply, int rplen){
+    //Please excuse the language, during the course there were some moments of intense frustration :P
     ASSERT(tid >= 0, "fuck this");
     return syscall_3(SYSCALL_REPLY, tid, (int) reply, rplen);
 }

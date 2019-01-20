@@ -73,6 +73,7 @@ int RegisterAs(const char * name) {
     memcpy(msg.name, name, MAXNAMESIZE); 
     Send(TID_NS, &msg, sizeof(msg), &msg, sizeof(msg));
     if (msg.tid < 0) __builtin_trap();
+    //Please excuse the language, during the course there were some moments of intense frustration :P
     //ASSERT(msg.tid >= 2, "fuck %d", msg.tid);
     return msg.tid;
 }
@@ -83,6 +84,7 @@ int WhoIs(const char * name){
     memcpy(msg.name, name, MAXNAMESIZE);
     Send(TID_NS, &msg, sizeof(msg), &msg, sizeof(msg));
     if (msg.tid < 2) __builtin_trap();
+    //Please excuse the language, during the course there were some moments of intense frustration :P
     ASSERT(msg.tid >= 2, "fuck %d", msg.tid);
     return msg.tid;
 }
